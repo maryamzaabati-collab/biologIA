@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Machines — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html" class="active">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Machines</h1>
+        <p class="page-intro">Les appareils qui produisent tes mesures.</p>
+      </div>
+    </div>
+    <p id="erreur-liste" class="message erreur" hidden></p>
+    <div id="liste-machines" class="cards"><p class="empty">Chargement…</p></div>
+    <div class="only-technicien" style="margin-top:32px;">
+      <h2>Ajouter une machine</h2>
+      <form id="form-machine" style="max-width:420px">
+        <p id="erreur-form" class="message erreur" hidden></p>
+        <label for="nom">Nom</label>
+        <input type="text" id="nom" required placeholder="Nom de l'analyseur">
+        <label for="type">Type / site</label>
+        <input type="text" id="type" placeholder="ex. biochimie — laisser vide si inconnu">
+        <button type="submit">Ajouter une machine</button>
+      </form>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+async function chargerMachines() {
+  const conteneur = document.getElementById('liste-machines');
+  afficherMessage('erreur-liste', '');
+  try {
+    const [machines, lots] = await Promise.all([api('/machines'), api('/lots')]);
+    if (machines.length === 0) {
+      conteneur.innerHTML = '<p class="empty">Aucune machine enregistrée pour le moment.</p>';
+      return;
+    }
+    conteneur.innerHTML = machines.map((m) => {
+      const n = lots.filter((l) => String(l.machine_id) === String(m.id)).length;
+      return `
+      <div class="card">
+        <h3>${echap(m.nom)}</h3>
+        <p class="hint" style="margin:0 0 12px">${n} lot${n > 1 ? 's' : ''} · ${echap(m.type || 'type non précisé')}</p>
+        <span class="badge ok">En service</span>
+        <div class="actions only-technicien">
+          <button class="secondary" data-id="${m.id}">Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
+    conteneur.querySelectorAll('button[data-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Tu es sûr de vouloir supprimer cette machine ?')) return;
+        afficherMessage('erreur-liste', '');
+        try {
+          await api(`/machines/${btn.dataset.id}`, { method: 'DELETE' });
+          chargerMachines();
+        } catch (err) {
+          afficherMessage('erreur-liste', err.message);
+        }
+      });
+    });
+    appliquerRole();
+  } catch (err) {
+    conteneur.innerHTML = '';
+    afficherMessage('erreur-liste', err.message);
+  }
+}
+
+document.getElementById('form-machine').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-form', '');
+  try {
+    await api('/machines', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('nom').value,
+        type: document.getElementById('type').value
+      })
+    });
+    e.target.reset();
+    chargerMachines();
+  } catch (err) {
+    afficherMessage('erreur-form', err.message);
+  }
+});
+
+chargerMachines();
+</script>
+</body>
+</html>

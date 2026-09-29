@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html" class="active">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1 id="bonjour">Tableau de bord</h1>
+        <p class="page-intro">Voici l’état de tes lots de référence aujourd’hui.</p>
+      </div>
+      <a class="btn-link primary only-technicien" href="nouveau-lot.html">Ajouter un lot</a>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="stats" class="stats-row"></div>
+    <div class="dash-grid">
+      <div class="card">
+        <h2>Derniers lots</h2>
+        <div id="urgence" class="urgence"><p class="empty">Chargement…</p></div>
+      </div>
+      <div class="card">
+        <h2>Qualité des données</h2>
+        <div id="qualite"></div>
+      </div>
+    </div>
+    <form id="form-code" style="max-width:420px;margin-top:22px;">
+      <label for="code-verif">Ouvrir un lot par code de vérification</label>
+      <div class="actions">
+        <input type="text" id="code-verif" placeholder="Ex : LT-AB12CD34" autocomplete="off">
+        <button type="submit" style="margin-top:0">Ouvrir</button>
+      </div>
+    </form>
+    <p id="erreur-code" class="message erreur" hidden></p>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+document.querySelector('label[for="code-verif"]').innerHTML =
+  'Ouvrir un lot par code de vérification ' + aide('Identifiant unique du lot, aussi imprimé en code-barres sur le certificat.');
+
+document.getElementById('form-code').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-code', '');
+  const code = document.getElementById('code-verif').value.trim();
+  if (!code) return afficherMessage('erreur-code', 'Saisissez un code de vérification.');
+  try {
+    const r = await api('/lots/par-code/' + encodeURIComponent(code));
+    window.location.href = 'lot.html?id=' + r.id;
+  } catch (err) {
+    afficherMessage('erreur-code', err.message);
+  }
+});
+
+(async () => {
+  try {
+    const [s, lots, moi] = await Promise.all([
+      api('/synthese'),
+      api('/lots'),
+      api('/auth/moi').catch(() => null)
+    ]);
+    const prenom = moi?.nom || 'là';
+    document.getElementById('bonjour').textContent = 'Bonjour ' + prenom;
+    document.getElementById('stats').innerHTML = `
+      <div class="stat"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></div>
+      <div class="stat"><div class="valeur">${s.lotsSansValidation}</div><div class="label">À valider par un biologiste</div></div>
+      <div class="stat"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements ouverts</div></div>
+    `;
+    const recents = [...lots].sort((a, b) => Number(a.statut_affiche === 'ok') - Number(b.statut_affiche === 'ok')).slice(0, 6);
+    const box = document.getElementById('urgence');
+    if (!recents.length) {
+      box.innerHTML = '<p class="empty">Aucun lot pour le moment.</p>';
+    } else {
+      box.innerHTML = recents.map((l) => `
+        <a href="lot.html?id=${l.id}${l.statut_affiche === 'douteux' ? '&edit=1' : ''}">
+          <span><strong>${echap(l.nom)}</strong><br><span class="meta">${echap(l.machine_nom || 'machine n/r')}</span></span>
+          <span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span>
+        </a>
+      `).join('');
+    }
+    document.getElementById('qualite').innerHTML = htmlJauge(s.pourcentageValides, 'Lots validés') +
+      `<p class="hint">${s.lotsSansValidation} lot(s) en attente de validation biologiste. ${s.signalementsEnCours} signalement(s) ouvert(s).</p>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+    document.getElementById('urgence').innerHTML = '';
+  }
+})();
+</script>
+</body>
+</html>

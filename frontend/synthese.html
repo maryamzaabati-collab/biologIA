@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fiche de synthèse — Registre de traçabilité</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html" class="active">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>Fiche de synthèse</h1>
+    <p class="page-intro">Résumé de l'état du registre pour les contrôles qualité. Téléchargez un PDF généré côté serveur, ou un export CSV.</p>
+
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="stats"></div>
+
+    <div class="actions">
+      <a class="btn-link primary" href="/api/synthese/pdf">Télécharger le PDF</a>
+      <a class="btn-link" href="/api/synthese/csv">Télécharger le CSV</a>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+async function chargerSynthese() {
+  afficherMessage('erreur-page', '');
+  try {
+    const s = await api('/synthese');
+    const lots = await api('/lots');
+    const max = Math.max(s.totalLots, 1);
+    document.getElementById('stats').innerHTML = `
+      <div class="stats-row">
+        <div class="stat"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></div>
+        <div class="stat"><div class="valeur">${s.pourcentageValides}%</div><div class="label">Lots validés par un biologiste</div></div>
+        <div class="stat"><div class="valeur">${s.pourcentageAnonymises}%</div><div class="label">Lots pseudonymisés</div></div>
+        <div class="stat"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements en cours</div></div>
+        <div class="stat"><div class="valeur">${s.lotsAlerteIdentite}</div><div class="label">Alertes colonnes identifiantes</div></div>
+      </div>
+      <h2>Répartition</h2>
+      <div class="barres">
+        <div class="barre"><span>Validés</span><i style="width:${s.pourcentageValides}%"></i></div>
+        <div class="barre"><span>Signalés</span><i class="flag" style="width:${Math.round((s.lotsDouteux / max) * 100)}%"></i></div>
+      </div>
+      <h2 style="margin-top:24px">Lots</h2>
+      <table class="table-audit"><thead><tr><th>Lot</th><th>Machine</th><th>Statut</th><th>Score</th></tr></thead>
+      <tbody>${lots.map((l) => `<tr>
+        <td><a href="lot.html?id=${l.id}">${echap(l.nom)}</a></td>
+        <td>${echap(l.machine_nom || 'n/r')}</td>
+        <td><span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span></td>
+        <td>${l.score_confiance}</td>
+      </tr>`).join('')}</tbody></table>
+      <p style="color:var(--ink-soft); font-size:0.85rem;">Fiche générée le ${formatDateHeure(s.genereLe)}</p>
+    `;
+  } catch (err) {
+    document.getElementById('stats').innerHTML = '';
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+chargerSynthese();
+</script>
+</body>
+</html>

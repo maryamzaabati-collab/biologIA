@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lignée — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <h1>Lignée des données</h1>
+    <p class="page-intro">Machine → lot → règle → alerte → validation. Consulter d’où vient chaque seuil.</p>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="liste"><p class="empty">Chargement…</p></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const lots = await api('/lignee');
+    const box = document.getElementById('liste');
+    if (!lots.length) {
+      box.innerHTML = '<p class="empty">Aucun lot à tracer.</p>';
+      return;
+    }
+    box.innerHTML = lots.map((l) => `
+      <article class="card" style="margin-bottom:14px">
+        <h3><a href="lot.html?id=${l.id}">${echap(l.nom)}</a></h3>
+        <div class="schema-lignee">
+          <span>Machine<br><strong>${echap(l.machine || 'n/r')}</strong></span>
+          <span>→</span>
+          <span>Lot<br><strong>${echap(l.code_verification || l.nom)}</strong></span>
+          <span>→</span>
+          <span>Règle<br><strong>${echap(l.regles[0] ? l.regles[0].parametre : 'aucune')}</strong></span>
+          <span>→</span>
+          <span>Alerte<br><strong>${l.alertes.length ? l.alertes.length + ' ouverte(s)' : 'aucune'}</strong></span>
+          <span>→</span>
+          <span>Validation<br><strong>${echap(l.validations[0] ? l.validations[0].nom_biologiste : 'en attente')}</strong></span>
+        </div>
+      </article>
+    `).join('');
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
+</body>
+</html>

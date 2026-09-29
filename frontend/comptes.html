@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comptes — Registre de traçabilité</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+      <a href="comptes.html" class="active">Comptes</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>Validation des comptes</h1>
+    <p class="page-intro">Un biologiste accorde ou refuse l’accès, et confirme le rôle : client (consultation), technicien (lots) ou biologiste (validation). Aucune identité patient n’est collectée ici.</p>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <p id="ok-page" class="message ok" hidden></p>
+    <div id="liste"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+function libelleRole(r) {
+  if (r === 'client') return 'Client';
+  if (r === 'technicien') return 'Technicien';
+  if (r === 'biologiste') return 'Biologiste';
+  return r || '—';
+}
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const box = document.getElementById('liste');
+  try {
+    const comptes = await api('/comptes');
+    if (!comptes.length) {
+      box.innerHTML = '<p class="empty">Aucun compte en base.</p>';
+      return;
+    }
+    box.innerHTML = comptes.map((c) => `
+      <div class="signalement-row">
+        <div>
+          <strong>${echap(c.nom)}</strong> · <span class="mono">${echap(c.identifiant || '')}</span>
+          <div class="hint">${echap(c.email || 'pas d’e-mail')} · demandé : ${echap(libelleRole(c.role_demande || c.role))} · actuel : ${echap(libelleRole(c.role))}
+            <span class="badge ${c.statut === 'valide' ? 'ok' : 'douteux'}">${echap(c.statut)}</span>
+          </div>
+        </div>
+        ${c.statut === 'en_attente' ? `
+        <div class="actions">
+          <select data-role="${c.id}">
+            <option value="client" ${c.role_demande === 'client' ? 'selected' : ''}>Client</option>
+            <option value="technicien" ${c.role_demande === 'technicien' ? 'selected' : ''}>Technicien</option>
+            <option value="biologiste" ${c.role_demande === 'biologiste' ? 'selected' : ''}>Biologiste</option>
+          </select>
+          <button type="button" data-ok="${c.id}">Accorder</button>
+          <button type="button" class="danger" data-no="${c.id}">Refuser</button>
+        </div>` : ''}
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-ok]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const role = box.querySelector(`[data-role="${btn.dataset.ok}"]`).value;
+        try {
+          await api(`/comptes/${btn.dataset.ok}`, { method: 'PUT', body: JSON.stringify({ action: 'valider', role }) });
+          afficherMessage('ok-page', 'Compte validé.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-no]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await api(`/comptes/${btn.dataset.no}`, { method: 'PUT', body: JSON.stringify({ action: 'refuser' }) });
+          afficherMessage('ok-page', 'Compte refusé.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+  } catch (err) {
+    box.innerHTML = '';
+    afficherMessage('erreur-page', err.message);
+  }
+}
+charger();
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartes de contrôle — Registre de traçabilité</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html" class="active">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>Cartes de contrôle</h1>
+    <p class="page-intro">Lecture inspirée des cartes Levey-Jennings utilisées en laboratoire accrédité : on suit la moyenne de contrôle de chaque lot dans le temps, machine par machine. Un point hors de ± 2 écarts-types attire l'attention — ce n'est pas un diagnostic patient.</p>
+
+    <div class="filtres">
+      <select id="filtre-machine">
+        <option value="">Toutes les machines</option>
+      </select>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="carte"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const machine = document.getElementById('filtre-machine').value;
+  const q = machine ? `/controle?machine_id=${encodeURIComponent(machine)}` : '/controle';
+  try {
+    const serie = await api(q);
+    document.getElementById('carte').innerHTML = htmlCarteControle(serie);
+  } catch (err) {
+    document.getElementById('carte').innerHTML = '';
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+(async () => {
+  try {
+    const machines = await api('/machines');
+    const select = document.getElementById('filtre-machine');
+    machines.forEach((m) => {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = m.nom;
+      select.appendChild(o);
+    });
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+  document.getElementById('filtre-machine').addEventListener('change', charger);
+  charger();
+})();
+</script>
+</body>
+</html>

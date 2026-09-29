@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nouveau lot — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html" class="active">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>Nouveau lot</h1>
+    <p class="page-intro">Renseigne l’origine pour garder une trace complète.</p>
+    <p id="erreur-form" class="message erreur" hidden></p>
+    <form id="form-lot" class="only-technicien">
+      <div class="grid-2">
+        <div>
+          <label for="nom">Nom du lot</label>
+          <input type="text" id="nom" required placeholder="LOT-2026-025">
+        </div>
+        <div>
+          <label for="machine">Machine</label>
+          <select id="machine"><option value="">— Sélectionner —</option></select>
+        </div>
+        <div>
+          <label for="date">Date de mesure</label>
+          <input type="date" id="date">
+        </div>
+        <div>
+          <label for="conditions">Conditions de mesure</label>
+          <input type="text" id="conditions" placeholder="20 °C, réactifs lot B12">
+        </div>
+      </div>
+      <label for="csv">Fichier CSV du lot (contrôle RGPD)</label>
+      <input type="file" id="csv" accept=".csv,text/csv,text/plain">
+      <p class="hint">Seuls les noms de colonnes sont scannés. Une colonne identifiante déclenche un signalement.</p>
+      <div id="apercu-csv" class="hint"></div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="anonymise">
+        <label for="anonymise">Les identités patients sont remplacées par un code (pseudonymisation)</label>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <a class="btn-link" href="index.html">Annuler</a>
+        <button type="submit">Enregistrer le lot</button>
+      </div>
+    </form>
+    <p class="only-biologiste hint">Passez en compte technicien pour créer un lot.</p>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const machines = await api('/machines');
+    const select = document.getElementById('machine');
+    machines.forEach((m) => {
+      const option = document.createElement('option');
+      option.value = m.id;
+      option.textContent = m.nom;
+      select.appendChild(option);
+    });
+  } catch (err) {
+    afficherMessage('erreur-form', err.message);
+  }
+})();
+
+document.getElementById('csv').addEventListener('change', async () => {
+  const texte = await lireFichierTexte(document.getElementById('csv'));
+  const box = document.getElementById('apercu-csv');
+  if (!texte.trim()) { box.innerHTML = ''; return; }
+  try {
+    const a = await api('/lots/analyser-csv', { method: 'POST', body: JSON.stringify({ csv_texte: texte }) });
+    if (a.sensibles.length) {
+      box.className = 'message erreur';
+      box.textContent = 'Colonnes suspectes : ' + a.sensibles.join(', ') + '. Ce lot sera signalé.';
+    } else {
+      box.className = 'message ok';
+      box.textContent = 'Colonnes : ' + (a.colonnes.join(', ') || '(aucune)') + '. Aucune identité détectée dans les en-têtes.';
+    }
+  } catch (err) {
+    box.className = 'message erreur';
+    box.textContent = err.message;
+  }
+});
+
+document.getElementById('form-lot').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-form', '');
+  try {
+    const csvTexte = await lireFichierTexte(document.getElementById('csv'));
+    const cree = await api('/lots', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('nom').value,
+        machine_id: document.getElementById('machine').value || null,
+        date: document.getElementById('date').value || null,
+        conditions: document.getElementById('conditions').value || null,
+        anonymise: document.getElementById('anonymise').checked,
+        csv_texte: csvTexte
+      })
+    });
+    window.location.href = 'lot.html?id=' + cree.id;
+  } catch (err) {
+    afficherMessage('erreur-form', err.message);
+  }
+});
+</script>
+</body>
+</html>

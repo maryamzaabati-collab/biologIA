@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TraceLab — Connexion</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="landing">
+  <section class="landing-gauche">
+    <div>
+      <div class="brand" style="padding:0 0 32px;color:#fff;"><span class="logo-mark" style="box-shadow:0 0 0 6px rgba(255,255,255,.25);background:#fff;"></span> TraceLab</div>
+    </div>
+    <div>
+      <h1>Chaque lot de données garde sa mémoire</h1>
+      <p>Suis l’origine, la qualité et la validation de tes données de référence.</p>
+      <ul class="landing-points">
+        <li>Machine, date et conditions renseignées</li>
+        <li>Pseudonymisation contrôlée (RGPD)</li>
+        <li>Validation nominative par un biologiste</li>
+      </ul>
+    </div>
+  </section>
+  <section class="landing-droite">
+    <h1>Connexion</h1>
+    <p class="page-intro">Accède à ton espace de laboratoire. Un biologiste valide chaque nouveau compte.</p>
+    <div class="onglets">
+      <button type="button" class="secondary active" id="onglet-connexion">Connexion</button>
+      <button type="button" class="secondary" id="onglet-inscription">Créer un compte</button>
+    </div>
+    <p id="message-page" class="message ok" hidden></p>
+    <p id="erreur-page" class="message erreur" hidden></p>
+
+    <form id="form-connexion">
+      <label for="identifiant">Identifiant ou e-mail</label>
+      <input type="text" id="identifiant" required autocomplete="username">
+      <label for="mot_de_passe">Mot de passe</label>
+      <input type="password" id="mot_de_passe" required autocomplete="current-password">
+      <button type="submit" style="width:100%">Se connecter</button>
+    </form>
+
+    <form id="form-inscription" hidden>
+      <label for="ins-nom">Nom affiché</label>
+      <input type="text" id="ins-nom" required>
+      <label for="ins-identifiant">Identifiant</label>
+      <input type="text" id="ins-identifiant" required>
+      <label for="ins-email">E-mail</label>
+      <input type="email" id="ins-email">
+      <label for="ins-role">Rôle demandé</label>
+      <select id="ins-role" required>
+        <option value="client">Client (consultation)</option>
+        <option value="technicien">Technicien (enregistre les lots)</option>
+        <option value="biologiste">Biologiste (valide lots et comptes)</option>
+      </select>
+      <label for="ins-mdp">Mot de passe (8 caractères min.)</label>
+      <input type="password" id="ins-mdp" required minlength="8">
+      <button type="submit" style="width:100%">Demander l’accès</button>
+      <p class="hint">Un biologiste devra valider le compte avant toute connexion.</p>
+    </form>
+  </section>
+</div>
+<script src="app.js"></script>
+<script>
+document.getElementById('onglet-connexion').addEventListener('click', () => {
+  document.getElementById('form-connexion').hidden = false;
+  document.getElementById('form-inscription').hidden = true;
+  document.getElementById('onglet-connexion').classList.add('active');
+  document.getElementById('onglet-inscription').classList.remove('active');
+});
+document.getElementById('onglet-inscription').addEventListener('click', () => {
+  document.getElementById('form-connexion').hidden = true;
+  document.getElementById('form-inscription').hidden = false;
+  document.getElementById('onglet-inscription').classList.add('active');
+  document.getElementById('onglet-connexion').classList.remove('active');
+});
+
+document.getElementById('form-connexion').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-page', '');
+  try {
+    await api('/auth/connexion', {
+      method: 'POST',
+      body: JSON.stringify({
+        identifiant: document.getElementById('identifiant').value,
+        mot_de_passe: document.getElementById('mot_de_passe').value
+      })
+    });
+    window.location.href = 'accueil.html';
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+
+document.getElementById('form-inscription').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-page', '');
+  afficherMessage('message-page', '');
+  try {
+    const r = await api('/auth/inscription', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('ins-nom').value,
+        identifiant: document.getElementById('ins-identifiant').value,
+        email: document.getElementById('ins-email').value,
+        mot_de_passe: document.getElementById('ins-mdp').value,
+        role_demande: document.getElementById('ins-role').value
+      })
+    });
+    e.target.reset();
+    document.getElementById('onglet-connexion').click();
+    afficherMessage('message-page', r.message, 'ok');
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+</script>
+</body>
+</html>

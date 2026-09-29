@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lots — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html" class="active">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Lots</h1>
+        <p class="page-intro">Tous les jeux de données de référence.</p>
+      </div>
+      <a class="btn-link primary only-technicien" href="nouveau-lot.html">Ajouter un lot</a>
+    </div>
+    <div class="pills" id="pills">
+      <button type="button" class="secondary active" data-filtre="">Tous</button>
+      <button type="button" class="secondary" data-filtre="a_valider">À valider</button>
+      <button type="button" class="secondary" data-filtre="ok">Validés</button>
+      <button type="button" class="secondary" data-filtre="douteux">Signalés</button>
+    </div>
+    <div class="filtres">
+      <input type="search" id="filtre-q" placeholder="Rechercher un lot">
+      <select id="filtre-machine"><option value="">Toutes les machines</option></select>
+      <input type="date" id="filtre-date">
+    </div>
+    <p id="erreur-liste" class="message erreur" hidden></p>
+    <div id="liste-lots" class="entry-list"><p class="empty">Chargement…</p></div>
+    <p class="only-biologiste hint" style="margin-top:24px;">Ouvrez un lot pour le valider.</p>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+let filtreStatutAffiche = '';
+
+async function remplirMachines() {
+  const machines = await api('/machines');
+  const select = document.getElementById('filtre-machine');
+  machines.forEach((m) => {
+    const option = document.createElement('option');
+    option.value = m.id;
+    option.textContent = m.nom;
+    select.appendChild(option);
+  });
+}
+
+function queryLots() {
+  const params = new URLSearchParams();
+  const q = document.getElementById('filtre-q').value.trim();
+  const machine = document.getElementById('filtre-machine').value;
+  const date = document.getElementById('filtre-date').value;
+  if (q) params.set('q', q);
+  if (machine) params.set('machine_id', machine);
+  if (filtreStatutAffiche === 'douteux') params.set('statut', 'douteux');
+  if (date) params.set('date', date);
+  const s = params.toString();
+  return s ? `/lots?${s}` : '/lots';
+}
+
+async function chargerLots() {
+  const conteneur = document.getElementById('liste-lots');
+  afficherMessage('erreur-liste', '');
+  try {
+    let lots = await api(queryLots());
+    if (filtreStatutAffiche === 'a_valider') lots = lots.filter((l) => l.statut_affiche === 'a_valider' || l.statut_affiche === 'a_revalider');
+    if (filtreStatutAffiche === 'ok') lots = lots.filter((l) => l.statut_affiche === 'ok');
+    if (lots.length === 0) {
+      conteneur.innerHTML = '<p class="empty">Aucun lot ne correspond à ces critères.</p>';
+      return;
+    }
+    conteneur.innerHTML = lots.map((lot) => `
+      <a class="entry" href="lot.html?id=${lot.id}">
+        <span class="ref">${lot.id}</span>
+        <span>
+          <span class="nom">${echap(lot.nom)}</span>
+          <div class="meta">${echap(lot.machine_nom || 'machine non renseignée')} · ${formatDate(lot.date)}</div>
+        </span>
+        <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+      </a>
+    `).join('');
+  } catch (err) {
+    conteneur.innerHTML = '';
+    afficherMessage('erreur-liste', err.message);
+  }
+}
+
+document.getElementById('pills').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-filtre]');
+  if (!btn) return;
+  filtreStatutAffiche = btn.dataset.filtre;
+  document.querySelectorAll('#pills [data-filtre]').forEach((b) => b.classList.toggle('active', b === btn));
+  chargerLots();
+});
+
+['filtre-q', 'filtre-machine', 'filtre-date'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', chargerLots);
+  document.getElementById(id).addEventListener('change', chargerLots);
+});
+
+(async () => {
+  try { await remplirMachines(); } catch (err) { afficherMessage('erreur-liste', err.message); }
+  chargerLots();
+})();
+</script>
+</body>
+</html>

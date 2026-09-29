@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conformité — TraceLab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html" class="active">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>Conformité</h1>
+    <p class="page-intro">Protection des données de référence, RGPD, ISO 15189 et AI Act — démonstrateur pédagogique, pas une certification.</p>
+    <div class="card">
+      <div class="conformite-ligne">
+        <div>
+          <strong>Pseudonymisation</strong>
+          <p>Case cochée et scan des colonnes CSV à chaque lot. Identités remplacées par un code, pas d’anonymisation irréversible.</p>
+        </div>
+        <span class="badge ok">Conforme</span>
+      </div>
+      <div class="conformite-ligne">
+        <div>
+          <strong>Journal de validation</strong>
+          <p>Qui a validé quoi, et quand — signature biologiste nominative, péremption à 12 mois.</p>
+        </div>
+        <span class="badge ok">Conforme</span>
+      </div>
+      <div class="conformite-ligne">
+        <div>
+          <strong>Contrôle des accès</strong>
+          <p>Un rôle par utilisateur (client, technicien, biologiste). Les comptes attendent une validation biologiste.</p>
+        </div>
+        <span class="badge attente">À renforcer</span>
+      </div>
+      <div class="conformite-ligne">
+        <div>
+          <strong>Transparence sur l’IA</strong>
+          <p>Chaque règle d’alerte reste liée à un lot, une machine et une date. Les décisions de validation restent humaines.</p>
+        </div>
+        <span class="badge ok">Conforme</span>
+      </div>
+    </div>
+    <h2 style="margin-top:32px;">ISO 15189</h2>
+    <p>Le registre, la validation biologiste et le certificat par lot répondent à l’esprit de l’accréditation COFRAC : retracer les données de référence.</p>
+    <h2 style="margin-top:24px;">RGPD</h2>
+    <p>Aucun bilan patient n’est stocké ni interprété. Une colonne identifiante (nom, NIR…) déclenche un signalement.</p>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

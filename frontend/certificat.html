@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificat de traçabilité</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> TraceLab</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <a id="retour" class="back-link" href="index.html">← Retour au lot</a>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="certificat"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+const idLot = new URLSearchParams(location.search).get('id');
+document.getElementById('retour').href = idLot ? `lot.html?id=${idLot}` : 'index.html';
+
+(async () => {
+  if (!idLot) {
+    afficherMessage('erreur-page', "Aucun identifiant de lot n'a été fourni.");
+    return;
+  }
+  try {
+    const lot = await api(`/lots/${idLot}`);
+    const regle = lot.reglesAlerte?.[0];
+    const val = lot.validations?.[0];
+    document.title = `Certificat ${refLot(lot.id)}`;
+    document.getElementById('certificat').innerHTML = `
+      <article class="certificat">
+        <h1>Certificat de traçabilité</h1>
+        <p class="hint" style="text-align:center;">Registre des données de référence — esprit ISO 15189 / ISO 17025</p>
+        ${htmlJauge(lot.score_confiance, 'Score de confiance', lot.score_detail)}
+        <p>
+          ${icone('lot')}<strong>Lot</strong> ${echap(lot.nom)} (${echap(refLot(lot.id))})<br>
+          ${icone('machine')}<strong>Machine</strong> ${echap(lot.machine_nom || 'non renseignée')}<br>
+          ${icone('date')}<strong>Date de mesure</strong> ${formatDate(lot.date)}<br>
+          <strong>Conditions</strong> ${echap(lot.conditions || 'non renseignées')}<br>
+          <strong>Pseudonymisation</strong> ${lot.anonymise ? 'identités remplacées par un code' : 'non confirmée'}<br>
+          ${icone('regle')}<strong>Règle</strong> ${echap(regle ? `${regle.parametre} (${libelleSeuils(regle)})` : 'non définie')}<br>
+          ${icone('biologiste')}<strong>Validation</strong> ${echap(val ? `${val.nom_biologiste} — ${formatDateHeure(val.date_validation)}` : 'en attente')}<br>
+          <strong>Statut</strong> <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+        </p>
+        <p class="mono code-verif">Code ${echap(lot.code_verification || '')}</p>
+        ${lot.code_verification ? svgCode39(lot.code_verification) : ''}
+        ${htmlChaineTracabilite(lot)}
+        <p class="hint">Données de référence fictives — aucun bilan patient. Document imprimable pour le jury ou un audit qualité.</p>
+        <div class="actions">
+          <button type="button" onclick="window.print()">Imprimer</button>
+          <a class="btn-link" href="/api/lots/${lot.id}/certificat">Télécharger le PDF</a>
+        </div>
+      </article>
+    `;
+  } catch (err) {
+    const message = /n'existe pas/i.test(err.message) ? "Ce lot n'existe pas." : err.message;
+    afficherMessage('erreur-page', message);
+  }
+})();
+</script>
+</body>
+</html>
