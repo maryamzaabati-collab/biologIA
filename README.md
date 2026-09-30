@@ -32,10 +32,16 @@ Si `npm` n’est pas reconnu dans VS Code, installe Node 22 depuis [nodejs.org](
 1. Sur GitHub, vérifie que le dépôt `biologIA` contient bien les dossiers `frontend/` et `backend/` (pas un dépôt vide).
 2. Va sur [replit.com](https://replit.com) → **Create Repl** → **Import from GitHub** → choisis `maryamzaabati-collab/biologIA`.
 3. Si un ancien Repl importé est encore vide : **ne le réutilise pas**. Crée un **nouveau** Repl depuis GitHub (après que les fichiers soient sur GitHub).
-4. Clique **Run**, ou dans le Shell : `cd backend && npm install && node start.js` (Node 20 de Replit suffit).
-5. L’URL du type `xxx.replit.app` s’affiche en haut. Comptes démo : `samira` / `labo2026` et `amrani` / `labo2026`.
+4. Dans le **Shell** Replit (pas seulement le bouton Git → Pull, souvent bloqué) :
+   ```bash
+   git fetch origin main
+   git reset --hard origin/main
+   ```
+   Puis **Run**. L’aperçu à droite (`….replit.dev`) se met à jour.
+5. Le lien public `….replit.app` ne change **que** avec **Publish → Republish**. Run ne le met pas à jour.
+6. Comptes démo : `samira` / `labo2026` et `amrani` / `labo2026`.
 
-Si GitHub est à jour mais Repl ancien : menu **Git** du Repl → **Pull**.
+Si le Repl reste coincé (fichiers vides, Pull qui échoue) : crée un **nouveau** Repl → Import from GitHub → `maryamzaabati-collab/biologIA`.
 
 ## Tests
 

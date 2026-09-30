@@ -41,7 +41,13 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'connexion.html'));
 });
 
-app.use(express.static(path.join(__dirname, '..', 'frontend'), { etag: false, maxAge: 0 }));
+app.use(express.static(path.join(__dirname, '..', 'frontend'), {
+  etag: false,
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', exigerConnexion);

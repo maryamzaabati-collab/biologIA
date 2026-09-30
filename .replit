@@ -1,4 +1,4 @@
-run = "sh -c 'cd backend && npm install && node start.js'"
+run = "sh -c '(git fetch origin main && git reset --hard origin/main) || true; cd backend && npm install && node start.js'"
 entrypoint = "backend/start.js"
 modules = ["nodejs-22"]
 hidden = [".config", "node_modules", "backend/node_modules"]
