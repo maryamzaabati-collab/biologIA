@@ -33,7 +33,8 @@ db.exec('PRAGMA foreign_keys = ON');
 function run(sql, params = []) {
   return Promise.resolve().then(() => {
     const info = db.prepare(sql).run(...params);
-    return { id: Number(info.lastInsertRowid), changes: info.changes };
+    const brut = info.lastInsertRowid ?? info.lastInsertRowId ?? 0;
+    return { id: Number(brut), changes: Number(info.changes || 0) };
   });
 }
 
@@ -188,7 +189,11 @@ async function init() {
     }
   }
 
-  await require('./lib/donnees-demo').remplir({ run, get, all });
+  try {
+    await require('./lib/donnees-demo').remplir({ run, get, all });
+  } catch (err) {
+    console.error('Chargement des données de démonstration :', err);
+  }
 
   const lotsExistants = await all('SELECT * FROM lots');
   for (const lot of lotsExistants) {
