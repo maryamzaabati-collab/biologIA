@@ -1,9 +1,9 @@
-const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
+const { ouvrirSqlite } = require('./lib/ouvrir-sqlite');
 const { genererCodeVerification } = require('./lib/tracabilite');
 
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, 'labo.db');
-const db = new DatabaseSync(dbPath);
+const db = ouvrirSqlite(dbPath);
 db.exec('PRAGMA foreign_keys = ON');
 
 function run(sql, params = []) {

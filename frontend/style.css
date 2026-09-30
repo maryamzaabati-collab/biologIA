@@ -1,16 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #0c1024;
-  --ink: #f4f6ff;
-  --ink-soft: #9aa3c7;
-  --paper: #0c1024;
-  --panel: #161c3a;
-  --panel-2: #1c2348;
-  --line: rgba(154, 163, 199, 0.16);
-  --accent: #8b8cff;
-  --accent-strong: #a5a4ff;
-  --accent-soft: rgba(139, 140, 255, 0.16);
+  --bg: #103936;
+  --ink: #F5F5DC;
+  --ink-soft: #d4e3e1;
+  --paper: #103936;
+  --panel: #18534F;
+  --panel-2: #1d635e;
+  --line: rgba(245, 245, 220, 0.16);
+  --accent: #F5F5DC;
+  --accent-strong: #F5F5DC;
+  --accent-soft: rgba(245, 245, 220, 0.16);
+  --accent-ink: #18534F;
   --flag: #f07178;
   --flag-soft: rgba(240, 113, 120, 0.16);
   --ok: #3dd6a5;
@@ -19,27 +20,28 @@
   --wait-soft: rgba(232, 177, 90, 0.16);
   --radius: 16px;
   --radius-lg: 28px;
-  --shadow: 0 18px 50px rgba(4, 8, 28, 0.35);
+  --shadow: 0 18px 50px rgba(16, 57, 54, 0.45);
 }
 
 html[data-theme="clair"] {
-  --bg: #eef0f8;
-  --ink: #1b2140;
-  --ink-soft: #5b6388;
-  --paper: #eef0f8;
-  --panel: #ffffff;
-  --panel-2: #f6f7fc;
-  --line: rgba(27, 33, 64, 0.1);
-  --accent: #5c5ef0;
-  --accent-strong: #4a4cdc;
-  --accent-soft: rgba(92, 94, 240, 0.12);
+  --bg: #F7EFE0;
+  --ink: #18534F;
+  --ink-soft: #4a7d79;
+  --paper: #F7EFE0;
+  --panel: #F5F5DC;
+  --panel-2: #fff8ea;
+  --line: rgba(24, 83, 79, 0.14);
+  --accent: #18534F;
+  --accent-strong: #134441;
+  --accent-soft: rgba(24, 83, 79, 0.12);
+  --accent-ink: #F5F5DC;
   --flag: #c94b54;
   --flag-soft: #fde8e9;
   --ok: #1ea57a;
   --ok-soft: #ddf7ee;
   --wait: #b07a18;
   --wait-soft: #f8ecd3;
-  --shadow: 0 10px 30px rgba(27, 33, 64, 0.08);
+  --shadow: 0 10px 30px rgba(24, 83, 79, 0.12);
   color-scheme: light;
 }
 
@@ -207,7 +209,7 @@ button {
   margin-top: 18px;
   padding: 11px 20px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border: none;
   border-radius: 999px;
   font-size: 0.95rem;
@@ -223,7 +225,7 @@ button.secondary {
   margin-top: 0;
 }
 button.secondary:hover { background: var(--accent-soft); color: var(--ink); }
-button.secondary.active { background: var(--accent); color: #fff; border-color: transparent; }
+button.secondary.active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
 .signalement-row {
   display: flex;
@@ -278,7 +280,7 @@ button.danger { background: var(--flag); }
   font-size: 0.9rem;
   font-weight: 600;
 }
-.btn-link.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.btn-link.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .btn-link:hover { background: var(--accent-soft); }
 
 .role-switch { padding: 18px 10px 0; font-size: 0.82rem; color: var(--ink-soft); }
@@ -291,7 +293,7 @@ button.danger { background: var(--flag); }
   border: 1px solid var(--line);
   font-size: 0.8rem;
 }
-.role-switch button.active { border-color: var(--accent); color: #fff; background: var(--accent); }
+.role-switch button.active { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
 
 body:not([data-role]) .only-biologiste,
 body[data-role="technicien"] .only-biologiste { display: none; }
@@ -480,15 +482,15 @@ body[data-role="client"] .only-biologiste { display: none; }
 }
 .landing-gauche {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border-radius: 36px;
   padding: 48px 44px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
 }
-.landing-gauche h1 { font-size: 2.5rem; max-width: 12ch; line-height: 1.15; color: #fff; }
-.landing-gauche p { color: rgba(255,255,255,.88); max-width: 36ch; }
+.landing-gauche h1 { font-size: 2.5rem; max-width: 12ch; line-height: 1.15; color: var(--accent-ink); }
+.landing-gauche p { color: rgba(24, 83, 79, .78); max-width: 36ch; }
 .landing-droite {
   background: var(--panel);
   border-radius: 36px;
@@ -507,7 +509,7 @@ body[data-role="client"] .only-biologiste { display: none; }
   border: 1px solid var(--line);
 }
 .btn-google:hover { background: var(--accent-soft); }
-.landing-points { color: #fff; padding-left: 18px; line-height: 1.7; }
+.landing-points { color: var(--accent-ink); padding-left: 18px; line-height: 1.7; }
 .score-detail { margin-top: 8px; color: var(--ink-soft); font-size: 0.85rem; }
 .score-detail ul { margin: 8px 0 0; padding-left: 18px; }
 .schema-lignee {

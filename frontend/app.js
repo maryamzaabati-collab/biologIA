@@ -313,7 +313,7 @@ function installerRecherche() {
 
 function installerNav() {
   const brand = document.querySelector('.sidebar .brand');
-  if (brand) brand.innerHTML = '<span class="logo-mark"></span> TraceLab';
+  if (brand) brand.innerHTML = '<span class="logo-mark"></span> biologIA';
   const nav = document.querySelector('.sidebar nav');
   if (!nav) return;
   const page = (location.pathname.split('/').pop() || 'accueil.html').replace(/^$/, 'accueil.html');

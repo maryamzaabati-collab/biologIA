@@ -1,7 +1,7 @@
-const { DatabaseSync } = require('node:sqlite');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+const { ouvrirSqlite } = require('./lib/ouvrir-sqlite');
 const { hasherMotDePasse } = require('./lib/motdepasse');
 const { problemesLot, colonnesSensibles } = require('./lib/tracabilite');
 
@@ -27,7 +27,7 @@ function cheminBase() {
 }
 
 const dbPath = cheminBase();
-const db = new DatabaseSync(dbPath);
+const db = ouvrirSqlite(dbPath);
 db.exec('PRAGMA foreign_keys = ON');
 
 function run(sql, params = []) {
