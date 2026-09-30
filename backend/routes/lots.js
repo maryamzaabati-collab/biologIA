@@ -199,7 +199,7 @@ router.get('/:id/certificat', async (req, res) => {
     doc.fontSize(10);
     if (!validations.length) doc.text('Aucune validation enregistrée.');
     validations.forEach((v) => {
-      doc.text(`- ${v.nom_biologiste} — ${v.date_validation}`);
+      doc.text(`- ${v.nom_biologiste} — ${formaterParis(v.date_validation)}`);
     });
     doc.moveDown(1.5);
     doc.fontSize(8).fillColor('#4C5850').text(

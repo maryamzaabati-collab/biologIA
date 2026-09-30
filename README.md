@@ -16,6 +16,13 @@ node start.js
 
 Ouvrir [http://localhost:3000](http://localhost:3000).
 
+Pour (re)charger machines, lots et signalements de démonstration :
+
+```bash
+cd backend
+npm run seed
+```
+
 Comptes de démonstration (à ne pas réutiliser en production) : `samira` / `labo2026` (technicien), `amrani` / `labo2026` (biologiste).
 
 Si `npm` n’est pas reconnu dans VS Code, installe Node 22 depuis [nodejs.org](https://nodejs.org), ferme l’éditeur, puis rouvre un terminal. Script d’aide : `sh outils/installer-node.sh` puis `sh outils/lancer.sh`.

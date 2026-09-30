@@ -53,7 +53,7 @@ document.getElementById('retour').href = idLot ? `lot.html?id=${idLot}` : 'index
           <strong>Conditions</strong> ${echap(lot.conditions || 'non renseignées')}<br>
           <strong>Pseudonymisation</strong> ${lot.anonymise ? 'identités remplacées par un code' : 'non confirmée'}<br>
           ${icone('regle')}<strong>Règle</strong> ${echap(regle ? `${regle.parametre} (${libelleSeuils(regle)})` : 'non définie')}<br>
-          ${icone('biologiste')}<strong>Validation</strong> ${echap(val ? `${val.nom_biologiste} — ${formatDateHeure(val.date_validation)}` : 'en attente')}<br>
+          ${icone('biologiste')}<strong>Validation</strong> ${echap(val ? `${val.nom_biologiste} — ${val.date_validation_paris || formatDateHeure(val.date_validation)}` : 'en attente')}<br>
           <strong>Statut</strong> <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
         </p>
         <p class="mono code-verif">Code ${echap(lot.code_verification || '')}</p>

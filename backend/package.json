@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node start.js",
-    "seed": "node seed.js",
+    "seed": "node reset-demo.js",
     "test": "node --test tests/tracabilite.test.js tests/lots.test.js"
   },
   "engines": {

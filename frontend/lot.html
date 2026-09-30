@@ -70,7 +70,7 @@ async function charger() {
     ]);
     machines = listeMachines;
     biologistes = listeBio;
-    document.title = `${lot.nom} — Registre de traçabilité`;
+    document.title = `${lot.nom} — biologIA`;
     const colonnes = colonnesDuLot(lot);
     const optionsMachines = machines.map((m) =>
       `<option value="${m.id}" ${String(m.id) === String(lot.machine_id) ? 'selected' : ''}>${echap(m.nom)}</option>`

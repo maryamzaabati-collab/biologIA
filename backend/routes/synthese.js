@@ -77,7 +77,7 @@ router.get('/pdf', async (req, res) => {
 
     doc.fontSize(18).text('Fiche de synthese — Controle qualite', { underline: false });
     doc.moveDown(0.3);
-    doc.fontSize(10).fillColor('#4C5850').text(`Registre de tracabilite — generee le ${new Date(s.genereLe).toLocaleString('fr-FR')}`);
+    doc.fontSize(10).fillColor('#4C5850').text(`Registre de tracabilite — generee le ${new Date(s.genereLe).toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })}`);
     doc.moveDown(1);
     doc.fillColor('#16241E').fontSize(12);
     doc.text(`Lots enregistres : ${s.totalLots}`);

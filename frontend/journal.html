@@ -31,7 +31,7 @@
     }
     box.innerHTML = `<table class="table-audit"><thead><tr><th>Date</th><th>Qui</th><th>Action</th><th>Cible</th></tr></thead><tbody>${
       lignes.map((l) => `<tr>
-        <td>${echap(formatDateHeure(l.date))}</td>
+        <td>${echap(l.date_paris || formatDateHeure(l.date))}</td>
         <td>${echap(l.nom_affiche)}</td>
         <td>${echap(l.action)}</td>
         <td>${echap(l.cible)} ${echap(l.details || '')}</td>
