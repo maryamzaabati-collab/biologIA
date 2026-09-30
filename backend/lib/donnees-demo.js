@@ -4,10 +4,14 @@ function csvValeurs(valeurs) {
   return ['code;valeur'].concat(valeurs.map((v, i) => `R${i + 1};${v}`)).join('\n');
 }
 
-async function remplir({ run, get }) {
-  const deja = await get('SELECT COUNT(*) AS n FROM machines');
-  if (deja && deja.n > 0) return;
+async function compter(get, sql) {
+  const row = await get(sql);
+  if (!row) return 0;
+  const v = row.n ?? Object.values(row)[0];
+  return Number(v) || 0;
+}
 
+async function remplir({ run, get }) {
   const machines = [
     ['Cobas 8000', 'biochimie'],
     ['Sysmex XN-1000', 'hematologie'],
@@ -17,9 +21,16 @@ async function remplir({ run, get }) {
   ];
   const machineIds = {};
   for (const [nom, type] of machines) {
-    const { id } = await run('INSERT INTO machines (nom, type) VALUES (?, ?)', [nom, type]);
-    machineIds[nom] = id;
+    const existante = await get('SELECT id FROM machines WHERE nom = ?', [nom]);
+    if (existante) {
+      machineIds[nom] = existante.id;
+    } else {
+      const { id } = await run('INSERT INTO machines (nom, type) VALUES (?, ?)', [nom, type]);
+      machineIds[nom] = id;
+    }
   }
+
+  const nLots = await compter(get, 'SELECT COUNT(*) AS n FROM lots');
 
   const lots = [
     {
@@ -141,21 +152,39 @@ async function remplir({ run, get }) {
       regles: [
         { parametre: 'Hémoglobine', seuil_bas: '12.0', seuil_haut: '16.0', unite: 'g/dL' }
       ]
+    },
+    {
+      nom: 'Ionogramme — pseudonymisation à confirmer',
+      machine: 'Cobas 8000',
+      date: '2026-09-14',
+      conditions: 'ISE calibrées, pente dans les limites',
+      csv: csvValeurs([138, 141, 139, 140]),
+      anonymise: 0,
+      biologiste: null,
+      regles: [
+        { parametre: 'Sodium', seuil_bas: '135', seuil_haut: '145', unite: 'mmol/L' }
+      ]
     }
   ];
 
-  for (const lot of lots) {
+  const aCreer = nLots === 0 ? lots : lots.filter((lot) => !lot.biologiste || lot.anonymise === 0);
+
+  for (const lot of aCreer) {
+    const dejaLot = await get('SELECT id FROM lots WHERE nom = ?', [lot.nom]);
+    if (dejaLot) continue;
     const { colonnes, valeurs, moyenne } = analyserCsv(lot.csv);
     const machine_id = machineIds[lot.machine];
+    const anonymise = lot.anonymise === 0 ? 0 : 1;
     const { id } = await run(
       `INSERT INTO lots (nom, machine_id, date, conditions, anonymise, colonnes_csv, alerte_identite,
         code_verification, moyenne_controle, valeurs_controle)
-       VALUES (?, ?, ?, ?, 1, ?, 0, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
       [
         lot.nom,
         machine_id,
         lot.date,
         lot.conditions,
+        anonymise,
         JSON.stringify(colonnes),
         genererCodeVerification(),
         moyenne,
@@ -182,14 +211,16 @@ async function remplir({ run, get }) {
     }
   }
 
-  const glycemie = await get("SELECT id, conditions FROM lots WHERE nom LIKE 'Glycémie — série janvier%'");
-  if (glycemie) {
-    const nouvelle = glycemie.conditions + ' — recontrôle après maintenance';
-    await run(
-      'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?, ?, ?, ?)',
-      [glycemie.id, 'conditions', glycemie.conditions, nouvelle]
-    );
-    await run('UPDATE lots SET conditions = ? WHERE id = ?', [nouvelle, glycemie.id]);
+  if (nLots === 0) {
+    const glycemie = await get("SELECT id, conditions FROM lots WHERE nom LIKE 'Glycémie — série janvier%'");
+    if (glycemie && glycemie.conditions && !String(glycemie.conditions).includes('recontrôle')) {
+      const nouvelle = glycemie.conditions + ' — recontrôle après maintenance';
+      await run(
+        'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?, ?, ?, ?)',
+        [glycemie.id, 'conditions', glycemie.conditions, nouvelle]
+      );
+      await run('UPDATE lots SET conditions = ? WHERE id = ?', [nouvelle, glycemie.id]);
+    }
   }
 
   console.log('Données de démonstration chargées (machines, lots, signalements).');
