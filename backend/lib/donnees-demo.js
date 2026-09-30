@@ -194,8 +194,8 @@ async function remplir({ run, get }) {
 
     if (lot.biologiste) {
       const dateVal = lot.nom.includes('Hémocultures')
-        ? "datetime('now', '-14 months', 'localtime')"
-        : "datetime('now', 'localtime')";
+        ? "datetime('now', '-14 months')"
+        : "datetime('now')";
       await run(
         `INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ${dateVal})`,
         [id, lot.biologiste]

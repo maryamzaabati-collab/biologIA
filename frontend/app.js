@@ -21,18 +21,38 @@ async function api(chemin, options = {}) {
   return data;
 }
 
+function analyserHorodatage(chaine) {
+  if (!chaine) return null;
+  const s = String(chaine).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [annee, mois, jour] = s.split('-').map(Number);
+    return new Date(annee, mois - 1, jour);
+  }
+  let iso = s.includes(' ') ? s.replace(' ', 'T') : s;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) iso += 'Z';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(chaineISO) {
   if (!chaineISO) return 'non renseignée';
-  const d = new Date(chaineISO);
-  if (isNaN(d)) return chaineISO;
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const d = analyserHorodatage(chaineISO);
+  if (!d) return chaineISO;
+  return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function formatDateHeure(chaineISO) {
   if (!chaineISO) return '-';
-  const d = new Date(chaineISO.includes(' ') ? chaineISO.replace(' ', 'T') : chaineISO);
-  if (isNaN(d)) return chaineISO;
-  return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = analyserHorodatage(chaineISO);
+  if (!d) return chaineISO;
+  return d.toLocaleString('fr-FR', {
+    timeZone: 'Europe/Paris',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 }
 
 function refLot(id) {

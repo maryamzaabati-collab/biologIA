@@ -5,6 +5,7 @@ const {
   analyserCsv,
   problemesLot,
   valeurHistorique,
+  historiqueDifferent,
   colonnesSensibles,
   scoreConfiance,
   detailScoreConfiance,
@@ -296,7 +297,18 @@ router.put('/:id', async (req, res) => {
       ['colonnes_csv', ancien.colonnes_csv, data.colonnes_csv]
     ];
     for (const [champ, avant, apres] of champs) {
-      if (valeurHistorique(avant) !== valeurHistorique(apres)) {
+      if (historiqueDifferent(champ, avant, apres)) {
+        const dernier = await db.get(
+          'SELECT ancienne_valeur, nouvelle_valeur FROM historique_lots WHERE lot_id = ? AND champ = ? ORDER BY id DESC LIMIT 1',
+          [req.params.id, champ]
+        );
+        if (
+          dernier
+          && valeurHistorique(dernier.ancienne_valeur) === valeurHistorique(avant)
+          && valeurHistorique(dernier.nouvelle_valeur) === valeurHistorique(apres)
+        ) {
+          continue;
+        }
         await db.run(
           'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?, ?, ?, ?)',
           [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres)]
@@ -362,8 +374,19 @@ router.post('/:id/validations', async (req, res) => {
       return res.status(400).json({ erreur: 'Choisissez un biologiste enregistre dans la liste.' });
     }
 
+    const recente = await db.get(
+      `SELECT id FROM validations
+       WHERE lot_id = ? AND nom_biologiste = ?
+         AND date_validation >= datetime('now', '-2 minutes')
+       ORDER BY id DESC LIMIT 1`,
+      [req.params.id, biologiste.nom]
+    );
+    if (recente) {
+      return res.status(200).json({ id: recente.id, nom_biologiste: biologiste.nom, deja: true });
+    }
+
     const { id } = await db.run(
-      "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, datetime('now', 'localtime'))",
+      "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, datetime('now'))",
       [req.params.id, biologiste.nom]
     );
     await journal.enregistrer(req, 'validation lot', `lot ${req.params.id}`, biologiste.nom);

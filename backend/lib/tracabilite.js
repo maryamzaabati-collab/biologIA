@@ -92,6 +92,23 @@ function valeurHistorique(v) {
   return String(v);
 }
 
+function historiqueDifferent(champ, avant, apres) {
+  if (champ === 'anonymise') return Number(avant || 0) !== Number(apres || 0);
+  if (champ === 'machine_id') {
+    const a = avant === null || avant === undefined || avant === '' ? null : Number(avant);
+    const b = apres === null || apres === undefined || apres === '' ? null : Number(apres);
+    return a !== b;
+  }
+  if (champ === 'colonnes_csv') {
+    const normaliser = (v) => {
+      if (v == null || v === '' || v === '(vide)') return '';
+      try { return JSON.stringify(JSON.parse(v)); } catch { return String(v); }
+    };
+    return normaliser(avant) !== normaliser(apres);
+  }
+  return valeurHistorique(avant) !== valeurHistorique(apres);
+}
+
 function parseNombre(v) {
   if (v === null || v === undefined || v === '') return null;
   const n = Number(String(v).replace(',', '.'));
@@ -205,6 +222,7 @@ module.exports = {
   analyserCsv,
   problemesLot,
   valeurHistorique,
+  historiqueDifferent,
   testerValeur,
   scoreConfiance,
   detailScoreConfiance,

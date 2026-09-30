@@ -316,6 +316,8 @@ async function charger() {
 
     document.getElementById('form-validation').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const bouton = e.target.querySelector('button[type="submit"]');
+      if (bouton) bouton.disabled = true;
       afficherMessage('erreur-validation', '');
       try {
         await api(`/lots/${idLot}/validations`, {
@@ -325,6 +327,7 @@ async function charger() {
         afficherMessage('ok-validation', 'Lot validé.', 'ok');
         charger();
       } catch (err) {
+        if (bouton) bouton.disabled = false;
         afficherMessage('erreur-validation', err.message);
       }
     });
