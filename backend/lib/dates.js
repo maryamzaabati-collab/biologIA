@@ -1,33 +1,62 @@
-function versDateUtc(valeur) {
-  if (!valeur) return null;
-  if (valeur instanceof Date) return Number.isNaN(valeur.getTime()) ? null : valeur;
-  const s = String(valeur).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const [annee, mois, jour] = s.split('-').map(Number);
-    return new Date(Date.UTC(annee, mois - 1, jour));
-  }
-  let iso = s.includes(' ') ? s.replace(' ', 'T') : s;
-  if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) iso += 'Z';
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
+function aUnFuseau(s) {
+  return /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+}
+
+function formaterCivil(annee, mois, jour, heure, minute) {
+  return `${jour}/${mois}/${annee} ${heure}:${minute}`;
 }
 
 function formaterParis(valeur) {
-  const d = versDateUtc(valeur);
-  if (!d) return valeur || '-';
-  return d.toLocaleString('fr-FR', {
+  if (!valeur) return '-';
+  if (valeur instanceof Date) {
+    return valeur.toLocaleString('fr-FR', {
+      timeZone: 'Europe/Paris',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  const s = String(valeur).trim();
+  if (aUnFuseau(s) || (s.includes('T') && s.endsWith('Z'))) {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return s;
+    return d.toLocaleString('fr-FR', {
+      timeZone: 'Europe/Paris',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (!m) return s;
+  if (!m[4]) return `${m[3]}/${m[2]}/${m[1]}`;
+  return formaterCivil(m[1], m[2], m[3], m[4], m[5]);
+}
+
+function horlogeParis() {
+  const fmt = new Intl.DateTimeFormat('en-GB', {
     timeZone: 'Europe/Paris',
-    day: '2-digit',
-    month: '2-digit',
     year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
   });
+  const p = {};
+  for (const part of fmt.formatToParts(new Date())) {
+    if (part.type !== 'literal') p[part.type] = part.value;
+  }
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
 }
 
 function isoUtc(valeur) {
-  const d = versDateUtc(valeur);
-  return d ? d.toISOString() : valeur;
+  return valeur;
 }
 
-module.exports = { versDateUtc, formaterParis, isoUtc };
+module.exports = { formaterParis, horlogeParis, isoUtc };

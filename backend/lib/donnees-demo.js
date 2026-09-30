@@ -211,17 +211,8 @@ async function remplir({ run, get }) {
     }
   }
 
-  if (nLots === 0) {
-    const glycemie = await get("SELECT id, conditions FROM lots WHERE nom LIKE 'Glycémie — série janvier%'");
-    if (glycemie && glycemie.conditions && !String(glycemie.conditions).includes('recontrôle')) {
-      const nouvelle = glycemie.conditions + ' — recontrôle après maintenance';
-      await run(
-        'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?, ?, ?, ?)',
-        [glycemie.id, 'conditions', glycemie.conditions, nouvelle]
-      );
-      await run('UPDATE lots SET conditions = ? WHERE id = ?', [nouvelle, glycemie.id]);
-    }
-  }
+  await run("DELETE FROM historique_lots WHERE nouvelle_valeur LIKE '%recontrôle après maintenance%'");
+  await run("UPDATE lots SET conditions = REPLACE(conditions, ' — recontrôle après maintenance', '') WHERE conditions LIKE '%recontrôle après maintenance%'");
 
   console.log('Données de démonstration chargées (machines, lots, signalements).');
 }

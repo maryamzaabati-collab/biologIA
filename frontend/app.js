@@ -28,21 +28,38 @@ function analyserHorodatage(chaine) {
     const [annee, mois, jour] = s.split('-').map(Number);
     return new Date(annee, mois - 1, jour);
   }
-  let iso = s.includes(' ') ? s.replace(' ', 'T') : s;
-  if (/^\d{4}-\d{2}-\d{2}T/.test(iso) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) iso += 'Z';
-  const d = new Date(iso);
+  const naive = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (naive && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+    return new Date(
+      Number(naive[1]),
+      Number(naive[2]) - 1,
+      Number(naive[3]),
+      Number(naive[4]),
+      Number(naive[5]),
+      Number(naive[6] || 0)
+    );
+  }
+  const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function formatDate(chaineISO) {
   if (!chaineISO) return 'non renseignée';
+  const s = String(chaineISO).trim();
+  const jour = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (jour && !/[zZ]/.test(s)) return `${jour[3]}/${jour[2]}/${jour[1]}`;
   const d = analyserHorodatage(chaineISO);
   if (!d) return chaineISO;
-  return d.toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric' });
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function formatDateHeure(chaineISO) {
   if (!chaineISO) return '-';
+  const s = String(chaineISO).trim();
+  const naive = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (naive && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
+    return `${naive[3]}/${naive[2]}/${naive[1]} ${naive[4]}:${naive[5]}`;
+  }
   const d = analyserHorodatage(chaineISO);
   if (!d) return chaineISO;
   return d.toLocaleString('fr-FR', {

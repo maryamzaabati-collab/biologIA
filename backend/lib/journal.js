@@ -1,16 +1,19 @@
+const { horlogeParis } = require('./dates');
+
 async function enregistrer(req, action, cible, details) {
   try {
     const db = require('../db');
     const u = req && req.utilisateur;
     await db.run(
-      `INSERT INTO journal_audit (utilisateur_id, nom_affiche, action, cible, details)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO journal_audit (utilisateur_id, nom_affiche, action, cible, details, date)
+       VALUES (?, ?, ?, ?, ?, ?)`,
       [
         u ? u.id : null,
         u ? u.nom : 'système',
         action,
         cible || '',
-        details ? String(details).slice(0, 500) : ''
+        details ? String(details).slice(0, 500) : '',
+        horlogeParis()
       ]
     );
   } catch {

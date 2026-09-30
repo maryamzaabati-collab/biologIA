@@ -14,7 +14,7 @@ const {
   MOIS_PEREMPTION
 } = require('../lib/tracabilite');
 const journal = require('../lib/journal');
-const { formaterParis, isoUtc } = require('../lib/dates');
+const { formaterParis, isoUtc, horlogeParis } = require('../lib/dates');
 
 async function verifierEtSignaler(lotId, champs) {
   const problemes = problemesLot(champs);
@@ -321,8 +321,8 @@ router.put('/:id', async (req, res) => {
           continue;
         }
         await db.run(
-          'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur) VALUES (?, ?, ?, ?)',
-          [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres)]
+          'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date) VALUES (?, ?, ?, ?, ?)',
+          [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres), horlogeParis()]
         );
       }
     }
@@ -397,8 +397,8 @@ router.post('/:id/validations', async (req, res) => {
     }
 
     const { id } = await db.run(
-      "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, datetime('now'))",
-      [req.params.id, biologiste.nom]
+      "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ?)",
+      [req.params.id, biologiste.nom, horlogeParis()]
     );
     await journal.enregistrer(req, 'validation lot', `lot ${req.params.id}`, biologiste.nom);
     res.status(201).json({ id, nom_biologiste: biologiste.nom });
