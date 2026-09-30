@@ -14,6 +14,7 @@ const {
   MOIS_PEREMPTION
 } = require('../lib/tracabilite');
 const journal = require('../lib/journal');
+const { formaterParis, isoUtc } = require('../lib/dates');
 
 async function verifierEtSignaler(lotId, champs) {
   const problemes = problemesLot(champs);
@@ -225,7 +226,7 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     const historique = await db.all(
-      'SELECT * FROM historique_lots WHERE lot_id = ? ORDER BY date DESC, id DESC',
+      'SELECT * FROM historique_lots WHERE lot_id = ? ORDER BY id DESC',
       [req.params.id]
     );
     const signalements = await db.all(
@@ -238,8 +239,16 @@ router.get('/:id', async (req, res) => {
     );
     res.json({
       ...enrichir(lot, validations),
-      validations,
-      historique,
+      validations: validations.map((v) => ({
+        ...v,
+        date_validation: isoUtc(v.date_validation),
+        date_validation_paris: formaterParis(v.date_validation)
+      })),
+      historique: historique.map((h) => ({
+        ...h,
+        date: isoUtc(h.date),
+        date_paris: formaterParis(h.date)
+      })),
       signalements,
       reglesAlerte
     });
@@ -293,9 +302,11 @@ router.put('/:id', async (req, res) => {
       ['machine_id', ancien.machine_id, data.machine_id],
       ['date', ancien.date, data.date],
       ['conditions', ancien.conditions, data.conditions],
-      ['anonymise', ancien.anonymise, data.anonymise],
-      ['colonnes_csv', ancien.colonnes_csv, data.colonnes_csv]
+      ['anonymise', ancien.anonymise, data.anonymise]
     ];
+    if (String(req.body.csv_texte || '').trim()) {
+      champs.push(['colonnes_csv', ancien.colonnes_csv, data.colonnes_csv]);
+    }
     for (const [champ, avant, apres] of champs) {
       if (historiqueDifferent(champ, avant, apres)) {
         const dernier = await db.get(

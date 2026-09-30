@@ -238,7 +238,7 @@ async function charger() {
       conteneurValidations.innerHTML = lot.validations.map((v) => `
         <div class="validation-item">
           ${icone('biologiste')}<span class="qui">${echap(v.nom_biologiste)}</span> —
-          <span class="quand">${formatDateHeure(v.date_validation)}</span>
+          <span class="quand">${echap(v.date_validation_paris || formatDateHeure(v.date_validation))}</span>
         </div>
       `).join('');
     }
@@ -251,7 +251,7 @@ async function charger() {
         <div class="validation-item">
           <span class="qui">${echap(libelleChamp(h.champ))}</span> :
           ${echap(h.ancienne_valeur)} → ${echap(h.nouvelle_valeur)}
-          <span class="quand"> (${formatDateHeure(h.date)})</span>
+          <span class="quand"> (${echap(h.date_paris || formatDateHeure(h.date))})</span>
         </div>
       `).join('');
     }
