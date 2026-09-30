@@ -85,26 +85,24 @@ a { color: var(--accent-strong); }
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--accent) url('logo.png') center/contain no-repeat;
+  background: var(--accent-ink) url('logo.png') center/70% no-repeat;
   box-shadow: 0 0 0 6px var(--accent-soft);
   flex-shrink: 0;
 }
 
 .logo-connexion {
-  width: 148px;
-  height: 148px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
   flex-shrink: 0;
+  background: transparent;
 }
-.landing-entete {
+.landing-accroche {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  max-width: 520px;
-  margin-bottom: 8px;
+  gap: 20px;
 }
-.landing-entete .page-intro { margin-bottom: 0; }
 
 .sidebar nav a {
   display: flex;
@@ -525,7 +523,6 @@ body[data-role="client"] .only-biologiste { display: none; }
   border: 1px solid var(--line);
 }
 .btn-google:hover { background: var(--accent-soft); }
-.landing-points { color: var(--accent-ink); padding-left: 18px; line-height: 1.7; }
 .score-detail { margin-top: 8px; color: var(--ink-soft); font-size: 0.85rem; }
 .score-detail ul { margin: 8px 0 0; padding-left: 18px; }
 .schema-lignee {
@@ -556,6 +553,7 @@ body[data-role="client"] .only-biologiste { display: none; }
   .grid-2, .dash-grid, .chaine, .landing { grid-template-columns: 1fr; }
   .chaine::before { display: none; }
   .landing { padding: 12px; }
+  .landing-accroche { flex-direction: column; align-items: flex-start; }
 }
 
 @media (max-width: 720px) {
