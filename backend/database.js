@@ -188,6 +188,8 @@ async function init() {
     }
   }
 
+  await require('./lib/donnees-demo').remplir({ run, get, all });
+
   const lotsExistants = await all('SELECT * FROM lots');
   for (const lot of lotsExistants) {
     let sensibles = [];
