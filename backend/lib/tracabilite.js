@@ -214,6 +214,21 @@ function pointsControle(moyennes) {
   };
 }
 
+function leveyJennings(valeurs) {
+  const vals = (valeurs || []).map(Number).filter((v) => !Number.isNaN(v));
+  if (!vals.length) {
+    return { moyenne: null, ecart_type: 0, limite_2s_bas: null, limite_2s_haut: null, hors_norme: [], nb_reference: 0 };
+  }
+  const ref = vals.length > 1 ? vals.slice(0, -1) : vals;
+  const stats = pointsControle(ref);
+  const hors_norme = vals.map((v, i) => {
+    const base = vals.length > 1 && i === vals.length - 1 ? ref : vals.filter((_, j) => j !== i);
+    const s = pointsControle(base.length ? base : vals);
+    return s.ecart_type > 0 && Math.abs(v - s.moyenne) > 2 * s.ecart_type;
+  });
+  return { ...stats, hors_norme, nb_reference: ref.length };
+}
+
 module.exports = {
   MOIS_PEREMPTION,
   extraireColonnesCsv,
@@ -232,5 +247,6 @@ module.exports = {
   genererCodeVerification,
   moyenne,
   ecartType,
-  pointsControle
+  pointsControle,
+  leveyJennings
 };

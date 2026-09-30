@@ -26,7 +26,7 @@
         <h1>Lots</h1>
         <p class="page-intro">Tous les jeux de données de référence.</p>
       </div>
-      <a class="btn-link primary only-technicien" href="nouveau-lot.html">Ajouter un lot</a>
+      <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
     <div class="pills" id="pills">
       <button type="button" class="secondary active" data-filtre="">Tous</button>
@@ -41,12 +41,15 @@
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
     <div id="liste-lots" class="entry-list"><p class="empty">Chargement…</p></div>
+    <div id="pagination-lots" class="pagination"></div>
     <p class="only-biologiste hint" style="margin-top:24px;">Ouvrez un lot pour le valider.</p>
   </main>
 </div>
 <script src="app.js"></script>
 <script>
-let filtreStatutAffiche = '';
+let filtreStatutAffiche = new URLSearchParams(location.search).get('filtre') || '';
+let pageLots = 1;
+const PAGE_LOTS = 8;
 
 async function remplirMachines() {
   const machines = await api('/machines');
@@ -81,11 +84,15 @@ async function chargerLots() {
     if (filtreStatutAffiche === 'ok') lots = lots.filter((l) => l.statut_affiche === 'ok');
     if (lots.length === 0) {
       conteneur.innerHTML = '<p class="empty">Aucun lot ne correspond à ces critères.</p>';
+      document.getElementById('pagination-lots').innerHTML = '';
       return;
     }
-    conteneur.innerHTML = lots.map((lot) => `
+    const pages = Math.max(1, Math.ceil(lots.length / PAGE_LOTS));
+    if (pageLots > pages) pageLots = pages;
+    const slice = lots.slice((pageLots - 1) * PAGE_LOTS, pageLots * PAGE_LOTS);
+    conteneur.innerHTML = slice.map((lot) => `
       <a class="entry" href="lot.html?id=${lot.id}">
-        <span class="ref">${lot.id}</span>
+        <span class="ref">${refLot(lot.id)}</span>
         <span>
           <span class="nom">${echap(lot.nom)}</span>
           <div class="meta">${echap(lot.machine_nom || 'machine non renseignée')} · ${formatDate(lot.date)}</div>
@@ -93,6 +100,12 @@ async function chargerLots() {
         <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
       </a>
     `).join('');
+    const pag = document.getElementById('pagination-lots');
+    pag.innerHTML = pages > 1
+      ? `<button type="button" class="secondary" data-p="${pageLots - 1}" ${pageLots <= 1 ? 'disabled' : ''}>Précédent</button>
+         <span>Page ${pageLots} / ${pages}</span>
+         <button type="button" class="secondary" data-p="${pageLots + 1}" ${pageLots >= pages ? 'disabled' : ''}>Suivant</button>`
+      : '';
   } catch (err) {
     conteneur.innerHTML = '';
     afficherMessage('erreur-liste', err.message);
@@ -103,17 +116,28 @@ document.getElementById('pills').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-filtre]');
   if (!btn) return;
   filtreStatutAffiche = btn.dataset.filtre;
+  pageLots = 1;
   document.querySelectorAll('#pills [data-filtre]').forEach((b) => b.classList.toggle('active', b === btn));
   chargerLots();
 });
 
+document.getElementById('pagination-lots').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-p]');
+  if (!btn || btn.disabled) return;
+  pageLots = Number(btn.dataset.p);
+  chargerLots();
+});
+
 ['filtre-q', 'filtre-machine', 'filtre-date'].forEach((id) => {
-  document.getElementById(id).addEventListener('input', chargerLots);
-  document.getElementById(id).addEventListener('change', chargerLots);
+  document.getElementById(id).addEventListener('input', () => { pageLots = 1; chargerLots(); });
+  document.getElementById(id).addEventListener('change', () => { pageLots = 1; chargerLots(); });
 });
 
 (async () => {
   try { await remplirMachines(); } catch (err) { afficherMessage('erreur-liste', err.message); }
+  document.querySelectorAll('#pills [data-filtre]').forEach((b) => {
+    b.classList.toggle('active', b.dataset.filtre === filtreStatutAffiche);
+  });
   chargerLots();
 })();
 </script>

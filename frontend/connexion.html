@@ -41,7 +41,10 @@
       <label for="identifiant">Identifiant ou e-mail</label>
       <input type="text" id="identifiant" required autocomplete="username">
       <label for="mot_de_passe">Mot de passe</label>
-      <input type="password" id="mot_de_passe" required autocomplete="current-password">
+      <div class="champ-mdp">
+        <input type="password" id="mot_de_passe" required autocomplete="current-password">
+        <button type="button" class="oeil" id="voir-mdp" aria-label="Afficher le mot de passe">Afficher</button>
+      </div>
       <button type="submit" style="width:100%">Se connecter</button>
     </form>
 
@@ -67,6 +70,13 @@
 </div>
 <script src="app.js"></script>
 <script>
+document.getElementById('voir-mdp').addEventListener('click', () => {
+  const champ = document.getElementById('mot_de_passe');
+  const btn = document.getElementById('voir-mdp');
+  const visible = champ.type === 'text';
+  champ.type = visible ? 'password' : 'text';
+  btn.textContent = visible ? 'Afficher' : 'Masquer';
+});
 document.getElementById('onglet-connexion').addEventListener('click', () => {
   document.getElementById('form-connexion').hidden = false;
   document.getElementById('form-inscription').hidden = true;

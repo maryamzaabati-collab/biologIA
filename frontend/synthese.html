@@ -21,16 +21,19 @@
     </nav>
   </aside>
   <main>
-    <h1>Fiche de synthèse</h1>
-    <p class="page-intro">Résumé de l'état du registre pour les contrôles qualité. Téléchargez un PDF généré côté serveur, ou un export CSV.</p>
+    <div class="page-head">
+      <div>
+        <h1>Fiche de synthèse</h1>
+        <p class="page-intro">Résumé de l'état du registre pour les contrôles qualité.</p>
+      </div>
+      <div class="actions" style="margin:0">
+        <a class="btn-link primary" href="/api/synthese/pdf">Exporter PDF</a>
+        <a class="btn-link" href="/api/synthese/csv">Exporter CSV</a>
+      </div>
+    </div>
 
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="stats"></div>
-
-    <div class="actions">
-      <a class="btn-link primary" href="/api/synthese/pdf">Télécharger le PDF</a>
-      <a class="btn-link" href="/api/synthese/csv">Télécharger le CSV</a>
-    </div>
   </main>
 </div>
 <script src="app.js"></script>
@@ -51,8 +54,8 @@ async function chargerSynthese() {
       </div>
       <h2>Répartition</h2>
       <div class="barres">
-        <div class="barre"><span>Validés</span><i style="width:${s.pourcentageValides}%"></i></div>
-        <div class="barre"><span>Signalés</span><i class="flag" style="width:${Math.round((s.lotsDouteux / max) * 100)}%"></i></div>
+        <div class="barre"><span>Validés</span><i style="width:${s.pourcentageValides}%"></i><b>${s.lotsValides} (${s.pourcentageValides} %)</b></div>
+        <div class="barre"><span>Signalés</span><i class="flag" style="width:${Math.round((s.lotsDouteux / max) * 100)}%"></i><b>${s.lotsDouteux}</b></div>
       </div>
       <h2 style="margin-top:24px">Lots</h2>
       <table class="table-audit"><thead><tr><th>Lot</th><th>Machine</th><th>Statut</th><th>Score</th></tr></thead>

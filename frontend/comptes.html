@@ -10,16 +10,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
-    <nav>
-      <a href="accueil.html">Tableau de bord</a>
-      <a href="index.html">Lots</a>
-      <a href="machines.html">Machines</a>
-      <a href="signalements.html">Signalements</a>
-      <a href="controle.html">Cartes de contrôle</a>
-      <a href="synthese.html">Synthèse</a>
-      <a href="conformite.html">Conformité</a>
-      <a href="comptes.html" class="active">Comptes</a>
-    </nav>
+    <nav></nav>
   </aside>
   <main>
     <h1>Validation des comptes</h1>
@@ -37,6 +28,20 @@ function libelleRole(r) {
   if (r === 'biologiste') return 'Biologiste';
   return r || '—';
 }
+function libelleStatutCompte(s) {
+  if (s === 'valide') return 'Actif';
+  if (s === 'en_attente') return 'En attente';
+  if (s === 'refuse') return 'Suspendu';
+  return s || '—';
+}
+function initiales(nom) {
+  return String(nom || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+function classeRole(r) {
+  if (r === 'biologiste') return 'ok';
+  if (r === 'technicien') return 'attente';
+  return 'douteux';
+}
 
 async function charger() {
   afficherMessage('erreur-page', '');
@@ -49,22 +54,33 @@ async function charger() {
     }
     box.innerHTML = comptes.map((c) => `
       <div class="signalement-row">
-        <div>
-          <strong>${echap(c.nom)}</strong> · <span class="mono">${echap(c.identifiant || '')}</span>
-          <div class="hint">${echap(c.email || 'pas d’e-mail')} · demandé : ${echap(libelleRole(c.role_demande || c.role))} · actuel : ${echap(libelleRole(c.role))}
-            <span class="badge ${c.statut === 'valide' ? 'ok' : 'douteux'}">${echap(c.statut)}</span>
+        <div class="machine-head">
+          <span class="avatar" style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:0.8rem">${echap(initiales(c.nom))}</span>
+          <div>
+            <strong>${echap(c.nom)}</strong> · <span class="mono">${echap(c.identifiant || '')}</span>
+            <div class="hint">${c.email ? echap(c.email) : 'E-mail non renseigné'}</div>
+            <div class="hint">Rôle demandé : ${echap(libelleRole(c.role_demande || c.role))}</div>
           </div>
         </div>
-        ${c.statut === 'en_attente' ? `
-        <div class="actions">
+        <div class="actions compte-actions">
+          <span class="badge ${classeRole(c.role)} role-badge">${echap(libelleRole(c.role))}</span>
+          <span class="badge ${c.statut === 'valide' ? 'ok' : (c.statut === 'en_attente' ? 'attente' : 'douteux')}">${echap(libelleStatutCompte(c.statut))}</span>
+          ${c.statut === 'en_attente' ? `
           <select data-role="${c.id}">
             <option value="client" ${c.role_demande === 'client' ? 'selected' : ''}>Client</option>
             <option value="technicien" ${c.role_demande === 'technicien' ? 'selected' : ''}>Technicien</option>
             <option value="biologiste" ${c.role_demande === 'biologiste' ? 'selected' : ''}>Biologiste</option>
           </select>
           <button type="button" data-ok="${c.id}">Accorder</button>
-          <button type="button" class="danger" data-no="${c.id}">Refuser</button>
-        </div>` : ''}
+          <button type="button" class="danger" data-no="${c.id}">Refuser</button>` : `
+          <select data-changer="${c.id}">
+            <option value="client" ${c.role === 'client' ? 'selected' : ''}>Client</option>
+            <option value="technicien" ${c.role === 'technicien' ? 'selected' : ''}>Technicien</option>
+            <option value="biologiste" ${c.role === 'biologiste' ? 'selected' : ''}>Biologiste</option>
+          </select>
+          <button type="button" class="secondary" data-rolebtn="${c.id}">Changer le rôle</button>
+          ${c.statut === 'valide' ? `<button type="button" class="btn-ghost" data-suspend="${c.id}">Suspendre</button>` : ''}`}
+        </div>
       </div>
     `).join('');
     box.querySelectorAll('[data-ok]').forEach((btn) => {
@@ -72,7 +88,7 @@ async function charger() {
         const role = box.querySelector(`[data-role="${btn.dataset.ok}"]`).value;
         try {
           await api(`/comptes/${btn.dataset.ok}`, { method: 'PUT', body: JSON.stringify({ action: 'valider', role }) });
-          afficherMessage('ok-page', 'Compte validé.', 'ok');
+          afficherMessage('ok-page', 'Compte accordé.', 'ok');
           charger();
         } catch (err) { afficherMessage('erreur-page', err.message); }
       });
@@ -82,6 +98,26 @@ async function charger() {
         try {
           await api(`/comptes/${btn.dataset.no}`, { method: 'PUT', body: JSON.stringify({ action: 'refuser' }) });
           afficherMessage('ok-page', 'Compte refusé.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-rolebtn]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const role = box.querySelector(`[data-changer="${btn.dataset.rolebtn}"]`).value;
+        try {
+          await api(`/comptes/${btn.dataset.rolebtn}`, { method: 'PUT', body: JSON.stringify({ action: 'role', role }) });
+          afficherMessage('ok-page', 'Rôle mis à jour.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-suspend]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Suspendre ce compte ? Il ne pourra plus se connecter.')) return;
+        try {
+          await api(`/comptes/${btn.dataset.suspend}`, { method: 'PUT', body: JSON.stringify({ action: 'suspendre' }) });
+          afficherMessage('ok-page', 'Compte suspendu.', 'ok');
           charger();
         } catch (err) { afficherMessage('erreur-page', err.message); }
       });

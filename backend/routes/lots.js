@@ -57,6 +57,15 @@ function payloadLot(body, ancien) {
   };
 }
 
+function uniqueValidations(liste) {
+  const vus = new Set();
+  return (liste || []).filter((v) => {
+    if (vus.has(v.nom_biologiste)) return false;
+    vus.add(v.nom_biologiste);
+    return true;
+  });
+}
+
 function enrichir(lot, validations = []) {
   const n = Number(lot.nb_signalements) || 0;
   const detail = detailScoreConfiance(lot, validations, n);
@@ -116,7 +125,7 @@ router.get('/', async (req, res) => {
         'SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC',
         [lot.id]
       );
-      enrichis.push(enrichir(lot, validations));
+      enrichis.push(enrichir(lot, uniqueValidations(validations)));
     }
     res.json(enrichis);
   } catch (err) {
@@ -162,7 +171,7 @@ router.get('/:id/certificat', async (req, res) => {
       [req.params.id]
     );
     const regles = await db.all('SELECT * FROM regles_alerte WHERE lot_id = ?', [req.params.id]);
-    const vu = enrichir(lot, validations);
+    const vu = enrichir(lot, uniqueValidations(validations));
 
     const PDFDocument = require('pdfkit');
     res.setHeader('Content-Type', 'application/pdf');
@@ -238,8 +247,8 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     res.json({
-      ...enrichir(lot, validations),
-      validations: validations.map((v) => ({
+      ...enrichir(lot, uniqueValidations(validations)),
+      validations: uniqueValidations(validations).map((v) => ({
         ...v,
         date_validation: isoUtc(v.date_validation),
         date_validation_paris: formaterParis(v.date_validation)

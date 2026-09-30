@@ -30,14 +30,14 @@ function analyserHorodatage(chaine) {
   }
   const naive = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/);
   if (naive && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-    return new Date(
+    return new Date(Date.UTC(
       Number(naive[1]),
       Number(naive[2]) - 1,
       Number(naive[3]),
       Number(naive[4]),
       Number(naive[5]),
       Number(naive[6] || 0)
-    );
+    ));
   }
   const d = new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
@@ -55,11 +55,6 @@ function formatDate(chaineISO) {
 
 function formatDateHeure(chaineISO) {
   if (!chaineISO) return '-';
-  const s = String(chaineISO).trim();
-  const naive = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
-  if (naive && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(s)) {
-    return `${naive[3]}/${naive[2]}/${naive[1]} ${naive[4]}:${naive[5]}`;
-  }
   const d = analyserHorodatage(chaineISO);
   if (!d) return chaineISO;
   return d.toLocaleString('fr-FR', {
@@ -119,7 +114,11 @@ function appliquerTheme() {
   const theme = themeActuel();
   document.documentElement.dataset.theme = theme;
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = theme === 'sombre' ? 'Thème clair' : 'Thème sombre';
+  if (btn) {
+    btn.textContent = '';
+    btn.setAttribute('aria-label', theme === 'sombre' ? 'Passer au thème clair' : 'Passer au thème sombre');
+    btn.title = theme === 'sombre' ? 'Thème clair' : 'Thème sombre';
+  }
 }
 
 function classeBadge(code) {
@@ -129,7 +128,7 @@ function classeBadge(code) {
 }
 
 function aide(texte) {
-  return `<span class="aide" tabindex="0" aria-label="Aide">?<span class="aide-bulle">${echap(texte)}</span></span>`;
+  return `<span class="aide" tabindex="0" aria-label="Aide"><span class="aide-i">i</span><span class="aide-bulle">${echap(texte)}</span></span>`;
 }
 
 function icone(nom) {
@@ -139,31 +138,37 @@ function icone(nom) {
     biologiste: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg>',
     lot: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-3 8 3v10l-8 3-8-3z"/><path d="M12 4v16M4 7l8 3 8-3"/></svg>',
     regle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v4H5zM5 11h10v4H5zM5 17h7v2H5z"/></svg>',
-    alerte: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4m0 2v1"/></svg>'
+    alerte: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4m0 2v1"/></svg>',
+    analyseur: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="11" rx="2"/><path d="M7 8V6h10v2M8 12h3m2 0h3M8 16h8"/></svg>',
+    centrifugeuse: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/></svg>',
+    pipeteur: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v7l3 11H7l3-11z"/></svg>'
   };
   return `<span class="icone">${svg[nom] || ''}</span>`;
 }
 
-function htmlJauge(score, libelle = 'Score de confiance', detail) {
+function htmlJauge(score, libelle = 'Score de confiance', detail, opts = {}) {
   const n = Number(score) || 0;
+  const modePct = opts.mode === 'pourcent';
   const c = 2 * Math.PI * 42;
   const offset = c - (n / 100) * c;
   const classe = n >= 80 ? 'ok' : n >= 50 ? 'moyen' : 'faible';
   const lignes = Array.isArray(detail) ? `<details class="score-detail"><summary>Voir le calcul</summary><ul>${
     detail.map((l) => `<li>${l.ok ? '✓' : '✗'} ${echap(l.label)} <strong>${l.points}/${l.max}</strong></li>`).join('')
   }</ul></details>` : '';
+  const sousTitre = opts.sousTitre ? `<p class="hint" style="margin-top:8px">${echap(opts.sousTitre)}</p>` : '';
   return `
     <div class="jauge-bloc">
-      <svg class="jauge ${classe}" viewBox="0 0 120 120" aria-label="${echap(libelle)} ${n} sur 100">
+      <svg class="jauge ${classe}" viewBox="0 0 120 120" aria-label="${echap(libelle)} ${modePct ? n + ' %' : n + ' sur 100'}">
         <circle class="jauge-fond" cx="60" cy="60" r="42"></circle>
         <circle class="jauge-arc" cx="60" cy="60" r="42"
           stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"></circle>
-        <text x="60" y="58" text-anchor="middle">${n}</text>
-        <text x="60" y="74" text-anchor="middle" class="jauge-sous">/ 100</text>
+        <text x="60" y="${modePct ? 64 : 58}" text-anchor="middle">${n}${modePct ? '%' : ''}</text>
+        ${modePct ? '' : '<text x="60" y="74" text-anchor="middle" class="jauge-sous">/ 100</text>'}
       </svg>
       <div>
         <p>${echap(libelle)}</p>
         ${lignes}
+        ${sousTitre}
       </div>
     </div>`;
 }
@@ -259,7 +264,7 @@ function htmlCarteControle(serie) {
   const listeHors = hors.length
     ? `<p class="hint">Points hors ±2σ (en rouge) — lots de référence, jamais un patient :</p>
        <ul class="urgence">${hors.map((p) => `<li><a href="lot.html?id=${Number(p.id)}">${echap(p.nom)} — ${formatDate(p.date)}</a></li>`).join('')}</ul>`
-    : '<p class="hint">Aucun point hors ±2σ sur cette série. Les points violets sont dans la zone habituelle.</p>';
+    : '<p class="hint">Aucun point hors ±2σ sur cette série. Les points dans la zone habituelle suivent la moyenne de référence.</p>';
   return `
     <svg class="carte-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Carte de contrôle Levey-Jennings">
       ${ligne(serie.moyenne, '0', 'var(--ink-soft)')}
@@ -294,88 +299,15 @@ function installerRole() {
 }
 
 function installerTheme() {
-  if (document.getElementById('btn-theme')) return;
-  const aside = document.querySelector('.sidebar');
-  if (!aside) return;
-  const btn = document.createElement('button');
-  btn.id = 'btn-theme';
-  btn.type = 'button';
-  btn.className = 'theme-btn';
-  btn.addEventListener('click', () => {
-    localStorage.setItem('themeLabo', themeActuel() === 'sombre' ? 'clair' : 'sombre');
-    appliquerTheme();
-  });
-  aside.appendChild(btn);
   appliquerTheme();
 }
 
-function installerRecherche() {
-  if (document.getElementById('recherche-globale')) return;
-  const aside = document.querySelector('.sidebar');
-  if (!aside) return;
-  const bloc = document.createElement('div');
-  bloc.className = 'recherche-globale';
-  bloc.innerHTML = `
-    <label for="recherche-globale">Recherche</label>
-    <input type="search" id="recherche-globale" placeholder="Lots, machines, signalements">
-    <div id="recherche-resultats" class="recherche-resultats" hidden></div>
-  `;
-  aside.appendChild(bloc);
-  const input = document.getElementById('recherche-globale');
-  const box = document.getElementById('recherche-resultats');
-  let timer;
-  input.addEventListener('input', () => {
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      const q = input.value.trim();
-      if (q.length < 2) {
-        box.hidden = true;
-        box.innerHTML = '';
-        return;
-      }
-      try {
-        const r = await api(`/recherche?q=${encodeURIComponent(q)}`);
-        const lignes = [];
-        r.lots.forEach((l) => lignes.push(`<a href="lot.html?id=${l.id}">Lot · ${echap(l.nom)}</a>`));
-        r.machines.forEach((m) => lignes.push(`<a href="machines.html">${echap(m.nom)}</a>`));
-        r.signalements.forEach((s) => lignes.push(`<a href="lot.html?id=${s.lot_id}&edit=1">Signalement · ${echap(s.lot_nom)}</a>`));
-        box.innerHTML = lignes.length ? lignes.join('') : '<p class="empty">Aucun résultat.</p>';
-        box.hidden = false;
-      } catch (err) {
-        box.innerHTML = `<p class="empty">${echap(err.message)}</p>`;
-        box.hidden = false;
-      }
-    }, 200);
-  });
-}
+function installerRecherche() {}
 
-function installerNav() {
-  const brand = document.querySelector('.sidebar .brand');
-  if (brand) brand.innerHTML = '<span class="logo-mark"></span> biologIA';
-  const nav = document.querySelector('.sidebar nav');
-  if (!nav) return;
-  const page = (location.pathname.split('/').pop() || 'accueil.html').replace(/^$/, 'accueil.html');
-  const liens = [
-    ['accueil.html', 'Tableau de bord'],
-    ['index.html', 'Lots'],
-    ['machines.html', 'Machines'],
-    ['signalements.html', 'Signalements'],
-    ['controle.html', 'Cartes de contrôle'],
-    ['lignee.html', 'Lignée'],
-    ['synthese.html', 'Synthèse'],
-    ['conformite.html', 'Conformité']
-  ];
-  nav.innerHTML = liens.map(([href, label]) => {
-    const active = page === href || (page === '' && href === 'accueil.html') || (page === 'lot.html' && href === 'index.html') || (page === 'certificat.html' && href === 'index.html') || (page === 'nouveau-lot.html' && href === 'index.html');
-    return `<a href="${href}" class="${active ? 'active' : ''}">${label}</a>`;
-  }).join('');
-}
+function installerNav() {}
 
 function installerChrome() {
-  installerNav();
-  installerRole();
-  installerRecherche();
-  installerTheme();
+  appliquerTheme();
 }
 
 if (document.readyState === 'loading') {

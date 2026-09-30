@@ -14,33 +14,100 @@
   </aside>
   <main>
     <h1>Journal d’audit</h1>
-    <p class="page-intro">Qui a fait quoi, et quand. Visible des biologistes.</p>
+    <p class="page-intro">Qui a fait quoi, et quand. Heure de Paris. Visible des biologistes.</p>
+    <div class="filtres">
+      <input type="search" id="filtre-qui" placeholder="Utilisateur">
+      <select id="filtre-action"><option value="">Toutes les actions</option></select>
+      <input type="date" id="filtre-date">
+    </div>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="liste"><p class="empty">Chargement…</p></div>
+    <div id="pagination" class="pagination"></div>
   </main>
 </div>
 <script src="app.js"></script>
 <script>
-(async () => {
+const PAGE = 15;
+let page = 1;
+let cache = { lignes: [], actions: [] };
+
+function classeAction(action) {
+  const a = String(action || '').toLowerCase();
+  if (a.includes('connexion')) return 'connexion';
+  if (a.includes('valid') || a.includes('accord')) return 'validation';
+  if (a.includes('refus') || a.includes('suspen')) return 'refus';
+  return 'attente';
+}
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const q = new URLSearchParams();
+  const qui = document.getElementById('filtre-qui').value.trim();
+  const action = document.getElementById('filtre-action').value;
+  const date = document.getElementById('filtre-date').value;
+  if (qui) q.set('utilisateur', qui);
+  if (action) q.set('action', action);
+  if (date) q.set('date', date);
   try {
-    const lignes = await api('/journal');
-    const box = document.getElementById('liste');
-    if (!lignes.length) {
-      box.innerHTML = '<p class="empty">Aucune action enregistrée pour l’instant.</p>';
-      return;
+    const data = await api('/journal' + (q.toString() ? '?' + q : ''));
+    cache = Array.isArray(data) ? { lignes: data, actions: [] } : data;
+    const sel = document.getElementById('filtre-action');
+    if (cache.actions && sel.options.length <= 1) {
+      cache.actions.forEach((a) => {
+        const o = document.createElement('option');
+        o.value = a;
+        o.textContent = a;
+        sel.appendChild(o);
+      });
     }
-    box.innerHTML = `<table class="table-audit"><thead><tr><th>Date</th><th>Qui</th><th>Action</th><th>Cible</th></tr></thead><tbody>${
-      lignes.map((l) => `<tr>
-        <td>${echap(l.date_paris || formatDateHeure(l.date))}</td>
-        <td>${echap(l.nom_affiche)}</td>
-        <td>${echap(l.action)}</td>
-        <td>${echap(l.cible)} ${echap(l.details || '')}</td>
-      </tr>`).join('')
-    }</tbody></table>`;
+    afficherPage();
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }
-})();
+}
+
+function afficherPage() {
+  const lignes = cache.lignes || [];
+  const box = document.getElementById('liste');
+  if (!lignes.length) {
+    box.innerHTML = '<p class="empty">Aucune action enregistrée pour l’instant.</p>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(lignes.length / PAGE));
+  if (page > pages) page = pages;
+  const slice = lignes.slice((page - 1) * PAGE, page * PAGE);
+  box.innerHTML = `<table class="table-audit"><thead><tr><th>Date</th><th>Qui</th><th>Action</th><th>Cible</th></tr></thead><tbody>${
+    slice.map((l) => {
+      const cible = l.lot_id
+        ? `<a href="lot.html?id=${l.lot_id}">${echap(l.cible_lisible || l.cible)}</a>`
+        : echap(l.cible_lisible || l.cible || '—');
+      return `<tr>
+        <td>${echap(l.date_paris || formatDateHeure(l.date))}</td>
+        <td>${echap(l.nom_affiche)}</td>
+        <td><span class="badge-action ${classeAction(l.action)}">${echap(l.action)}</span></td>
+        <td>${cible}${l.details ? ' · ' + echap(l.details) : ''}</td>
+      </tr>`;
+    }).join('')
+  }</tbody></table>`;
+  document.getElementById('pagination').innerHTML = pages > 1
+    ? `<button type="button" class="secondary" data-p="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Précédent</button>
+       <span>Page ${page} / ${pages}</span>
+       <button type="button" class="secondary" data-p="${page + 1}" ${page >= pages ? 'disabled' : ''}>Suivant</button>`
+    : '';
+}
+
+document.getElementById('pagination').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-p]');
+  if (!btn || btn.disabled) return;
+  page = Number(btn.dataset.p);
+  afficherPage();
+});
+['filtre-qui', 'filtre-action', 'filtre-date'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => { page = 1; charger(); });
+  document.getElementById(id).addEventListener('change', () => { page = 1; charger(); });
+});
+charger();
 </script>
 </body>
 </html>

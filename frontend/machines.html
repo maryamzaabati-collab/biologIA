@@ -55,11 +55,22 @@ async function chargerMachines() {
     }
     conteneur.innerHTML = machines.map((m) => {
       const n = lots.filter((l) => String(l.machine_id) === String(m.id)).length;
+      const t = String(m.type || '').toLowerCase();
+      const ico = t.includes('centrif') ? 'centrifugeuse' : (t.includes('pipet') ? 'pipeteur' : 'analyseur');
       return `
       <div class="card">
-        <h3>${echap(m.nom)}</h3>
-        <p class="hint" style="margin:0 0 12px">${n} lot${n > 1 ? 's' : ''} · ${echap(m.type || 'type non précisé')}</p>
-        <span class="badge ok">En service</span>
+        <div class="machine-head">
+          ${icone(ico)}
+          <div>
+            <h3>${echap(m.nom)}</h3>
+            <p class="hint" style="margin:0">${n} lot${n > 1 ? 's' : ''} · ${echap(m.type || 'type non précisé')}</p>
+            <p class="hint">Dernière date de lot : ${m.derniere_calibration ? formatDate(m.derniere_calibration) : 'aucune'}</p>
+          </div>
+        </div>
+        <div class="actions">
+          <span class="badge ok">En service</span>
+          <a class="btn-link" href="controle.html?machine_id=${m.id}">Carte de contrôle</a>
+        </div>
         <div class="actions only-technicien">
           <button class="secondary" data-id="${m.id}">Supprimer</button>
         </div>

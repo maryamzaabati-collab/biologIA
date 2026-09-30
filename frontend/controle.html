@@ -10,23 +10,18 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
-    <nav>
-      <a href="accueil.html">Tableau de bord</a>
-      <a href="index.html">Lots</a>
-      <a href="machines.html">Machines</a>
-      <a href="signalements.html">Signalements</a>
-      <a href="controle.html" class="active">Cartes de contrôle</a>
-      <a href="synthese.html">Synthèse</a>
-      <a href="conformite.html">Conformité</a>
-    </nav>
+    <nav></nav>
   </aside>
   <main>
     <h1>Cartes de contrôle</h1>
-    <p class="page-intro">Lecture inspirée des cartes Levey-Jennings utilisées en laboratoire accrédité : on suit la moyenne de contrôle de chaque lot dans le temps, machine par machine. Un point hors de ± 2 écarts-types attire l'attention — ce n'est pas un diagnostic patient.</p>
+    <p class="page-intro">Carte de Levey-Jennings : un paramètre à la fois, machine par machine. La moyenne et l’écart-type sont calculés sur la période de référence, sans le dernier point testé. Un point hors ± 2σ attire l’attention — ce n’est pas un diagnostic patient.</p>
 
     <div class="filtres">
       <select id="filtre-machine">
         <option value="">Toutes les machines</option>
+      </select>
+      <select id="filtre-parametre">
+        <option value="">Tous les paramètres</option>
       </select>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
@@ -38,9 +33,18 @@
 async function charger() {
   afficherMessage('erreur-page', '');
   const machine = document.getElementById('filtre-machine').value;
-  const q = machine ? `/controle?machine_id=${encodeURIComponent(machine)}` : '/controle';
+  const parametre = document.getElementById('filtre-parametre').value;
+  const q = new URLSearchParams();
+  if (machine) q.set('machine_id', machine);
+  if (parametre) q.set('parametre', parametre);
+  const suffix = q.toString() ? `?${q}` : '';
   try {
-    const serie = await api(q);
+    const serie = await api('/controle' + suffix);
+    const select = document.getElementById('filtre-parametre');
+    const actuel = select.value;
+    const options = ['<option value="">Tous les paramètres</option>']
+      .concat((serie.parametres || []).map((p) => `<option value="${echap(p)}" ${p === actuel ? 'selected' : ''}>${echap(p)}</option>`));
+    select.innerHTML = options.join('');
     document.getElementById('carte').innerHTML = htmlCarteControle(serie);
   } catch (err) {
     document.getElementById('carte').innerHTML = '';
@@ -58,10 +62,13 @@ async function charger() {
       o.textContent = m.nom;
       select.appendChild(o);
     });
+    const mid = new URLSearchParams(location.search).get('machine_id');
+    if (mid) select.value = mid;
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }
   document.getElementById('filtre-machine').addEventListener('change', charger);
+  document.getElementById('filtre-parametre').addEventListener('change', charger);
   charger();
 })();
 </script>

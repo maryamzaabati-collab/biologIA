@@ -30,8 +30,19 @@ router.put('/:id', async (req, res) => {
     if (!user) return res.status(404).json({ erreur: "Ce compte n'existe pas." });
     if (action === 'refuser') {
       await db.run("UPDATE utilisateurs SET statut = 'refuse' WHERE id = ?", [user.id]);
-      await journal.enregistrer(req, 'refus compte', `utilisateur ${user.id}`, user.identifiant);
+      await journal.enregistrer(req, 'refus compte', `compte ${user.identifiant}`, user.nom);
       return res.json({ message: 'Compte refusé.' });
+    }
+    if (action === 'suspendre') {
+      await db.run("UPDATE utilisateurs SET statut = 'refuse' WHERE id = ?", [user.id]);
+      await journal.enregistrer(req, 'suspension compte', `compte ${user.identifiant}`, user.nom);
+      return res.json({ message: 'Compte suspendu.' });
+    }
+    if (action === 'role') {
+      if (!ROLES.includes(role)) return res.status(400).json({ erreur: 'Rôle inconnu.' });
+      await db.run('UPDATE utilisateurs SET role = ? WHERE id = ?', [role, user.id]);
+      await journal.enregistrer(req, 'changement rôle', `compte ${user.identifiant}`, role);
+      return res.json({ message: 'Rôle mis à jour.', role });
     }
     if (action === 'valider') {
       const roleFinal = ROLES.includes(role) ? role : (user.role_demande || user.role);
@@ -42,10 +53,10 @@ router.put('/:id', async (req, res) => {
         "UPDATE utilisateurs SET statut = 'valide', role = ? WHERE id = ?",
         [roleFinal, user.id]
       );
-      await journal.enregistrer(req, 'accord compte', `utilisateur ${user.id}`, `${user.identifiant} → ${roleFinal}`);
+      await journal.enregistrer(req, 'accord compte', `compte ${user.identifiant}`, roleFinal);
       return res.json({ message: 'Compte validé.', role: roleFinal });
     }
-    res.status(400).json({ erreur: 'Action inconnue (valider ou refuser).' });
+    res.status(400).json({ erreur: 'Action inconnue.' });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }

@@ -19,9 +19,9 @@ router.get('/', async (req, res) => {
     const signalements = await db.all(`
       SELECT signalements.*, lots.nom AS lot_nom, lots.statut AS lot_statut
       FROM signalements JOIN lots ON signalements.lot_id = lots.id
-      WHERE signalements.resolu = 0
+      WHERE signalements.resolu = ?
       ORDER BY signalements.date DESC
-    `);
+    `, [req.query.resolu === '1' ? 1 : 0]);
     res.json(signalements);
   } catch (err) {
     res.status(500).json({ erreur: err.message });

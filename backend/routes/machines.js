@@ -4,7 +4,11 @@ const db = require('../db');
 
 router.get('/', async (req, res) => {
   try {
-    const machines = await db.all('SELECT * FROM machines ORDER BY nom');
+    const machines = await db.all(`
+      SELECT machines.*,
+        (SELECT MAX(lots.date) FROM lots WHERE lots.machine_id = machines.id) AS derniere_calibration
+      FROM machines ORDER BY nom
+    `);
     res.json(machines);
   } catch (err) {
     res.status(500).json({ erreur: err.message });

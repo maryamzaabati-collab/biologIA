@@ -90,7 +90,7 @@ router.get('/pdf', async (req, res) => {
     doc.moveDown(0.4);
     doc.fontSize(9);
     lots.forEach((lot) => {
-      const statut = lot.statut === 'ok' ? 'Conforme' : 'A verifier';
+      const statut = lot.statut === 'ok' ? 'Valide' : 'A verifier';
       doc.text(`L-${String(lot.id).padStart(3, '0')} — ${lot.nom} — ${lot.machine_nom || 'machine n/r'} — ${lot.date || 'date n/r'} — ${statut}`);
     });
     if (!lots.length) doc.text('Aucun lot enregistre.');

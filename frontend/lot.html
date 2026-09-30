@@ -104,14 +104,14 @@ async function charger() {
       </div>
 
       <h2>Origine</h2>
-      <p>
-        ${icone('machine')}<strong>Machine :</strong> ${echap(lot.machine_nom || 'non renseignée')}<br>
-        ${icone('date')}<strong>Date de mesure :</strong> ${formatDate(lot.date)}<br>
-        <strong>Conditions :</strong> ${echap(lot.conditions || 'non renseignées')}<br>
-        <strong>Identités remplacées par un code (pseudonymisation) :</strong> ${lot.anonymise ? 'oui' : 'non confirmé'}<br>
-        <strong>Colonnes CSV :</strong> ${colonnes.length ? echap(colonnes.join(', ')) : 'aucun fichier analysé'}<br>
-        <strong>Péremption des validations :</strong> ${lot.mois_peremption} mois (ISO 15189)
-      </p>
+      <dl class="fiche-dl">
+        <div><dt>Machine</dt><dd>${echap(lot.machine_nom || 'non renseignée')}</dd></div>
+        <div><dt>Date de mesure</dt><dd>${formatDate(lot.date)}</dd></div>
+        <div><dt>Conditions</dt><dd>${echap(lot.conditions || 'non renseignées')}</dd></div>
+        <div><dt>Pseudonymisation</dt><dd>${lot.anonymise ? 'oui' : 'non confirmé'}</dd></div>
+        <div><dt>Colonnes CSV</dt><dd>${colonnes.length ? echap(colonnes.join(', ')) : 'aucun fichier analysé'}</dd></div>
+        <div><dt>Péremption des validations</dt><dd>${lot.mois_peremption} mois (ISO 15189)</dd></div>
+      </dl>
       ${lot.alerte_identite ? '<p class="message erreur">Alerte RGPD : des colonnes identifiantes ont été détectées dans le CSV. Retirez-les puis réimportez un fichier pseudonymisé.</p>' : ''}
       ${(lot.signalements && lot.signalements.length) ? `<div class="card" style="margin-bottom:16px"><strong>Signalements ouverts</strong><ul>${lot.signalements.map((s) => `<li>${echap(s.raison)}</li>`).join('')}</ul><p class="hint">Corrigez le lot : le statut « Signalé » disparaît quand ces points sont levés.</p></div>` : ''}
 
@@ -173,7 +173,7 @@ async function charger() {
         <p id="erreur-validation" class="message erreur" hidden></p>
         <p id="ok-validation" class="message ok" hidden></p>
         <p class="hint">La signature utilise le biologiste connecté (${echap(window.__utilisateur?.nom || '')}).</p>
-        <button type="submit">Valider ce lot</button>
+        <button type="submit">${lot.validations.length ? 'Revalider' : 'Valider ce lot'}</button>
       </form>
       <p class="only-technicien hint">Passez en rôle biologiste pour valider ce lot.</p>
 

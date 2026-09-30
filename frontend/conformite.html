@@ -10,15 +10,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
-    <nav>
-      <a href="accueil.html">Tableau de bord</a>
-      <a href="index.html">Lots</a>
-      <a href="machines.html">Machines</a>
-      <a href="signalements.html">Signalements</a>
-      <a href="controle.html">Cartes de contrôle</a>
-      <a href="synthese.html">Synthèse</a>
-      <a href="conformite.html" class="active">Conformité</a>
-    </nav>
+    <nav></nav>
   </aside>
   <main>
     <h1>Conformité</h1>
@@ -29,34 +21,53 @@
           <strong>Pseudonymisation</strong>
           <p>Case cochée et scan des colonnes CSV à chaque lot. Identités remplacées par un code, pas d’anonymisation irréversible.</p>
         </div>
-        <span class="badge ok">Conforme</span>
+        <span class="badge ok">Mis en place</span>
       </div>
       <div class="conformite-ligne">
         <div>
           <strong>Journal de validation</strong>
           <p>Qui a validé quoi, et quand — signature biologiste nominative, péremption à 12 mois.</p>
         </div>
-        <span class="badge ok">Conforme</span>
+        <span class="badge ok">Mis en place</span>
       </div>
       <div class="conformite-ligne">
         <div>
           <strong>Contrôle des accès</strong>
           <p>Un rôle par utilisateur (client, technicien, biologiste). Les comptes attendent une validation biologiste.</p>
         </div>
-        <span class="badge attente">À renforcer</span>
+        <span class="badge attente">Partiel</span>
       </div>
       <div class="conformite-ligne">
         <div>
           <strong>Transparence sur l’IA</strong>
           <p>Chaque règle d’alerte reste liée à un lot, une machine et une date. Les décisions de validation restent humaines.</p>
         </div>
-        <span class="badge ok">Conforme</span>
+        <span class="badge ok">Mis en place</span>
       </div>
     </div>
-    <h2 style="margin-top:32px;">ISO 15189</h2>
-    <p>Le registre, la validation biologiste et le certificat par lot répondent à l’esprit de l’accréditation COFRAC : retracer les données de référence.</p>
-    <h2 style="margin-top:24px;">RGPD</h2>
-    <p>Aucun bilan patient n’est stocké ni interprété. Une colonne identifiante (nom, NIR…) déclenche un signalement.</p>
+    <div class="card" style="margin-top:20px">
+      <div class="conformite-ligne">
+        <div>
+          <strong>ISO 15189</strong>
+          <p>Le registre, la validation biologiste et le certificat par lot illustrent l’esprit de l’accréditation : retracer les données de référence. Ce n’est pas une accréditation COFRAC.</p>
+        </div>
+        <span class="badge attente">Partiel</span>
+      </div>
+      <div class="conformite-ligne">
+        <div>
+          <strong>RGPD</strong>
+          <p>Aucun bilan patient n’est stocké ni interprété. Une colonne identifiante (nom, NIR…) déclenche un signalement.</p>
+        </div>
+        <span class="badge ok">Mis en place</span>
+      </div>
+      <div class="conformite-ligne">
+        <div>
+          <strong>AI Act</strong>
+          <p>Pas de diagnostic automatisé. Les seuils d’alerte sont des exemples pédagogiques, validés par un biologiste.</p>
+        </div>
+        <span class="badge douteux">À faire</span>
+      </div>
+    </div>
   </main>
 </div>
 <script src="app.js"></script>
