@@ -4,6 +4,7 @@ async function api(chemin, options = {}) {
   let reponse;
   try {
     reponse = await fetch(`/api${chemin}`, {
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       ...options
     });

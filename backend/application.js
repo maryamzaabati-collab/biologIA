@@ -6,9 +6,26 @@ const db = require('./database');
 const { pointsControle } = require('./lib/tracabilite');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(express.json({ limit: '2mb' }));
 app.use(attacherUtilisateur);
+
+app.get('/api/sante', async (req, res) => {
+  try {
+    const machines = await db.get('SELECT COUNT(*) AS n FROM machines');
+    const lots = await db.get('SELECT COUNT(*) AS n FROM lots');
+    const signalements = await db.get('SELECT COUNT(*) AS n FROM signalements WHERE resolu = 0');
+    res.json({
+      ok: true,
+      machines: Number(machines && machines.n) || 0,
+      lots: Number(lots && lots.n) || 0,
+      signalements: Number(signalements && signalements.n) || 0
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, erreur: err.message });
+  }
+});
 
 app.get('/app.js', (req, res) => {
   try {

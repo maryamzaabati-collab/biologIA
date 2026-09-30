@@ -22,7 +22,9 @@ function lireCookies(req) {
 }
 
 function enteteCookie(sessionId, maxAge = DUREE_SECONDES) {
-  return `${NOM_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
+  const https = Boolean(process.env.REPL_ID || process.env.REPLIT_DEV_DOMAIN);
+  const sameSite = https ? 'None; Secure' : 'Lax';
+  return `${NOM_COOKIE}=${sessionId}; Path=/; HttpOnly; SameSite=${sameSite}; Max-Age=${maxAge}`;
 }
 
 async function creerSession(utilisateurId) {

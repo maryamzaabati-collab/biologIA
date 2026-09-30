@@ -5,7 +5,7 @@
     let reponse;
     try {
       reponse = await fetch(`/api${chemin}`, {
-        credentials: 'same-origin',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         ...options
       });
