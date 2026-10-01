@@ -12,9 +12,13 @@ db.init()
     console.log(
       `Base prête — machines : ${machines && machines.n}, lots : ${lots && lots.n}, signalements ouverts : ${signalements && signalements.n}`
     );
-    app.listen(PORT, HOST, () => {
+    const server = app.listen(PORT, HOST, () => {
       console.log(`biologIA lancé sur http://${HOST}:${PORT}`);
       console.log('Base :', db.dbPath);
+    });
+    server.on('error', (err) => {
+      console.error('Impossible d\'écouter le port :', err);
+      process.exit(1);
     });
   })
   .catch((err) => {

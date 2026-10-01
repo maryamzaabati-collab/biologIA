@@ -14,10 +14,29 @@ function genererCodeVerification() {
   return code;
 }
 
+function cheminEcriture(dossier) {
+  fs.mkdirSync(dossier, { recursive: true });
+  fs.accessSync(dossier, fs.constants.W_OK);
+  return dossier;
+}
+
 function cheminBase() {
   if (process.env.DATABASE_PATH) return process.env.DATABASE_PATH;
-  const dossier = path.join(os.homedir(), '.labo-tracabilite');
-  fs.mkdirSync(dossier, { recursive: true });
+  const candidats = [
+    path.join(os.homedir(), '.labo-tracabilite'),
+    path.join('/tmp', 'labo-tracabilite'),
+    path.join(__dirname, 'data')
+  ];
+  let dossier;
+  for (const candidat of candidats) {
+    try {
+      dossier = cheminEcriture(candidat);
+      break;
+    } catch {
+      dossier = null;
+    }
+  }
+  if (!dossier) dossier = '/tmp';
   const cible = path.join(dossier, 'labo.db');
   const copieOneDrive = path.join(__dirname, 'labo.db');
   if (!fs.existsSync(cible) && fs.existsSync(copieOneDrive)) {

@@ -39,7 +39,8 @@ Si `npm` n’est pas reconnu dans VS Code, installe Node 22 depuis [nodejs.org](
    ```
    Puis **Run**. L’aperçu à droite (`….replit.dev`) se met à jour.
 5. Le lien public `….replit.app` ne change **que** avec **Publish → Republish**. Run ne le met pas à jour.
-6. Comptes démo : `samira` / `labo2026` et `amrani` / `labo2026`.
+6. Si Publish dit « failed to start » : dans Deployments, le **Build** doit être `npm install` et le **Run** `node backend/start.js` (déjà dans `.replit`). Republish après un `git pull` du dernier `main`.
+7. Comptes démo : `samira` / `labo2026` et `amrani` / `labo2026`.
 
 Si le Repl reste coincé (fichiers vides, Pull qui échoue) : crée un **nouveau** Repl → Import from GitHub → `maryamzaabati-collab/biologIA`.
 
