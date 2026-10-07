@@ -6,7 +6,7 @@
 <title>Machines — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-machines">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -37,6 +37,13 @@
         <input type="text" id="nom" required placeholder="Nom de l'analyseur">
         <label for="type">Type / site</label>
         <input type="text" id="type" placeholder="ex. biochimie — laisser vide si inconnu">
+        <label for="date_calibration">Date de dernière calibration</label>
+        <input type="date" id="date_calibration">
+        <label for="statut_service">Statut</label>
+        <select id="statut_service">
+          <option value="en_service">En service</option>
+          <option value="maintenance">Maintenance</option>
+        </select>
         <button type="submit">Ajouter une machine</button>
       </form>
     </div>
@@ -64,15 +71,15 @@ async function chargerMachines() {
           <div>
             <h3>${echap(m.nom)}</h3>
             <p class="hint" style="margin:0">${n} lot${n > 1 ? 's' : ''} · ${echap(m.type || 'type non précisé')}</p>
-            <p class="hint">Dernière date de lot : ${m.derniere_calibration ? formatDate(m.derniere_calibration) : 'aucune'}</p>
+            <p class="hint">Dernière calibration : ${m.date_calibration ? formatDate(m.date_calibration) : (m.derniere_calibration ? formatDate(m.derniere_calibration) : 'non renseignée')}</p>
           </div>
         </div>
         <div class="actions">
-          <span class="badge ok">En service</span>
+          <span class="badge ${m.statut_service === 'maintenance' ? 'attente' : 'ok'}">${m.statut_service === 'maintenance' ? 'Maintenance' : 'En service'}</span>
           <a class="btn-link" href="controle.html?machine_id=${m.id}">Carte de contrôle</a>
         </div>
-        <div class="actions only-technicien">
-          <button class="secondary" data-id="${m.id}">Supprimer</button>
+        <div class="actions only-biologiste">
+          ${n ? `<p class="hint">Suppression bloquée : ${n} lot(s) rattaché(s).</p>` : `<button class="secondary" data-id="${m.id}">Retirer (sans lots)</button>`}
         </div>
       </div>`;
     }).join('');
@@ -103,7 +110,9 @@ document.getElementById('form-machine').addEventListener('submit', async (e) => 
       method: 'POST',
       body: JSON.stringify({
         nom: document.getElementById('nom').value,
-        type: document.getElementById('type').value
+        type: document.getElementById('type').value,
+        date_calibration: document.getElementById('date_calibration').value || null,
+        statut_service: document.getElementById('statut_service').value
       })
     });
     e.target.reset();

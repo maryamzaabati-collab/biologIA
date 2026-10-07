@@ -6,7 +6,7 @@
 <title>Cartes de contrôle — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-controle">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -14,7 +14,7 @@
   </aside>
   <main>
     <h1>Cartes de contrôle</h1>
-    <p class="page-intro">Carte de Levey-Jennings : un paramètre à la fois, machine par machine. La moyenne et l’écart-type sont calculés sur la période de référence, sans le dernier point testé. Un point hors ± 2σ attire l’attention — ce n’est pas un diagnostic patient.</p>
+    <p class="page-intro">Carte de Levey-Jennings : un analyte à la fois, à partir des valeurs du CSV du lot. Moyenne et écart-type uniquement si au moins 20 points. Lignes ±1σ, ±2σ, ±3σ ; points hors limites en rouge ; règles de Westgard 1-3s et 2-2s.</p>
 
     <div class="filtres">
       <select id="filtre-machine">

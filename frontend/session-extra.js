@@ -14,16 +14,16 @@
     }
     const type = reponse.headers.get('content-type') || '';
     if (!type.includes('application/json')) {
-      if (!reponse.ok) throw new Error('Une erreur est survenue.');
+      if (!reponse.ok) throw new Error(messageDepuisReponse(reponse));
       return reponse;
     }
     const data = await reponse.json().catch(() => ({}));
     const pageConnexion = location.pathname.endsWith('connexion.html') || location.pathname === '/';
     if (reponse.status === 401 && !pageConnexion) {
       window.location.href = 'connexion.html';
-      throw new Error(data.erreur || 'Connexion requise.');
+      throw new Error(messageDepuisReponse(reponse, data));
     }
-    if (!reponse.ok) throw new Error(data.erreur || 'Une erreur est survenue.');
+    if (!reponse.ok) throw new Error(messageDepuisReponse(reponse, data));
     return data;
   };
 
@@ -34,17 +34,21 @@
   const dessinerCarte = htmlCarteControle;
   function htmlUneCarte(serie) {
     const titre = serie.machine_nom
-      ? `<h2>${echap(serie.machine_nom)}${serie.parametre ? ' — ' + echap(serie.parametre) : ''}</h2>`
+      ? `<h2>${echap(serie.machine_nom)}${serie.parametre ? ' — ' + echap(serie.parametre) : ''}${serie.nom ? ' · ' + echap(serie.nom) : ''}</h2>`
       : '';
+    if (serie.suffisant === false) {
+      return titre + '<p class="empty">Pas assez de données pour calculer les limites</p>'
+        + `<p class="hint">${serie.nb_points || 0} valeur(s) CSV — minimum 20 pour un seul analyte.</p>`;
+    }
     const note = serie.nb_reference
-      ? `<p class="hint">Moyenne et écart-type calculés sur ${serie.nb_reference} point(s) de référence, hors le dernier point de la série.</p>`
+      ? `<p class="hint">Moyenne et écart-type calculés sur ${serie.nb_reference} valeurs du CSV importé (un seul analyte).</p>`
       : '';
     return titre + note + dessinerCarte(serie);
   }
 
   htmlCarteControle = function (serie) {
     if (Array.isArray(serie.series)) {
-      if (!serie.series.length) return '<p class="empty">Pas assez de points de contrôle pour tracer une carte.</p>';
+      if (!serie.series.length) return '<p class="empty">Pas assez de données pour calculer les limites</p>';
       return serie.series.map((s) => htmlUneCarte(s)).join('');
     }
     return htmlUneCarte(serie);
@@ -68,7 +72,8 @@
     synthese: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5h12l4 4v10z"/><path d="M16 5v4h4"/></svg>',
     conformite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 20 7v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>',
     comptes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg>',
-    journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4h11v16H8z"/><path d="M5 4h3v16H5z"/></svg>'
+    journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4h11v16H8z"/><path d="M5 4h3v16H5z"/></svg>',
+    patients: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c1-4 11-4 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M21 20c-.6-3-5-3.5-7-2"/></svg>'
   };
 
   function lienNav(href, label, icon, page) {
@@ -99,6 +104,8 @@
       ${lienNav('controle.html', 'Cartes de contrôle', 'controle', page)}
       <p class="nav-section">Traçabilité</p>
       ${lienNav('lignee.html', 'Lignée', 'lignee', page)}
+      ${role === 'client' ? '' : `${lienNav('patients.html', 'Patients', 'patients', page)}
+      ${lienNav('identifiants.html', 'Identifiants', 'patients', page)}`}
       ${lienNav('synthese.html', 'Synthèse', 'synthese', page)}
       ${lienNav('conformite.html', 'Conformité', 'conformite', page)}
       ${admin}
@@ -144,9 +151,13 @@
           const r = await api(`/recherche?q=${encodeURIComponent(q)}`);
           const lignes = [];
           r.lots.forEach((l) => lignes.push(`<a href="lot.html?id=${l.id}">Lot · ${echap(l.nom)}</a>`));
-          r.machines.forEach((m) => lignes.push(`<a href="machines.html">${echap(m.nom)}</a>`));
+          r.machines.forEach((m) => lignes.push(`<a href="machines.html">Machine · ${echap(m.nom)}</a>`));
           r.signalements.forEach((s) => lignes.push(`<a href="lot.html?id=${s.lot_id}&edit=1">Signalement · ${echap(s.lot_nom)}</a>`));
-          box.innerHTML = lignes.length ? lignes.join('') : '<p class="empty">Aucun résultat.</p>';
+          const groupes = [];
+          if (r.lots.length) groupes.push(`<p class="hint">Lots</p>`);
+          box.innerHTML = lignes.length
+            ? `<p class="hint">${r.lots.length} lot(s) · ${r.machines.length} machine(s) · ${r.signalements.length} signalement(s)</p>${lignes.join('')}`
+            : '<p class="empty">Aucun résultat.</p>';
           box.hidden = false;
         } catch (err) {
           box.innerHTML = `<p class="empty">${echap(err.message)}</p>`;
@@ -170,7 +181,7 @@
     if (!document.getElementById('css-roles')) {
       const s = document.createElement('style');
       s.id = 'css-roles';
-      s.textContent = 'body[data-role="client"] .only-technicien, body[data-role="client"] .only-biologiste { display: none; }';
+      s.textContent = 'body[data-role="client"] .only-technicien, body[data-role="client"] .only-biologiste, body[data-role="technicien"] .only-biologiste { display: none !important; }';
       document.head.appendChild(s);
     }
     try {

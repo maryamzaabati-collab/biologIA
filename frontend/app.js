@@ -1,5 +1,18 @@
 // app.js - fonctions partagees par toutes les pages
 
+function messageDepuisReponse(reponse, data) {
+  if (data && data.erreur) return data.erreur;
+  const status = reponse && reponse.status;
+  if (status === 401) return 'Connexion requise. Reconnectez-vous.';
+  if (status === 403) return 'Votre rôle ne permet pas cette action.';
+  if (status === 404) return 'Élément introuvable.';
+  if (status === 409) return 'Cette action entre en conflit avec l’état actuel.';
+  if (status === 413) return 'Le fichier est trop volumineux (2 Mo maximum).';
+  if (status === 429) return 'Trop de tentatives. Réessayez dans 15 minutes.';
+  if (status >= 500) return 'Le serveur a rencontré un problème. Réessayez dans un instant.';
+  return 'Une erreur est survenue. Vérifiez les champs puis réessayez.';
+}
+
 async function api(chemin, options = {}) {
   let reponse;
   try {
@@ -13,11 +26,11 @@ async function api(chemin, options = {}) {
   }
   const type = reponse.headers.get('content-type') || '';
   if (!type.includes('application/json')) {
-    if (!reponse.ok) throw new Error('Une erreur est survenue.');
+    if (!reponse.ok) throw new Error(messageDepuisReponse(reponse));
     return reponse;
   }
   const data = await reponse.json().catch(() => ({}));
-  if (!reponse.ok) throw new Error(data.erreur || 'Une erreur est survenue.');
+  if (!reponse.ok) throw new Error(messageDepuisReponse(reponse, data));
   return data;
 }
 
@@ -107,7 +120,7 @@ function appliquerRole() {
 }
 
 function themeActuel() {
-  return localStorage.getItem('themeLabo') || 'sombre';
+  return localStorage.getItem('themeLabo') || 'clair';
 }
 
 function appliquerTheme() {
@@ -122,9 +135,24 @@ function appliquerTheme() {
 }
 
 function classeBadge(code) {
-  if (code === 'ok') return 'ok';
-  if (code === 'a_valider' || code === 'a_revalider') return 'attente';
+  if (code === 'ok' || code === 'valide') return 'ok';
+  if (code === 'a_valider' || code === 'a_revalider' || code === 'brouillon' || code === 'archive') return 'attente';
   return 'douteux';
+}
+
+function notifier(texte, type = 'ok') {
+  let barre = document.getElementById('toasts');
+  if (!barre) {
+    barre = document.createElement('div');
+    barre.id = 'toasts';
+    barre.className = 'toasts';
+    document.body.appendChild(barre);
+  }
+  const el = document.createElement('p');
+  el.className = 'toast ' + (type === 'erreur' ? 'erreur' : 'ok');
+  el.textContent = texte;
+  barre.appendChild(el);
+  setTimeout(() => el.remove(), 4200);
 }
 
 function aide(texte) {
@@ -231,11 +259,23 @@ function htmlChaineTracabilite(lot) {
 }
 
 function htmlCarteControle(serie) {
-  const pts = serie.points || [];
-  if (!pts.length) return '<p class="empty">Pas assez de points de contrôle pour tracer une carte.</p>';
-  const w = 760, h = 320, pad = { l: 56, r: 20, t: 24, b: 64 };
+  if (serie && serie.suffisant === false) {
+    return `<p class="empty">Pas assez de données pour calculer les limites</p>
+      <p class="hint">${serie.nb_points || 0} point(s) dans ce lot — il en faut au moins 20, issus du CSV d’un seul analyte.</p>`;
+  }
+  const pts = (serie.points || []).map((p) => ({
+    ...p,
+    moyenne_controle: p.moyenne_controle != null ? p.moyenne_controle : p.valeur
+  }));
+  if (!pts.length) return '<p class="empty">Pas assez de données pour calculer les limites</p>';
+  const w = 900, h = 380, pad = { l: 56, r: 56, t: 28, b: 70 };
   const ys = pts.map((p) => p.moyenne_controle);
-  const lims = [serie.limite_2s_bas, serie.limite_2s_haut, serie.moyenne, ...ys].filter((n) => n != null && !Number.isNaN(n));
+  const lims = [
+    serie.limite_1s_bas, serie.limite_1s_haut,
+    serie.limite_2s_bas, serie.limite_2s_haut,
+    serie.limite_3s_bas, serie.limite_3s_haut,
+    serie.moyenne, ...ys
+  ].filter((n) => n != null && !Number.isNaN(n));
   let ymin = Math.min(...lims), ymax = Math.max(...lims);
   const span = ymax - ymin || 1;
   ymin -= span * 0.12;
@@ -244,38 +284,49 @@ function htmlCarteControle(serie) {
   const innerH = h - pad.t - pad.b;
   const x = (i) => pad.l + (pts.length === 1 ? innerW / 2 : (i / (pts.length - 1)) * innerW);
   const y = (v) => pad.t + (1 - (v - ymin) / (ymax - ymin)) * innerH;
-  const ligne = (v, dash, color) => {
+  const ligne = (v, dash, color, ep = 1) => {
     if (v == null) return '';
-    return `<line x1="${pad.l}" y1="${y(v)}" x2="${w - pad.r}" y2="${y(v)}" stroke="${color}" stroke-dasharray="${dash}" />`;
+    return `<line x1="${pad.l}" y1="${y(v)}" x2="${w - pad.r}" y2="${y(v)}" stroke="${color}" stroke-width="${ep}" stroke-dasharray="${dash}" />`;
+  };
+  const etiquette = (v, txt) => {
+    if (v == null) return '';
+    return `<text x="${w - pad.r + 4}" y="${y(v) + 3}" font-size="9" fill="currentColor">${txt}</text>`;
   };
   const path = pts.map((p, i) => `${i ? 'L' : 'M'}${x(i)},${y(p.moyenne_controle)}`).join(' ');
   const cercles = pts.map((p, i) => {
     const c = p.hors_norme ? 'var(--flag)' : 'var(--accent)';
-    return `<circle class="point-controle" data-lot-id="${p.id}" cx="${x(i)}" cy="${y(p.moyenne_controle)}" r="${p.hors_norme ? 8 : 6}" fill="${c}" stroke="#fff" stroke-width="1.5" style="cursor:pointer"></circle>`;
+    return `<circle class="point-controle" data-lot-id="${p.id || ''}" cx="${x(i)}" cy="${y(p.moyenne_controle)}" r="${p.hors_norme ? 7 : 5}" fill="${c}" stroke="#fff" stroke-width="1.4"></circle>`;
   }).join('');
+  const pas = pts.length > 12 ? Math.ceil(pts.length / 10) : 1;
   const labels = pts.map((p, i) => {
-    const d = formatDate(p.date);
-    return `<text x="${x(i)}" y="${h - 18}" text-anchor="end" font-size="10" fill="currentColor" transform="rotate(-35 ${x(i)} ${h - 18})">${echap(d)}</text>`;
+    if (i % pas !== 0 && i !== pts.length - 1) return '';
+    const brut = p.date ? formatDate(p.date) : String(i + 1);
+    const d = String(brut).replace(/\/\d{4}$/, '');
+    return `<text x="${x(i)}" y="${h - 22}" text-anchor="middle" font-size="10" fill="currentColor">${echap(d)}</text>`;
   }).join('');
   const yTicks = [ymin, (ymin + ymax) / 2, ymax].map((v) =>
     `<text x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="currentColor">${v.toFixed(2)}</text>`
   ).join('');
   const hors = pts.filter((p) => p.hors_norme);
+  const west = (serie.westgard || []).map((w) => `<li>${echap(w.message)}</li>`).join('');
   const listeHors = hors.length
-    ? `<p class="hint">Points hors ±2σ (en rouge) — lots de référence, jamais un patient :</p>
-       <ul class="urgence">${hors.map((p) => `<li><a href="lot.html?id=${Number(p.id)}">${echap(p.nom)} — ${formatDate(p.date)}</a></li>`).join('')}</ul>`
-    : '<p class="hint">Aucun point hors ±2σ sur cette série. Les points dans la zone habituelle suivent la moyenne de référence.</p>';
+    ? `<p class="hint">Points hors limites (rouge) — valeurs du CSV de référence, jamais un patient :</p>
+       <ul class="urgence">${hors.map((p) => `<li>${echap(p.nom || serie.nom || '')} · ${p.date ? formatDate(p.date) : '#' + p.index} · ${p.moyenne_controle}</li>`).join('')}</ul>`
+    : '<p class="hint">Aucun point hors ±2σ sur cette série.</p>';
   return `
     <svg class="carte-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Carte de contrôle Levey-Jennings">
-      ${ligne(serie.moyenne, '0', 'var(--ink-soft)')}
-      ${ligne(serie.limite_2s_haut, '4 4', 'var(--flag)')}
-      ${ligne(serie.limite_2s_bas, '4 4', 'var(--flag)')}
+      ${ligne(serie.moyenne, '0', 'var(--ink-soft)', 1.6)}
+      ${ligne(serie.limite_1s_haut, '2 4', 'var(--wait)')}${ligne(serie.limite_1s_bas, '2 4', 'var(--wait)')}
+      ${ligne(serie.limite_2s_haut, '5 4', 'var(--flag)')}${ligne(serie.limite_2s_bas, '5 4', 'var(--flag)')}
+      ${ligne(serie.limite_3s_haut, '8 5', 'var(--flag)', 1.4)}${ligne(serie.limite_3s_bas, '8 5', 'var(--flag)', 1.4)}
+      ${etiquette(serie.moyenne, 'x̄')}${etiquette(serie.limite_1s_haut, '+1σ')}${etiquette(serie.limite_2s_haut, '+2σ')}${etiquette(serie.limite_3s_haut, '+3σ')}
       <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
       ${cercles}
       ${labels}
       ${yTicks}
     </svg>
-    ${listeHors}`;
+    ${listeHors}
+    ${west ? `<p class="hint">Règles de Westgard :</p><ul>${west}</ul>` : ''}`;
 }
 
 function installerRole() {

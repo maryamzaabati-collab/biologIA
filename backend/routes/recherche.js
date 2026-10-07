@@ -9,7 +9,7 @@ router.get('/', async (req, res) => {
   try {
     const lots = await db.all(
       `SELECT id, nom, code_verification, statut FROM lots
-       WHERE nom LIKE ? OR code_verification LIKE ? OR conditions LIKE ?
+       WHERE COALESCE(archive, 0) = 0 AND (nom LIKE ? OR code_verification LIKE ? OR conditions LIKE ?)
        ORDER BY date_creation DESC LIMIT 8`,
       [like, like, like]
     );

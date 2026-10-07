@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patients — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-patients">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <h1>Patients</h1>
+    <p class="page-intro">Données 100 % fictives. Le technicien identifie un numéro et obtient un PSN, jamais un nom. Le biologiste peut afficher l’identité avec un motif, écrit dans le journal.</p>
+    <div class="onglets-page">
+      <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
+      <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
+      <button type="button" class="secondary" data-onglet="tester">Tester l’identification</button>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+
+    <section class="card panneau" id="panneau-identifier">
+      <h2>Identifier</h2>
+      <form id="form-numero">
+        <label for="numero">Numéro patient</label>
+        <input type="text" id="numero" placeholder="NP-2026-000123" autocomplete="off">
+        <button type="submit">Chercher le numéro</button>
+      </form>
+      <form id="form-nom" style="margin-top:16px">
+        <label>Ou nom + date de naissance (normalisés, sans accents)</label>
+        <div class="grid-2">
+          <input type="text" id="nom" placeholder="Nom">
+          <input type="date" id="date_naissance">
+        </div>
+        <button type="submit">Retrouver le PSN</button>
+      </form>
+      <div id="resultat-recherche"></div>
+    </section>
+
+    <section class="card panneau only-biologiste" id="panneau-creer" hidden>
+      <h2>Créer une identité fictive</h2>
+      <form id="form-creer">
+        <div class="grid-2">
+          <div>
+            <label for="c-nom">Nom</label>
+            <input type="text" id="c-nom" required>
+          </div>
+          <div>
+            <label for="c-prenom">Prénom</label>
+            <input type="text" id="c-prenom" required>
+          </div>
+          <div>
+            <label for="c-date">Date de naissance</label>
+            <input type="date" id="c-date" required>
+          </div>
+          <div>
+            <label for="c-sexe">Sexe</label>
+            <select id="c-sexe" required>
+              <option value="">Choisir</option>
+              <option value="F">F</option>
+              <option value="M">M</option>
+            </select>
+          </div>
+          <div>
+            <label for="c-ville">Ville</label>
+            <input type="text" id="c-ville" required>
+          </div>
+          <div>
+            <label for="c-cp">Code postal (5 chiffres)</label>
+            <input type="text" id="c-cp" required pattern="\d{5}" maxlength="5">
+          </div>
+        </div>
+        <p class="hint">Le numéro NP-AAAA-… et le PSN sont générés automatiquement.</p>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <div id="resultat-creer"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-tester" hidden>
+      <h2>Tester l’identification</h2>
+      <p class="hint">Rapport OK/KO exécuté sur le serveur (numéro, chiffre de contrôle, inconnu, accents, doublon, droits technicien).</p>
+      <button type="button" id="btn-tests">Lancer la suite de tests</button>
+      <div id="rapport-tests"></div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+function montrerOnglet(id) {
+  document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
+    b.classList.toggle('actif', b.dataset.onglet === id);
+  });
+  document.querySelectorAll('.panneau').forEach((p) => {
+    p.hidden = p.id !== 'panneau-' + id;
+  });
+}
+document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
+  b.addEventListener('click', () => montrerOnglet(b.dataset.onglet));
+});
+
+function blocResultat(r) {
+  if (!r.trouve) {
+    return `<p class="message erreur">${echap(r.message || 'Inconnu')}</p>`;
+  }
+  const bio = roleActuel() === 'biologiste';
+  const afficher = bio
+    ? `<form id="form-motif" style="margin-top:12px">
+         <label for="motif">Motif (obligatoire pour afficher l’identité)</label>
+         <input type="text" id="motif" required placeholder="Ex. contrôle pédagogique">
+         <button type="submit">Afficher l’identité</button>
+       </form>
+       <div id="identite-revelee"></div>`
+    : '<p class="hint">Identité masquée — le technicien ne voit que le PSN.</p>';
+  return `<p class="message ok">${echap(r.message)}</p>${afficher}`;
+}
+
+async function identifier(corps) {
+  afficherMessage('erreur-page', '');
+  const r = await api('/patients/identifier', { method: 'POST', body: JSON.stringify(corps) });
+  document.getElementById('resultat-recherche').innerHTML = blocResultat(r);
+  const formMotif = document.getElementById('form-motif');
+  if (formMotif) {
+    formMotif.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const idn = await api('/patients/afficher-identite', {
+          method: 'POST',
+          body: JSON.stringify({ psn: r.psn, motif: document.getElementById('motif').value })
+        });
+        const i = idn.identite;
+        document.getElementById('identite-revelee').innerHTML =
+          `<p class="message ok">${echap(i.nom)} ${echap(i.prenom)} — ${echap(i.numero_patient)} — ${echap(i.date_naissance)}</p>
+           <p class="hint">Action écrite dans le journal d’audit.</p>`;
+        notifier('Identité affichée et journalisée', 'ok');
+      } catch (err) {
+        afficherMessage('erreur-page', err.message);
+      }
+    });
+  }
+}
+
+document.getElementById('form-numero').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await identifier({ numero_patient: document.getElementById('numero').value });
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+
+document.getElementById('form-nom').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try {
+    await identifier({
+      nom: document.getElementById('nom').value,
+      date_naissance: document.getElementById('date_naissance').value
+    });
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+
+document.getElementById('form-creer').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-page', '');
+  try {
+    const r = await api('/patients', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('c-nom').value,
+        prenom: document.getElementById('c-prenom').value,
+        date_naissance: document.getElementById('c-date').value,
+        sexe: document.getElementById('c-sexe').value,
+        ville: document.getElementById('c-ville').value,
+        code_postal: document.getElementById('c-cp').value
+      })
+    });
+    document.getElementById('resultat-creer').innerHTML =
+      `<p class="message ok">Créé — ${echap(r.numero_patient)} → ${echap(r.psn)}</p>`;
+    notifier('Patient fictif créé', 'ok');
+  } catch (err) {
+    document.getElementById('resultat-creer').innerHTML =
+      `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
+
+document.getElementById('btn-tests').addEventListener('click', async () => {
+  afficherMessage('erreur-page', '');
+  try {
+    const r = await api('/patients/tests', { method: 'POST', body: '{}' });
+    document.getElementById('rapport-tests').innerHTML = `
+      <p class="message ${r.ok ? 'ok' : 'erreur'}">${r.ok ? 'Rapport OK' : 'Rapport KO'}</p>
+      <ul>${(r.tests || []).map((t) => `<li>${t.ok ? '✓' : '✗'} <strong>${echap(t.libelle)}</strong> — ${echap(t.detail || '')}</li>`).join('')}</ul>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+</script>
+</body>
+</html>

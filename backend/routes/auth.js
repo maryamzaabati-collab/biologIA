@@ -3,17 +3,26 @@ const router = express.Router();
 const db = require('../database');
 const { hasherMotDePasse, verifierMotDePasse } = require('../lib/motdepasse');
 const { creerSession, enteteCookie, NOM_COOKIE, lireCookies } = require('../lib/session');
-const { googleConfigure, urlAutorisationGoogle, echangerCodeGoogle, etatAleatoire } = require('../lib/google');
 const journal = require('../lib/journal');
 
 const ROLES = ['client', 'technicien', 'biologiste'];
+const MAX_ECHEC = 5;
 
 function publicUtilisateur(u) {
-  return { id: u.id, nom: u.nom, role: u.role, identifiant: u.identifiant, statut: u.statut };
+  return { id: u.id, nom: u.nom, role: u.role, identifiant: u.identifiant, email: u.email || null, statut: u.statut };
+}
+
+async function estBloque(identifiant) {
+  const row = await db.get(
+    `SELECT COUNT(*) AS n FROM tentatives_connexion
+     WHERE identifiant = ? AND reussie = 0 AND date >= datetime('now', '-15 minutes')`,
+    [identifiant]
+  );
+  return Number(row && row.n) >= MAX_ECHEC;
 }
 
 router.get('/config', (req, res) => {
-  res.json({ google: googleConfigure().actif });
+  res.json({ google: false });
 });
 
 router.post('/inscription', async (req, res) => {
@@ -25,6 +34,9 @@ router.post('/inscription', async (req, res) => {
   if (!nom || !identifiant || !motDePasse) {
     return res.status(400).json({ erreur: 'Nom, identifiant et mot de passe sont obligatoires.' });
   }
+  if (!email) {
+    return res.status(400).json({ erreur: 'L’e-mail est obligatoire (réinitialisation et journal).' });
+  }
   if (!ROLES.includes(roleDemande)) {
     return res.status(400).json({ erreur: 'Choisissez un rôle : client, technicien ou biologiste.' });
   }
@@ -33,15 +45,16 @@ router.post('/inscription', async (req, res) => {
   }
   try {
     const deja = await db.get(
-      'SELECT id FROM utilisateurs WHERE lower(identifiant) = ? OR (email IS NOT NULL AND lower(email) = ? AND ? != "")',
-      [identifiant, email, email]
+      'SELECT id FROM utilisateurs WHERE lower(identifiant) = ? OR (email IS NOT NULL AND lower(email) = ?)',
+      [identifiant, email]
     );
     if (deja) return res.status(409).json({ erreur: 'Cet identifiant ou cet e-mail existe déjà.' });
     const { id } = await db.run(
       `INSERT INTO utilisateurs (nom, role, identifiant, mot_de_passe, email, statut, role_demande)
        VALUES (?, ?, ?, ?, ?, 'en_attente', ?)`,
-      [nom, roleDemande, identifiant, hasherMotDePasse(motDePasse), email || null, roleDemande]
+      [nom, roleDemande, identifiant, hasherMotDePasse(motDePasse), email, roleDemande]
     );
+    await journal.enregistrer(req, 'inscription', `utilisateur ${id}`, identifiant);
     res.status(201).json({
       id,
       message: 'Compte créé. Un biologiste doit valider votre accès avant connexion.'
@@ -58,11 +71,22 @@ router.post('/connexion', async (req, res) => {
     return res.status(400).json({ erreur: 'Identifiant et mot de passe obligatoires.' });
   }
   try {
+    if (await estBloque(identifiant)) {
+      await journal.enregistrer(req, 'connexion bloquée', identifiant, '5 échecs');
+      return res.status(429).json({
+        erreur: 'Trop de tentatives. Réessayez dans 15 minutes.'
+      });
+    }
     const user = await db.get(
       `SELECT * FROM utilisateurs WHERE lower(identifiant) = ? OR (email IS NOT NULL AND lower(email) = ?)`,
       [identifiant, identifiant]
     );
     if (!user || !user.mot_de_passe || !verifierMotDePasse(motDePasse, user.mot_de_passe)) {
+      await db.run(
+        'INSERT INTO tentatives_connexion (identifiant, reussie) VALUES (?, 0)',
+        [identifiant]
+      );
+      await journal.enregistrer({ utilisateur: null }, 'connexion échouée', identifiant, '');
       return res.status(401).json({ erreur: 'Identifiant ou mot de passe incorrect.' });
     }
     if (user.statut === 'en_attente') {
@@ -71,67 +95,13 @@ router.post('/connexion', async (req, res) => {
     if (user.statut === 'refuse') {
       return res.status(403).json({ erreur: 'Ce compte a été refusé par un biologiste.' });
     }
+    await db.run('INSERT INTO tentatives_connexion (identifiant, reussie) VALUES (?, 1)', [identifiant]);
     const sid = await creerSession(user.id);
     res.setHeader('Set-Cookie', enteteCookie(sid));
     await journal.enregistrer({ utilisateur: user }, 'connexion', `utilisateur ${user.id}`, user.identifiant);
     res.json(publicUtilisateur(user));
   } catch (err) {
     res.status(500).json({ erreur: err.message });
-  }
-});
-
-router.get('/google', (req, res) => {
-  const conf = googleConfigure();
-  if (!conf.actif) {
-    return res.status(501).json({
-      erreur: 'Connexion Google non configurée. Définissez GOOGLE_CLIENT_ID et GOOGLE_CLIENT_SECRET.'
-    });
-  }
-  const role = ROLES.includes(req.query.role) ? req.query.role : 'client';
-  const etat = `${etatAleatoire()}.${role}`;
-  res.setHeader('Set-Cookie', `labo_oauth=${etat}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`);
-  res.redirect(urlAutorisationGoogle(etat));
-});
-
-router.get('/google/callback', async (req, res) => {
-  try {
-    const conf = googleConfigure();
-    if (!conf.actif) return res.redirect('/connexion.html?erreur=google');
-    const cookies = lireCookies(req);
-    if (!req.query.code || !req.query.state || cookies.labo_oauth !== req.query.state) {
-      return res.redirect('/connexion.html?erreur=google');
-    }
-    const roleDemande = ROLES.includes(String(req.query.state).split('.')[1])
-      ? String(req.query.state).split('.')[1]
-      : 'client';
-    const profil = await echangerCodeGoogle(req.query.code);
-    let user = await db.get(
-      'SELECT * FROM utilisateurs WHERE google_id = ? OR (email IS NOT NULL AND lower(email) = ?)',
-      [profil.google_id, profil.email]
-    );
-    if (!user) {
-      const identifiant = profil.email.split('@')[0].replace(/[^a-z0-9]/gi, '').toLowerCase() || `g${Date.now()}`;
-      const { id } = await db.run(
-        `INSERT INTO utilisateurs (nom, role, identifiant, email, statut, role_demande, google_id)
-         VALUES (?, ?, ?, ?, 'en_attente', ?, ?)`,
-        [profil.nom, roleDemande, identifiant, profil.email, roleDemande, profil.google_id]
-      );
-      user = await db.get('SELECT * FROM utilisateurs WHERE id = ?', [id]);
-    } else if (!user.google_id) {
-      await db.run('UPDATE utilisateurs SET google_id = ?, email = COALESCE(email, ?) WHERE id = ?',
-        [profil.google_id, profil.email, user.id]);
-    }
-    if (user.statut === 'en_attente') {
-      return res.redirect('/connexion.html?attente=1');
-    }
-    if (user.statut === 'refuse') {
-      return res.redirect('/connexion.html?erreur=refuse');
-    }
-    const sid = await creerSession(user.id);
-    res.setHeader('Set-Cookie', [enteteCookie(sid), 'labo_oauth=; Path=/; Max-Age=0']);
-    res.redirect('/accueil.html');
-  } catch {
-    res.redirect('/connexion.html?erreur=google');
   }
 });
 

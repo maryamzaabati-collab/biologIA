@@ -1,3 +1,13 @@
+function formaterJour(valeur) {
+  if (!valeur) return 'non renseignée';
+  const s = String(valeur).trim();
+  const jour = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (jour) return `${jour[3]}/${jour[2]}/${jour[1]}`;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' });
+}
+
 function formaterParis(valeur) {
   if (!valeur) return '-';
   const s = String(valeur).trim();
@@ -42,4 +52,4 @@ function isoUtc(valeur) {
   return Number.isNaN(d.getTime()) ? s : d.toISOString();
 }
 
-module.exports = { formaterParis, horlogeParis, isoUtc };
+module.exports = { formaterParis, formaterJour, horlogeParis, isoUtc };

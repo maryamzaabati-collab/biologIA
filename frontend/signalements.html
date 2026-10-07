@@ -6,7 +6,7 @@
 <title>Signalements — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-signalements">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -14,7 +14,7 @@
   </aside>
   <main>
     <h1>Signalements</h1>
-    <p class="page-intro">Les anomalies repérées automatiquement. Un signalement ne se clôture que si le lot a été corrigé.</p>
+    <p class="page-intro">Les anomalies repérées automatiquement. Un signalement ne se clôture que si le lot est corrigé, ou si un biologiste justifie la clôture.</p>
     <div class="pills" id="pills">
       <button type="button" class="secondary active" data-filtre="0">Ouverts</button>
       <button type="button" class="secondary" data-filtre="1">Résolus</button>
@@ -47,16 +47,26 @@ async function chargerSignalements() {
         <div class="actions">
           <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${resolus === '1' ? 'Résolu' : 'Ouvert'}</span>
           <a class="btn-link primary" href="lot.html?id=${s.lot_id}&edit=1">Corriger</a>
-          ${resolus === '0' ? '<button class="btn-ghost" data-id="' + s.id + '">Marquer comme résolu</button>' : ''}
+          ${resolus === '0' ? '<button class="btn-ghost only-biologiste" data-id="' + s.id + '">Clôturer (biologiste)</button>' : ''}
         </div>
       </div>
     `).join('');
     conteneur.querySelectorAll('button[data-id]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        if (!confirm('Marquer ce signalement comme résolu ? Le lot doit déjà avoir été corrigé.')) return;
+        const bio = roleActuel() === 'biologiste';
+        let justification = '';
+        if (bio) {
+          justification = prompt('Si le lot n’est pas encore corrigé, justifiez la clôture (rôle biologiste) :') || '';
+        } else if (!confirm('Marquer ce signalement comme résolu ? Le lot doit déjà avoir été corrigé.')) {
+          return;
+        }
         afficherMessage('erreur-liste', '');
         try {
-          await api(`/signalements/${btn.dataset.id}/resoudre`, { method: 'PUT' });
+          await api(`/signalements/${btn.dataset.id}/resoudre`, {
+            method: 'PUT',
+            body: JSON.stringify({ justification })
+          });
+          notifier('Signalement résolu.', 'ok');
           chargerSignalements();
         } catch (err) {
           afficherMessage('erreur-liste', err.message);

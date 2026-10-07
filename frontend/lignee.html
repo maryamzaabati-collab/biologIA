@@ -6,7 +6,7 @@
 <title>Lignée — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-lignee">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -14,7 +14,7 @@
   </aside>
   <main>
     <h1>Lignée des données</h1>
-    <p class="page-intro">Machine → lot → règle → alerte → validation. Consulter d’où vient chaque seuil.</p>
+    <p class="page-intro">Patient pseudonymisé → mesures → lot → machine → règle → alerte → validation. Dates et auteurs à chaque étape.</p>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="liste"><p class="empty">Chargement…</p></div>
   </main>
@@ -31,17 +31,16 @@
     }
     box.innerHTML = lots.map((l) => `
       <article class="card" style="margin-bottom:14px">
-        <h3><a href="lot.html?id=${l.id}">${echap(l.nom)}</a></h3>
+        <h3><a href="lot.html?id=${l.id}">${echap(l.nom)}</a>
+          <span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span></h3>
         <div class="schema-lignee">
-          <span>Machine<br><strong>${echap(l.machine || 'n/r')}</strong></span>
-          <span>→</span>
-          <span>Lot<br><strong>${echap(l.code_verification || l.nom)}</strong></span>
-          <span>→</span>
-          <span>Règle<br><strong>${echap(l.regles[0] ? l.regles[0].parametre : 'aucune')}</strong></span>
-          <span>→</span>
-          <span>Alerte<br><strong>${l.alertes.length ? l.alertes.length + ' ouverte(s)' : 'aucune'}</strong></span>
-          <span>→</span>
-          <span>Validation<br><strong>${echap(l.validations[0] ? l.validations[0].nom_biologiste : 'en attente')}</strong></span>
+          ${(l.etapes || []).map((e) => `
+            <span>
+              ${echap(e.libelle)}<br>
+              <strong>${e.href ? `<a href="${e.href}">${echap(e.valeur)}</a>` : echap(e.valeur)}</strong>
+              ${e.date ? `<small>${formatDateHeure(e.date)}</small>` : ''}
+              ${e.auteur ? `<small>${echap(e.auteur)}</small>` : ''}
+            </span>`).join('<span>→</span>')}
         </div>
       </article>
     `).join('');

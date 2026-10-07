@@ -46,6 +46,23 @@ async function json(chemin, options = {}) {
   return { status: r.status, data };
 }
 
+async function creerLotValide(nom) {
+  const machines = await json('/api/machines');
+  const mid = machines.data[0].id;
+  return json('/api/lots', {
+    method: 'POST',
+    body: JSON.stringify({
+      nom,
+      machine_id: mid,
+      date: '2026-03-01',
+      temperature: '21°C',
+      lot_reactifs: 'R-441',
+      calibration: 'matin',
+      anonymise: true
+    })
+  });
+}
+
 describe('authentification', () => {
   it('refuse l API sans session', async () => {
     const { status } = await json('/api/lots');
@@ -60,18 +77,12 @@ describe('authentification', () => {
     assert.equal(login.status, 200);
     assert.equal(login.data.role, 'technicien');
 
-    const cree = await json('/api/lots', {
-      method: 'POST',
-      body: JSON.stringify({ nom: 'Lot auth test' })
-    });
+    const cree = await creerLotValide('LOT-2026-301');
     assert.equal(cree.status, 201);
   });
 
   it('interdit au technicien de valider un lot', async () => {
-    const cree = await json('/api/lots', {
-      method: 'POST',
-      body: JSON.stringify({ nom: 'Lot sans validation tech' })
-    });
+    const cree = await creerLotValide('LOT-2026-302');
     const r = await json(`/api/lots/${cree.data.id}/validations`, {
       method: 'POST',
       body: JSON.stringify({})
@@ -92,10 +103,7 @@ describe('authentification', () => {
       method: 'POST',
       body: JSON.stringify({ identifiant: 'samira', mot_de_passe: 'labo2026' })
     });
-    const cree = await json('/api/lots', {
-      method: 'POST',
-      body: JSON.stringify({ nom: 'Lot a valider' })
-    });
+    const cree = await creerLotValide('LOT-2026-303');
     cookie = '';
     await json('/api/auth/connexion', {
       method: 'POST',
@@ -107,5 +115,16 @@ describe('authentification', () => {
     });
     assert.equal(val.status, 201);
     assert.match(val.data.nom_biologiste, /Amrani/);
+  });
+
+  it('interdit au technicien d archiver', async () => {
+    cookie = '';
+    await json('/api/auth/connexion', {
+      method: 'POST',
+      body: JSON.stringify({ identifiant: 'samira', mot_de_passe: 'labo2026' })
+    });
+    const cree = await creerLotValide('LOT-2026-304');
+    const r = await json(`/api/lots/${cree.data.id}/archiver`, { method: 'POST', body: '{}' });
+    assert.equal(r.status, 403);
   });
 });

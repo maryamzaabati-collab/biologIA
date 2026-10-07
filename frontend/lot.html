@@ -6,7 +6,7 @@
 <title>Détail du lot — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-lot">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -21,7 +21,7 @@
     </nav>
   </aside>
   <main>
-    <a href="index.html" class="back-link">Retour aux lots</a>
+    <a href="index.html" class="back-link">← Retour aux lots</a>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="detail">Chargement…</div>
   </main>
@@ -86,6 +86,8 @@ async function charger() {
           <p class="mono" style="color:var(--ink-soft)">${refLot(lot.id)}</p>
           <p>
             <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+            ${Number(lot.est_test) ? '<span class="badge attente">Lot TEST — hors statistiques</span>' : ''}
+            ${Number(lot.archive) ? '<span class="badge attente">Archivé</span>' : ''}
             ${lot.nb_signalements ? ` · ${lot.nb_signalements} signalement(s)` : ''}
           </p>
         </div>
@@ -117,7 +119,6 @@ async function charger() {
 
       <div class="actions only-technicien">
         <button type="button" class="secondary" id="btn-modifier">Modifier</button>
-        <button type="button" class="danger" id="btn-supprimer">Supprimer le lot</button>
         <a class="btn-link" href="certificat.html?id=${lot.id}">Certificat imprimable</a>
         <a class="btn-link" href="/api/lots/${lot.id}/certificat">PDF</a>
       </div>
@@ -130,17 +131,23 @@ async function charger() {
       <form id="form-edition" ${ouvrirEdition ? '' : 'hidden'}>
         <h2>Corriger le lot</h2>
         <p id="erreur-edition" class="message erreur" hidden></p>
-        <label for="edit-nom">Nom du lot ${aide('Nom interne du lot de données de référence, pas un patient.')}</label>
-        <input type="text" id="edit-nom" required value="${echap(lot.nom)}">
+        <label for="edit-nom">Nom du lot ${aide('Format imposé : LOT-2026-025. Exception : le lot TEST de démonstration.')}</label>
+        <input type="text" id="edit-nom" required ${Number(lot.est_test) ? '' : 'pattern="LOT-\\d{4}-\\d{3}"'} value="${echap(lot.nom)}">
         <label for="edit-machine">Machine utilisée ${aide('Appareil qui a produit les mesures de référence.')}</label>
-        <select id="edit-machine">
+        <select id="edit-machine" required>
           <option value="">— Sélectionner —</option>
           ${optionsMachines}
         </select>
         <label for="edit-date">Date de mesure</label>
-        <input type="date" id="edit-date" value="${lot.date || ''}">
-        <label for="edit-conditions">Conditions ${aide('Température, calibration, réactif : le contexte de la mesure.')}</label>
-        <input type="text" id="edit-conditions" value="${echap(lot.conditions || '')}">
+        <input type="date" id="edit-date" required value="${lot.date || ''}">
+        <label for="edit-temperature">Température</label>
+        <input type="text" id="edit-temperature" placeholder="21°C" required>
+        <label for="edit-reactifs">Lot de réactifs</label>
+        <input type="text" id="edit-reactifs" placeholder="R-441" required>
+        <label for="edit-calibration">Calibration</label>
+        <input type="text" id="edit-calibration" placeholder="matin, contrôle interne passé" required>
+        <label for="edit-motif">Motif de la modification ${aide('Obligatoire : le registre conserve qui, quand, quoi et pourquoi.')}</label>
+        <input type="text" id="edit-motif" required placeholder="Correction des conditions après CQ">
         <label for="edit-csv">Nouveau CSV (optionnel)</label>
         <input type="file" id="edit-csv" accept=".csv,text/csv,text/plain">
         <div class="checkbox-row">
@@ -178,7 +185,15 @@ async function charger() {
       <p class="only-technicien hint">Passez en rôle biologiste pour valider ce lot.</p>
 
       <h2 style="margin-top:32px;">Historique des modifications</h2>
+      <p class="hint">Registre en ajout seul : une ligne d’historique ne se modifie ni ne se supprime.</p>
       <div id="historique" class="frise"></div>
+
+      <div class="zone-archive only-biologiste" id="zone-archive" ${Number(lot.archive) ? 'hidden' : ''}>
+        <h2>Archiver ce lot</h2>
+        <p class="hint">Dans un outil de traçabilité on n’efface pas : on archive. Le lot reste dans l’historique.</p>
+        <button type="button" class="danger" id="btn-archiver">Archiver le lot</button>
+        <p id="erreur-archive" class="message erreur" hidden></p>
+      </div>
     `;
 
     const conteneurRegles = document.getElementById('regles-alerte');
@@ -251,7 +266,7 @@ async function charger() {
         <div class="validation-item">
           <span class="qui">${echap(libelleChamp(h.champ))}</span> :
           ${echap(h.ancienne_valeur)} → ${echap(h.nouvelle_valeur)}
-          <span class="quand"> (${echap(h.date_paris || formatDateHeure(h.date))})</span>
+          <span class="quand"> (${echap(h.date_paris || formatDateHeure(h.date))}${h.utilisateur ? ' · ' + echap(h.utilisateur) : ''}${h.motif ? ' · ' + echap(h.motif) : ''})</span>
         </div>
       `).join('');
     }
@@ -261,16 +276,25 @@ async function charger() {
       document.getElementById('form-edition').scrollIntoView({ behavior: 'smooth' });
     });
 
-    document.getElementById('btn-supprimer')?.addEventListener('click', async () => {
-      if (!confirm('Supprimer définitivement ce lot et son historique ?')) return;
-      afficherMessage('erreur-actions', '');
+    document.getElementById('btn-archiver')?.addEventListener('click', async () => {
+      if (roleActuel() !== 'biologiste') {
+        afficherMessage('erreur-archive', 'Seul un biologiste peut archiver.');
+        return;
+      }
+      if (!confirm('Archiver ce lot ? Il restera visible dans l’historique, sans être effacé.')) return;
+      afficherMessage('erreur-archive', '');
       try {
-        await api(`/lots/${idLot}`, { method: 'DELETE' });
+        await api(`/lots/${idLot}/archiver`, { method: 'POST', body: '{}' });
+        notifier('Lot archivé.', 'ok');
         window.location.href = 'index.html';
       } catch (err) {
-        afficherMessage('erreur-actions', err.message);
+        afficherMessage('erreur-archive', err.message);
       }
     });
+
+    const aujourd = new Date().toISOString().slice(0, 10);
+    const champDate = document.getElementById('edit-date');
+    if (champDate) champDate.max = aujourd;
 
     document.getElementById('form-edition').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -283,11 +307,15 @@ async function charger() {
             nom: document.getElementById('edit-nom').value,
             machine_id: document.getElementById('edit-machine').value || null,
             date: document.getElementById('edit-date').value || null,
-            conditions: document.getElementById('edit-conditions').value || null,
+            temperature: document.getElementById('edit-temperature').value,
+            lot_reactifs: document.getElementById('edit-reactifs').value,
+            calibration: document.getElementById('edit-calibration').value,
+            motif: document.getElementById('edit-motif').value,
             anonymise: document.getElementById('edit-anonymise').checked,
             csv_texte: csvTexte
           })
         });
+        notifier('Lot mis à jour.', 'ok');
         charger();
       } catch (err) {
         afficherMessage('erreur-edition', err.message);

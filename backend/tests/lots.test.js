@@ -38,6 +38,20 @@ async function json(chemin, options = {}) {
   return { status: r.status, data };
 }
 
+function payload(extra = {}) {
+  return {
+    nom: extra.nom || 'LOT-2026-101',
+    machine_id: extra.machine_id,
+    date: extra.date || '2026-03-01',
+    temperature: extra.temperature || '21°C',
+    lot_reactifs: extra.lot_reactifs || 'R-441',
+    calibration: extra.calibration || 'matin',
+    anonymise: extra.anonymise !== undefined ? extra.anonymise : true,
+    csv_texte: extra.csv_texte || '',
+    motif: extra.motif || 'Correction pédagogique'
+  };
+}
+
 describe('routes lots', () => {
   it('refuse un lot sans nom', async () => {
     const { status, data } = await json('/api/lots', { method: 'POST', body: JSON.stringify({}) });
@@ -45,41 +59,47 @@ describe('routes lots', () => {
     assert.match(data.erreur, /nom/i);
   });
 
-  it('cree un lot douteux puis le corrige via PUT', async () => {
-    const cree = await json('/api/lots', {
+  it('refuse un nom hors format LOT-YYYY-NNN', async () => {
+    const { status, data } = await json('/api/lots', {
       method: 'POST',
-      body: JSON.stringify({ nom: 'Lot test glycémie' })
+      body: JSON.stringify({ nom: 'loot' })
     });
-    assert.equal(cree.status, 201);
-    const id = cree.data.id;
+    assert.equal(status, 400);
+    assert.match(data.erreur, /LOT-/);
+  });
 
-    const detail = await json(`/api/lots/${id}`);
-    assert.equal(detail.status, 200);
-    assert.equal(detail.data.statut, 'douteux');
-    assert.ok(detail.data.signalements.length > 0);
-
+  it('cree un lot complet puis le corrige via PUT avec motif', async () => {
     const machine = await json('/api/machines', {
       method: 'POST',
       body: JSON.stringify({ nom: 'Cobas test', type: 'biochimie' })
     });
     assert.equal(machine.status, 201);
 
+    const cree = await json('/api/lots', {
+      method: 'POST',
+      body: JSON.stringify(payload({ nom: 'LOT-2026-201', machine_id: machine.data.id }))
+    });
+    assert.equal(cree.status, 201);
+    const id = cree.data.id;
+
+    const detail = await json(`/api/lots/${id}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.data.statut_affiche, 'a_valider');
+
     const maj = await json(`/api/lots/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({
-        nom: 'Lot test glycémie',
+      body: JSON.stringify(payload({
+        nom: 'LOT-2026-201',
         machine_id: machine.data.id,
-        date: '2024-03-01',
-        conditions: 'calibration matin',
-        anonymise: true
-      })
+        date: '2026-03-02',
+        motif: 'Ajustement de date après CQ'
+      }))
     });
     assert.equal(maj.status, 200);
 
     const apres = await json(`/api/lots/${id}`);
-    assert.equal(apres.data.statut, 'ok');
-    assert.equal(apres.data.signalements.length, 0);
     assert.ok(apres.data.historique.length > 0);
+    assert.ok(apres.data.historique.some((h) => h.motif));
   });
 
   it('renvoie 404 pour un lot inexistant', async () => {
@@ -89,9 +109,13 @@ describe('routes lots', () => {
   });
 
   it('refuse la validation si le biologiste n est pas enregistre', async () => {
+    const machine = await json('/api/machines', {
+      method: 'POST',
+      body: JSON.stringify({ nom: 'Architect test', type: 'immuno' })
+    });
     const cree = await json('/api/lots', {
       method: 'POST',
-      body: JSON.stringify({ nom: 'Lot validation' })
+      body: JSON.stringify(payload({ nom: 'LOT-2026-202', machine_id: machine.data.id }))
     });
     const { status } = await json(`/api/lots/${cree.data.id}/validations`, {
       method: 'POST',
@@ -100,42 +124,50 @@ describe('routes lots', () => {
     assert.equal(status, 400);
   });
 
-  it('supprime un lot', async () => {
+  it('refuse la suppression et archive a la place', async () => {
+    const machine = await json('/api/machines', {
+      method: 'POST',
+      body: JSON.stringify({ nom: 'Sysmex test', type: 'hemato' })
+    });
     const cree = await json('/api/lots', {
       method: 'POST',
-      body: JSON.stringify({ nom: 'Lot a supprimer' })
-    });
-    await json('/api/regles_alerte', {
-      method: 'POST',
-      body: JSON.stringify({
-        lot_id: cree.data.id,
-        parametre: 'Glycémie à jeun',
-        seuil_bas: '0.70',
-        seuil_haut: '1.10',
-        unite: 'g/L'
-      })
+      body: JSON.stringify(payload({ nom: 'LOT-2026-203', machine_id: machine.data.id }))
     });
     const suppr = await json(`/api/lots/${cree.data.id}`, { method: 'DELETE' });
-    assert.equal(suppr.status, 200);
-    const detail = await json(`/api/lots/${cree.data.id}`);
-    assert.equal(detail.status, 404);
+    assert.equal(suppr.status, 405);
+    const arch = await json(`/api/lots/${cree.data.id}/archiver`, { method: 'POST', body: '{}' });
+    assert.equal(arch.status, 200);
+    const liste = await json('/api/lots');
+    assert.ok(!liste.data.some((l) => l.id === cree.data.id));
   });
 
   it('refuse de resoudre un signalement si le lot n est pas corrige', async () => {
+    const machine = await json('/api/machines', {
+      method: 'POST',
+      body: JSON.stringify({ nom: 'ABL test', type: 'gaz' })
+    });
     const cree = await json('/api/lots', {
       method: 'POST',
-      body: JSON.stringify({ nom: 'Lot encore incomplet' })
+      body: JSON.stringify(payload({
+        nom: 'LOT-2026-204',
+        machine_id: machine.data.id,
+        anonymise: false
+      }))
     });
     const detail = await json(`/api/lots/${cree.data.id}`);
     const sid = detail.data.signalements[0].id;
-    const r = await json(`/api/signalements/${sid}/resoudre`, { method: 'PUT' });
+    const r = await json(`/api/signalements/${sid}/resoudre`, { method: 'PUT', body: '{}' });
     assert.equal(r.status, 400);
   });
 
   it('teste une valeur fictive contre une regle', async () => {
+    const machine = await json('/api/machines', {
+      method: 'POST',
+      body: JSON.stringify({ nom: 'Vitek test', type: 'micro' })
+    });
     const lot = await json('/api/lots', {
       method: 'POST',
-      body: JSON.stringify({ nom: 'Lot simulateur' })
+      body: JSON.stringify(payload({ nom: 'LOT-2026-205', machine_id: machine.data.id }))
     });
     const regle = await json('/api/regles_alerte', {
       method: 'POST',

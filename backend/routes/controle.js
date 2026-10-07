@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { leveyJennings } = require('../lib/tracabilite');
+const { carteLeveyJennings } = require('../lib/tracabilite');
 
 function parametreDuLot(lot) {
   if (lot.parametre) return String(lot.parametre).trim();
@@ -10,16 +10,41 @@ function parametreDuLot(lot) {
   return (coupure[0] || nom || 'Paramètre').trim();
 }
 
+function valeursDuLot(lot) {
+  if (!lot.valeurs_controle) return [];
+  try {
+    const parsed = JSON.parse(lot.valeurs_controle);
+    return Array.isArray(parsed) ? parsed.map(Number).filter((n) => !Number.isNaN(n)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function datesDuLot(lot) {
+  if (!lot.dates_controle) return [];
+  try {
+    const parsed = JSON.parse(lot.dates_controle);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 router.get('/', async (req, res) => {
   try {
-    const clauses = ['lots.moyenne_controle IS NOT NULL', "lots.date IS NOT NULL"];
+    const clauses = ['COALESCE(lots.archive, 0) = 0', 'COALESCE(lots.est_test, 0) = 0'];
     const params = [];
     if (req.query.machine_id) {
       clauses.push('lots.machine_id = ?');
       params.push(req.query.machine_id);
     }
+    if (req.query.lot_id) {
+      clauses.push('lots.id = ?');
+      params.push(req.query.lot_id);
+    }
     const lots = await db.all(`
       SELECT lots.id, lots.nom, lots.date, lots.moyenne_controle, lots.machine_id,
+        lots.valeurs_controle, lots.dates_controle,
         machines.nom AS machine_nom,
         (SELECT r.parametre FROM regles_alerte r WHERE r.lot_id = lots.id ORDER BY r.id ASC LIMIT 1) AS parametre
       FROM lots LEFT JOIN machines ON machines.id = lots.machine_id
@@ -32,26 +57,36 @@ router.get('/', async (req, res) => {
     const filtreParam = req.query.parametre ? String(req.query.parametre) : '';
     const filtrés = filtreParam ? enrichis.filter((l) => l.parametre === filtreParam) : enrichis;
 
-    const groupes = new Map();
-    for (const lot of filtrés) {
-      const cle = `${lot.machine_id || 'sans'}|${lot.parametre}`;
-      if (!groupes.has(cle)) groupes.set(cle, []);
-      groupes.get(cle).push(lot);
-    }
-
     const series = [];
-    for (const groupe of groupes.values()) {
-      const vals = groupe.map((l) => Number(l.moyenne_controle));
-      const stats = leveyJennings(vals);
+    for (const lot of filtrés) {
+      const vals = valeursDuLot(lot);
+      if (!vals.length) continue;
+      const dates = datesDuLot(lot);
+      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map(() => lot.date));
       series.push({
-        machine_nom: groupe[0].machine_nom || 'Machine non renseignée',
-        parametre: groupe[0].parametre,
+        lot_id: lot.id,
+        nom: lot.nom,
+        machine_nom: lot.machine_nom || 'Machine non renseignée',
+        parametre: lot.parametre,
+        suffisant: stats.suffisant,
+        message: stats.message,
         nb_reference: stats.nb_reference,
-        points: groupe.map((l, i) => ({ ...l, hors_norme: stats.hors_norme[i] || false })),
+        nb_points: stats.nb_points,
+        points: stats.points.map((p, i) => ({
+          ...p,
+          id: lot.id,
+          nom: lot.nom,
+          index: i + 1
+        })),
         moyenne: stats.moyenne,
         ecart_type: stats.ecart_type,
+        limite_1s_bas: stats.limite_1s_bas,
+        limite_1s_haut: stats.limite_1s_haut,
         limite_2s_bas: stats.limite_2s_bas,
-        limite_2s_haut: stats.limite_2s_haut
+        limite_2s_haut: stats.limite_2s_haut,
+        limite_3s_bas: stats.limite_3s_bas,
+        limite_3s_haut: stats.limite_3s_haut,
+        westgard: stats.westgard
       });
     }
 

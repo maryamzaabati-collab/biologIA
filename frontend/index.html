@@ -6,7 +6,7 @@
 <title>Lots — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-lots">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -30,9 +30,11 @@
     </div>
     <div class="pills" id="pills">
       <button type="button" class="secondary active" data-filtre="">Tous</button>
+      <button type="button" class="secondary" data-filtre="brouillon">Brouillons</button>
       <button type="button" class="secondary" data-filtre="a_valider">À valider</button>
-      <button type="button" class="secondary" data-filtre="ok">Validés</button>
-      <button type="button" class="secondary" data-filtre="douteux">Signalés</button>
+      <button type="button" class="secondary" data-filtre="valide">Validés</button>
+      <button type="button" class="secondary" data-filtre="a_revalider">À revalider</button>
+      <button type="button" class="secondary" data-filtre="signale">Signalés</button>
     </div>
     <div class="filtres">
       <input type="search" id="filtre-q" placeholder="Rechercher un lot">
@@ -69,7 +71,7 @@ function queryLots() {
   const date = document.getElementById('filtre-date').value;
   if (q) params.set('q', q);
   if (machine) params.set('machine_id', machine);
-  if (filtreStatutAffiche === 'douteux') params.set('statut', 'douteux');
+  if (filtreStatutAffiche === 'signale') params.set('statut_affiche', 'signale');
   if (date) params.set('date', date);
   const s = params.toString();
   return s ? `/lots?${s}` : '/lots';
@@ -80,8 +82,7 @@ async function chargerLots() {
   afficherMessage('erreur-liste', '');
   try {
     let lots = await api(queryLots());
-    if (filtreStatutAffiche === 'a_valider') lots = lots.filter((l) => l.statut_affiche === 'a_valider' || l.statut_affiche === 'a_revalider');
-    if (filtreStatutAffiche === 'ok') lots = lots.filter((l) => l.statut_affiche === 'ok');
+    if (filtreStatutAffiche) lots = lots.filter((l) => l.statut_affiche === filtreStatutAffiche);
     if (lots.length === 0) {
       conteneur.innerHTML = '<p class="empty">Aucun lot ne correspond à ces critères.</p>';
       document.getElementById('pagination-lots').innerHTML = '';
@@ -94,7 +95,7 @@ async function chargerLots() {
       <a class="entry" href="lot.html?id=${lot.id}">
         <span class="ref">${refLot(lot.id)}</span>
         <span>
-          <span class="nom">${echap(lot.nom)}</span>
+          <span class="nom">${echap(lot.nom)}${Number(lot.est_test) ? ' · TEST' : ''}</span>
           <div class="meta">${echap(lot.machine_nom || 'machine non renseignée')} · ${formatDate(lot.date)}</div>
         </span>
         <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>

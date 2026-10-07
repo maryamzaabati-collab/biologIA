@@ -7,20 +7,22 @@ const {
   valeurHistorique,
   historiqueDifferent,
   colonnesSensibles,
-  scoreConfiance,
   detailScoreConfiance,
   libelleStatut,
   genererCodeVerification,
+  composerConditions,
+  validerSaisieLot,
   MOIS_PEREMPTION
 } = require('../lib/tracabilite');
 const journal = require('../lib/journal');
 const { formaterParis, isoUtc, horlogeParis } = require('../lib/dates');
+const { extrairePsnCsv } = require('../lib/patients');
 
 async function verifierEtSignaler(lotId, champs) {
   const problemes = problemesLot(champs);
   const statut = problemes.length === 0 ? 'ok' : 'douteux';
   await db.run('UPDATE lots SET statut = ? WHERE id = ?', [statut, lotId]);
-  await db.run('DELETE FROM signalements WHERE lot_id = ?', [lotId]);
+  await db.run('DELETE FROM signalements WHERE lot_id = ? AND resolu = 0', [lotId]);
   for (const raison of problemes) {
     await db.run('INSERT INTO signalements (lot_id, raison) VALUES (?, ?)', [lotId, raison]);
   }
@@ -35,26 +37,83 @@ function payloadLot(body, ancien) {
     try { colonnesFinales = JSON.parse(ancien.colonnes_csv) || []; } catch { colonnesFinales = []; }
   }
   const sensiblesFinales = colonnesSensibles(colonnesFinales);
+  const contenus = analyse.contenus_sensibles || [];
 
   let valeurs = analyse.valeurs;
+  let dates = analyse.dates;
   let moyenneControle = analyse.moyenne;
   if (!valeurs.length && ancien?.valeurs_controle) {
     try { valeurs = JSON.parse(ancien.valeurs_controle) || []; } catch { valeurs = []; }
     moyenneControle = ancien.moyenne_controle;
+    try { dates = ancien.dates_controle ? JSON.parse(ancien.dates_controle) : []; } catch { dates = []; }
   }
 
+  const conditions = composerConditions(body) || (body.conditions ? String(body.conditions).trim() : null);
+
   return {
-    nom: body.nom,
+    nom: String(body.nom || '').trim(),
     machine_id: body.machine_id ? Number(body.machine_id) : null,
     date: body.date || null,
-    conditions: body.conditions || null,
+    conditions,
     anonymise: body.anonymise ? 1 : 0,
     colonnes_csv: colonnesFinales.length ? JSON.stringify(colonnesFinales) : null,
-    alerte_identite: sensiblesFinales.length ? 1 : 0,
+    alerte_identite: (sensiblesFinales.length || contenus.length) ? 1 : 0,
     sensibles: sensiblesFinales,
+    contenus_sensibles: contenus,
     valeurs_controle: valeurs.length ? JSON.stringify(valeurs) : null,
-    moyenne_controle: moyenneControle
+    dates_controle: dates && dates.length ? JSON.stringify(dates) : null,
+    moyenne_controle: moyenneControle,
+    est_test: Number(body.est_test || ancien?.est_test || 0)
   };
+}
+
+async function enregistrerMesuresCsv(lotId, csvTexte, dateLot) {
+  const texte = String(csvTexte || '');
+  if (!texte.trim()) return [];
+  const lignes = texte.split(/\r?\n/).filter((l) => l.trim());
+  if (lignes.length < 2 || !/code_patient/i.test(lignes[0])) return [];
+  const cols = lignes[0].split(/[;,]/);
+  const iCode = cols.findIndex((c) => /code_patient/i.test(c));
+  const iPar = cols.findIndex((c) => /parametre/i.test(c));
+  const iVal = cols.findIndex((c) => /valeur/i.test(c));
+  const iUni = cols.findIndex((c) => /unite/i.test(c));
+  const iDat = cols.findIndex((c) => /^date/i.test(c));
+  await db.run('DELETE FROM mesures_reference WHERE lot_id = ?', [lotId]);
+  const inconnus = new Set();
+  for (let k = 1; k < lignes.length; k++) {
+    const c = lignes[k].split(/[;,]/);
+    if (iCode < 0 || !c[iCode]) continue;
+    const psn = String(c[iCode]).trim().toUpperCase();
+    await db.run(
+      `INSERT INTO mesures_reference (code_patient, parametre, valeur, unite, date, lot_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        psn,
+        iPar >= 0 ? c[iPar] : null,
+        iVal >= 0 ? Number(String(c[iVal]).replace(',', '.')) : null,
+        iUni >= 0 ? c[iUni] : null,
+        iDat >= 0 ? c[iDat] : dateLot,
+        lotId
+      ]
+    );
+  }
+  for (const psn of extrairePsnCsv(texte)) {
+    const connu = await db.get(
+      `SELECT id FROM patients_pseudo WHERE upper(COALESCE(psn, code)) = ?`,
+      [String(psn).toUpperCase()]
+    );
+    if (!connu) inconnus.add(psn);
+  }
+  for (const psn of inconnus) {
+    await db.run(
+      'INSERT INTO signalements (lot_id, raison) VALUES (?, ?)',
+      [lotId, `PSN inconnu : ${psn}`]
+    );
+  }
+  if (inconnus.size) {
+    await db.run("UPDATE lots SET statut = 'douteux' WHERE id = ?", [lotId]);
+  }
+  return [...inconnus];
 }
 
 function uniqueValidations(liste) {
@@ -68,8 +127,13 @@ function uniqueValidations(liste) {
 
 function enrichir(lot, validations = []) {
   const n = Number(lot.nb_signalements) || 0;
-  const detail = detailScoreConfiance(lot, validations, n);
-  const statutVu = libelleStatut(lot, validations, n);
+  let sensibles = [];
+  if (lot.colonnes_csv) {
+    try { sensibles = colonnesSensibles(JSON.parse(lot.colonnes_csv) || []); } catch { sensibles = []; }
+  }
+  const lotVu = { ...lot, sensibles };
+  const detail = detailScoreConfiance(lotVu, validations, n);
+  const statutVu = libelleStatut(lotVu, validations, n);
   return {
     ...lot,
     score_confiance: detail.score,
@@ -85,15 +149,20 @@ router.post('/analyser-csv', (req, res) => {
   res.json({
     colonnes: analyse.colonnes,
     sensibles: analyse.sensibles,
+    contenus_sensibles: analyse.contenus_sensibles,
     nb_valeurs: analyse.valeurs.length,
-    moyenne: analyse.moyenne
+    moyenne: analyse.moyenne,
+    parametre: analyse.parametre
   });
 });
 
 router.get('/', async (req, res) => {
   try {
-    const clauses = [];
+    const clauses = ['COALESCE(lots.archive, 0) = 0'];
     const params = [];
+    if (req.query.archives === '1') {
+      clauses.length = 0;
+    }
     if (req.query.machine_id) {
       clauses.push('lots.machine_id = ?');
       params.push(req.query.machine_id);
@@ -127,7 +196,9 @@ router.get('/', async (req, res) => {
       );
       enrichis.push(enrichir(lot, uniqueValidations(validations)));
     }
-    res.json(enrichis);
+    const filtre = req.query.statut_affiche;
+    const sortie = filtre ? enrichis.filter((l) => l.statut_affiche === filtre) : enrichis;
+    res.json(sortie);
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
@@ -172,12 +243,13 @@ router.get('/:id/certificat', async (req, res) => {
     );
     const regles = await db.all('SELECT * FROM regles_alerte WHERE lot_id = ?', [req.params.id]);
     const vu = enrichir(lot, uniqueValidations(validations));
+    const { formaterJour } = require('../lib/dates');
 
     const PDFDocument = require('pdfkit');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="certificat-${lot.code_verification || lot.id}.pdf"`);
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
     doc.pipe(res);
     doc.fontSize(16).text('Certificat de traçabilité', { align: 'center' });
     doc.moveDown(0.3);
@@ -191,7 +263,7 @@ router.get('/:id/certificat', async (req, res) => {
     doc.text(`Référence interne : L-${String(lot.id).padStart(3, '0')}`);
     doc.text(`Code de vérification : ${lot.code_verification || 'n/r'}`);
     doc.text(`Machine : ${lot.machine_nom || 'non renseignée'} (${lot.machine_type || 'type n/r'})`);
-    doc.text(`Date de mesure : ${lot.date || 'non renseignée'}`);
+    doc.text(`Date de mesure : ${formaterJour(lot.date)}`);
     doc.text(`Conditions : ${lot.conditions || 'non renseignées'}`);
     doc.text(`Pseudonymisation confirmée : ${lot.anonymise ? 'oui' : 'non'}`);
     doc.text(`Statut : ${vu.statut_libelle}`);
@@ -246,6 +318,10 @@ router.get('/:id', async (req, res) => {
       'SELECT * FROM regles_alerte WHERE lot_id = ? ORDER BY parametre',
       [req.params.id]
     );
+    const codes = await db.all(
+      'SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ? LIMIT 8',
+      [req.params.id]
+    );
     res.json({
       ...enrichir(lot, uniqueValidations(validations)),
       validations: uniqueValidations(validations).map((v) => ({
@@ -259,7 +335,8 @@ router.get('/:id', async (req, res) => {
         date_paris: formaterParis(h.date)
       })),
       signalements,
-      reglesAlerte
+      reglesAlerte,
+      codes_patients: codes.map((c) => c.code_patient)
     });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
@@ -268,24 +345,29 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', async (req, res) => {
   const data = payloadLot(req.body);
-  if (!data.nom) return res.status(400).json({ erreur: 'Le nom du lot est obligatoire.' });
+  const erreurs = validerSaisieLot(data, { estTest: Boolean(data.est_test), strict: true });
+  if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
 
   try {
     const code = genererCodeVerification();
+    const createurId = req.utilisateur ? req.utilisateur.id : null;
     const { id } = await db.run(
       `INSERT INTO lots (nom, machine_id, date, conditions, anonymise, colonnes_csv, alerte_identite,
-        code_verification, moyenne_controle, valeurs_controle)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        code_verification, moyenne_controle, valeurs_controle, dates_controle, est_test, createur_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [data.nom, data.machine_id, data.date, data.conditions, data.anonymise, data.colonnes_csv,
-        data.alerte_identite, code, data.moyenne_controle, data.valeurs_controle]
+        data.alerte_identite, code, data.moyenne_controle, data.valeurs_controle, data.dates_controle,
+        data.est_test || 0, createurId]
     );
     await verifierEtSignaler(id, {
       machine_id: data.machine_id,
       date: data.date,
       conditions: data.conditions,
       anonymise: data.anonymise,
-      sensibles: data.sensibles
+      sensibles: data.sensibles,
+      contenus_sensibles: data.contenus_sensibles
     });
+    await enregistrerMesuresCsv(id, req.body.csv_texte, data.date);
     await journal.enregistrer(req, 'création lot', `lot ${id}`, data.nom);
     res.status(201).json({
       id,
@@ -303,9 +385,18 @@ router.put('/:id', async (req, res) => {
   try {
     const ancien = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
     if (!ancien) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (Number(ancien.archive)) {
+      return res.status(409).json({ erreur: 'Un lot archivé ne peut plus être modifié.' });
+    }
+    const motif = String(req.body.motif || '').trim();
+    if (!motif) {
+      return res.status(400).json({ erreur: 'Un motif de modification est obligatoire.' });
+    }
     const data = payloadLot(req.body, ancien);
-    if (!data.nom) return res.status(400).json({ erreur: 'Le nom du lot est obligatoire.' });
+    const erreurs = validerSaisieLot(data, { estTest: Boolean(Number(ancien.est_test)), strict: !Number(ancien.est_test) });
+    if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
 
+    const auteur = req.utilisateur ? req.utilisateur.nom : 'système';
     const champs = [
       ['nom', ancien.nom, data.nom],
       ['machine_id', ancien.machine_id, data.machine_id],
@@ -316,67 +407,87 @@ router.put('/:id', async (req, res) => {
     if (String(req.body.csv_texte || '').trim()) {
       champs.push(['colonnes_csv', ancien.colonnes_csv, data.colonnes_csv]);
     }
+    let change = false;
     for (const [champ, avant, apres] of champs) {
       if (historiqueDifferent(champ, avant, apres)) {
-        const dernier = await db.get(
-          'SELECT ancienne_valeur, nouvelle_valeur FROM historique_lots WHERE lot_id = ? AND champ = ? ORDER BY id DESC LIMIT 1',
-          [req.params.id, champ]
-        );
-        if (
-          dernier
-          && valeurHistorique(dernier.ancienne_valeur) === valeurHistorique(avant)
-          && valeurHistorique(dernier.nouvelle_valeur) === valeurHistorique(apres)
-        ) {
-          continue;
-        }
+        change = true;
         await db.run(
-          'INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date) VALUES (?, ?, ?, ?, ?)',
-          [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres), horlogeParis()]
+          `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres), horlogeParis(), auteur, motif]
         );
       }
     }
 
+    const validations = await db.all('SELECT * FROM validations WHERE lot_id = ?', [req.params.id]);
+    const revalider = change && validations.length > 0 ? 1 : Number(ancien.modifie_apres_validation || 0);
+
     await db.run(
       `UPDATE lots SET nom = ?, machine_id = ?, date = ?, conditions = ?, anonymise = ?,
-        colonnes_csv = ?, alerte_identite = ?, moyenne_controle = ?, valeurs_controle = ? WHERE id = ?`,
+        colonnes_csv = ?, alerte_identite = ?, moyenne_controle = ?, valeurs_controle = ?,
+        dates_controle = ?, modifie_apres_validation = ? WHERE id = ?`,
       [data.nom, data.machine_id, data.date, data.conditions, data.anonymise,
-        data.colonnes_csv, data.alerte_identite, data.moyenne_controle, data.valeurs_controle, req.params.id]
+        data.colonnes_csv, data.alerte_identite, data.moyenne_controle, data.valeurs_controle,
+        data.dates_controle, revalider, req.params.id]
     );
+    if (revalider) {
+      await db.run(
+        `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+         VALUES (?, 'statut', 'Validé', 'À revalider', ?, ?, ?)`,
+        [req.params.id, horlogeParis(), auteur, motif]
+      );
+    }
     await verifierEtSignaler(req.params.id, {
       machine_id: data.machine_id,
       date: data.date,
       conditions: data.conditions,
       anonymise: data.anonymise,
-      sensibles: data.sensibles
+      sensibles: data.sensibles,
+      contenus_sensibles: data.contenus_sensibles
     });
-    await journal.enregistrer(req, 'modification lot', `lot ${req.params.id}`, data.nom);
+    if (String(req.body.csv_texte || '').trim()) {
+      await enregistrerMesuresCsv(req.params.id, req.body.csv_texte, data.date);
+    }
+    await journal.enregistrer(req, 'modification lot', `lot ${req.params.id}`, `${data.nom} — ${motif}`);
     res.json({ message: 'Lot mis à jour.', alerte_identite: data.alerte_identite, sensibles: data.sensibles });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.post('/:id/archiver', async (req, res) => {
   try {
-    const lot = await db.get('SELECT id FROM lots WHERE id = ?', [req.params.id]);
+    const lot = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
     if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
-    await db.run('DELETE FROM signalements WHERE lot_id = ?', [req.params.id]);
-    await db.run('DELETE FROM validations WHERE lot_id = ?', [req.params.id]);
-    await db.run('DELETE FROM historique_lots WHERE lot_id = ?', [req.params.id]);
-    await db.run('DELETE FROM regles_alerte WHERE lot_id = ?', [req.params.id]);
-    await db.run('DELETE FROM lots WHERE id = ?', [req.params.id]);
-    await journal.enregistrer(req, 'suppression lot', `lot ${req.params.id}`, '');
-    res.json({ message: 'Lot supprimé.' });
+    if (Number(lot.archive)) return res.json({ message: 'Lot déjà archivé.' });
+    const auteur = req.utilisateur ? req.utilisateur.nom : 'système';
+    await db.run('UPDATE lots SET archive = 1 WHERE id = ?', [req.params.id]);
+    await db.run(
+      `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+       VALUES (?, 'archive', 'actif', 'archivé', ?, ?, ?)`,
+      [req.params.id, horlogeParis(), auteur, 'Archivage qualité — conservation de la mémoire']
+    );
+    await journal.enregistrer(req, 'archivage lot', `lot ${req.params.id}`, lot.nom);
+    res.json({ message: 'Lot archivé. Il reste consultable dans l’historique.' });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  return res.status(405).json({
+    erreur: 'La suppression est interdite dans un registre de traçabilité. Archivez le lot.'
+  });
+});
+
 router.post('/:id/validations', async (req, res) => {
   const { utilisateur_id, nom_biologiste } = req.body;
   try {
-    const lot = await db.get('SELECT id FROM lots WHERE id = ?', [req.params.id]);
+    const lot = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
     if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (Number(lot.archive)) {
+      return res.status(409).json({ erreur: 'Un lot archivé ne peut plus être validé.' });
+    }
 
     let biologiste = null;
     if (utilisateur_id) {
@@ -391,7 +502,12 @@ router.post('/:id/validations', async (req, res) => {
       );
     }
     if (!biologiste) {
-      return res.status(400).json({ erreur: 'Choisissez un biologiste enregistre dans la liste.' });
+      return res.status(400).json({ erreur: 'Choisissez un biologiste enregistré dans la liste.' });
+    }
+    if (lot.createur_id && Number(lot.createur_id) === Number(biologiste.id)) {
+      return res.status(403).json({
+        erreur: 'Règle des quatre yeux : un biologiste ne valide pas un lot qu’il a lui-même créé.'
+      });
     }
 
     const recente = await db.get(
@@ -409,6 +525,7 @@ router.post('/:id/validations', async (req, res) => {
       "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ?)",
       [req.params.id, biologiste.nom, horlogeParis()]
     );
+    await db.run('UPDATE lots SET modifie_apres_validation = 0 WHERE id = ?', [req.params.id]);
     await journal.enregistrer(req, 'validation lot', `lot ${req.params.id}`, biologiste.nom);
     res.status(201).json({ id, nom_biologiste: biologiste.nom });
   } catch (err) {

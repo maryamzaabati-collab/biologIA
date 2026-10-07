@@ -6,7 +6,7 @@
 <title>Tableau de bord — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-accueil">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -80,17 +80,19 @@ document.getElementById('form-code').addEventListener('submit', async (e) => {
     const prenom = moi?.nom || 'là';
     document.getElementById('bonjour').textContent = 'Bonjour ' + prenom;
     document.getElementById('stats').innerHTML = `
-      <a class="stat" href="index.html"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></a>
-      <a class="stat" href="index.html?filtre=a_valider"><div class="valeur">${s.lotsSansValidation}</div><div class="label">À valider par un biologiste</div></a>
-      <a class="stat" href="signalements.html"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements ouverts</div></a>
+      <a class="stat stat-ok" href="index.html"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></a>
+      <a class="stat stat-wait" href="index.html?filtre=a_valider"><div class="valeur">${s.lotsAValider ?? s.lotsSansValidation}</div><div class="label">À valider</div></a>
+      <a class="stat stat-reval" href="index.html?filtre=a_revalider"><div class="valeur">${s.lotsARevalider || 0}</div><div class="label">À revalider</div></a>
+      <a class="stat stat-alert" href="index.html?filtre=signale"><div class="valeur">${s.lotsDouteux || 0}</div><div class="label">Signalés</div></a>
+      <a class="stat stat-alert" href="signalements.html"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements ouverts</div></a>
     `;
-    const recents = [...lots].sort((a, b) => Number(a.statut_affiche === 'ok') - Number(b.statut_affiche === 'ok')).slice(0, 6);
+    const recents = [...lots].sort((a, b) => Number(a.statut_affiche === 'valide') - Number(b.statut_affiche === 'valide')).slice(0, 6);
     const box = document.getElementById('urgence');
     if (!recents.length) {
       box.innerHTML = '<p class="empty">Aucun lot pour le moment.</p>';
     } else {
       box.innerHTML = recents.map((l) => `
-        <a href="lot.html?id=${l.id}${l.statut_affiche === 'douteux' ? '&edit=1' : ''}">
+        <a href="lot.html?id=${l.id}${l.statut_affiche === 'signale' || l.statut_affiche === 'brouillon' ? '&edit=1' : ''}">
           <span><strong>${echap(l.nom)}</strong><br><span class="meta">${echap(l.machine_nom || 'machine n/r')}</span></span>
           <span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span>
         </a>

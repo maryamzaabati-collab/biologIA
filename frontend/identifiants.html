@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Identifiants — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-identifiants">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <h1>Identifiants</h1>
+    <p class="page-intro">Correspondance PSN ↔ numéro. Le technicien ne voit que le PSN et le nombre de mesures. Les noms restent masqués tant qu’un biologiste ne clique pas sur Afficher (journalisé).</p>
+    <div class="filtres">
+      <input type="search" id="filtre-q" placeholder="Rechercher un PSN ou un numéro">
+      <a class="btn-link" id="lien-export" href="/api/patients/export.csv">Exporter CSV</a>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="liste"><p class="empty">Chargement…</p></div>
+    <div id="pagination" class="pagination"></div>
+    <div id="identite-box"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+let page = 1;
+const taille = 20;
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const q = document.getElementById('filtre-q').value.trim() || params.get('q') || '';
+  if (q && !document.getElementById('filtre-q').value) document.getElementById('filtre-q').value = q;
+  const exportQ = q ? `?q=${encodeURIComponent(q)}` : '';
+  document.getElementById('lien-export').href = '/api/patients/export.csv' + exportQ;
+  try {
+    const data = await api(`/patients?page=${page}&taille=${taille}&q=${encodeURIComponent(q)}`);
+    const box = document.getElementById('liste');
+    const bio = roleActuel() === 'biologiste';
+    if (!data.identifiants.length) {
+      box.innerHTML = '<p class="empty">Aucun identifiant pour cette recherche.</p>';
+      document.getElementById('pagination').innerHTML = '';
+      return;
+    }
+    const entete = bio
+      ? '<th>PSN</th><th>Numéro</th><th>Lots</th><th>Mesures</th><th></th>'
+      : '<th>PSN</th><th>Mesures</th>';
+    box.innerHTML = `<table class="table-audit"><thead><tr>${entete}</tr></thead><tbody>
+      ${data.identifiants.map((l) => bio
+        ? `<tr>
+            <td class="mono">${echap(l.psn)}</td>
+            <td class="mono">${echap(l.numero_patient || '')}</td>
+            <td>${l.nb_lots}</td>
+            <td>${l.nb_mesures}</td>
+            <td><button type="button" class="secondary" data-psn="${echap(l.psn)}">Afficher</button></td>
+          </tr>`
+        : `<tr><td class="mono">${echap(l.psn)}</td><td>${l.nb_mesures}</td></tr>`
+      ).join('')}
+    </tbody></table>`;
+    const pages = Math.max(1, Math.ceil(data.total / taille));
+    document.getElementById('pagination').innerHTML =
+      `<button type="button" class="secondary" ${page <= 1 ? 'disabled' : ''} id="p-prec">Précédent</button>
+       <span>Page ${page} / ${pages} — ${data.total} identifiant(s)</span>
+       <button type="button" class="secondary" ${page >= pages ? 'disabled' : ''} id="p-suiv">Suivant</button>`;
+    const prec = document.getElementById('p-prec');
+    const suiv = document.getElementById('p-suiv');
+    if (prec) prec.onclick = () => { page -= 1; charger(); };
+    if (suiv) suiv.onclick = () => { page += 1; charger(); };
+    box.querySelectorAll('[data-psn]').forEach((btn) => {
+      btn.addEventListener('click', () => demanderIdentite(btn.dataset.psn));
+    });
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+async function demanderIdentite(psn) {
+  const motif = window.prompt('Motif obligatoire (écrit dans le journal) :');
+  if (!motif) return;
+  try {
+    const r = await api('/patients/afficher-identite', {
+      method: 'POST',
+      body: JSON.stringify({ psn, motif })
+    });
+    const i = r.identite;
+    document.getElementById('identite-box').innerHTML =
+      `<p class="message ok">${echap(i.nom)} ${echap(i.prenom)} · ${echap(i.numero_patient)} · ${echap(i.date_naissance)} · ${echap(i.ville)}</p>
+       <p class="hint">Affichage journalisé (qui, quand, PSN, motif).</p>`;
+    notifier('Identité affichée', 'ok');
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+document.getElementById('filtre-q').addEventListener('input', () => {
+  page = 1;
+  charger();
+});
+charger();
+</script>
+</body>
+</html>

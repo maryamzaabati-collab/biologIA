@@ -6,7 +6,7 @@
 <title>Conformité — biologIA</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="page-conformite">
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="logo-mark"></span> biologIA</div>
@@ -14,62 +14,36 @@
   </aside>
   <main>
     <h1>Conformité</h1>
-    <p class="page-intro">Protection des données de référence, RGPD, ISO 15189 et AI Act — démonstrateur pédagogique, pas une certification.</p>
-    <div class="card">
-      <div class="conformite-ligne">
-        <div>
-          <strong>Pseudonymisation</strong>
-          <p>Case cochée et scan des colonnes CSV à chaque lot. Identités remplacées par un code, pas d’anonymisation irréversible.</p>
-        </div>
-        <span class="badge ok">Mis en place</span>
-      </div>
-      <div class="conformite-ligne">
-        <div>
-          <strong>Journal de validation</strong>
-          <p>Qui a validé quoi, et quand — signature biologiste nominative, péremption à 12 mois.</p>
-        </div>
-        <span class="badge ok">Mis en place</span>
-      </div>
-      <div class="conformite-ligne">
-        <div>
-          <strong>Contrôle des accès</strong>
-          <p>Un rôle par utilisateur (client, technicien, biologiste). Les comptes attendent une validation biologiste.</p>
-        </div>
-        <span class="badge attente">Partiel</span>
-      </div>
-      <div class="conformite-ligne">
-        <div>
-          <strong>Transparence sur l’IA</strong>
-          <p>Chaque règle d’alerte reste liée à un lot, une machine et une date. Les décisions de validation restent humaines.</p>
-        </div>
-        <span class="badge ok">Mis en place</span>
-      </div>
-    </div>
-    <div class="card" style="margin-top:20px">
-      <div class="conformite-ligne">
-        <div>
-          <strong>ISO 15189</strong>
-          <p>Le registre, la validation biologiste et le certificat par lot illustrent l’esprit de l’accréditation : retracer les données de référence. Ce n’est pas une accréditation COFRAC.</p>
-        </div>
-        <span class="badge attente">Partiel</span>
-      </div>
-      <div class="conformite-ligne">
-        <div>
-          <strong>RGPD</strong>
-          <p>Aucun bilan patient n’est stocké ni interprété. Une colonne identifiante (nom, NIR…) déclenche un signalement.</p>
-        </div>
-        <span class="badge ok">Mis en place</span>
-      </div>
-      <div class="conformite-ligne">
-        <div>
-          <strong>AI Act</strong>
-          <p>Pas de diagnostic automatisé. Les seuils d’alerte sont des exemples pédagogiques, validés par un biologiste.</p>
-        </div>
-        <span class="badge douteux">À faire</span>
-      </div>
-    </div>
+    <p class="page-intro">Pastilles calculées à partir de contrôles réels (sessions, journal, patients PSN, validations). Démonstrateur pédagogique, pas une certification.</p>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="liste"><p class="empty">Chargement…</p></div>
   </main>
 </div>
 <script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const c = await api('/conformite');
+    const badge = (s) => s === 'mis_en_place' ? 'ok' : (s === 'partiel' ? 'attente' : 'douteux');
+    const lib = (s) => s === 'mis_en_place' ? 'Mis en place' : (s === 'partiel' ? 'Partiel' : 'À faire');
+    document.getElementById('liste').innerHTML = `
+      <div class="card">${c.items.map((it) => `
+        <div class="conformite-ligne">
+          <div>
+            <strong>${echap(it.titre)}</strong>
+            <p>${echap(it.detail)}</p>
+          </div>
+          <span class="badge ${badge(it.statut)}">${lib(it.statut)}</span>
+        </div>`).join('')}
+      </div>
+      <div class="card" style="margin-top:20px">
+        <strong>Note de transparence (AI Act)</strong>
+        <p class="hint">${echap(c.note_ai)}</p>
+      </div>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
 </body>
 </html>

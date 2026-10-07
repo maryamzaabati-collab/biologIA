@@ -3,7 +3,6 @@ const os = require('os');
 const fs = require('fs');
 const { ouvrirSqlite } = require('./lib/ouvrir-sqlite');
 const { hasherMotDePasse } = require('./lib/motdepasse');
-const { problemesLot, colonnesSensibles } = require('./lib/tracabilite');
 
 function genererCodeVerification() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -162,12 +161,72 @@ async function init() {
   await ajouterColonneSiAbsente('lots', 'code_verification', 'TEXT');
   await ajouterColonneSiAbsente('lots', 'moyenne_controle', 'REAL');
   await ajouterColonneSiAbsente('lots', 'valeurs_controle', 'TEXT');
+  await ajouterColonneSiAbsente('lots', 'dates_controle', 'TEXT');
+  await ajouterColonneSiAbsente('lots', 'archive', 'INTEGER DEFAULT 0');
+  await ajouterColonneSiAbsente('lots', 'est_test', 'INTEGER DEFAULT 0');
+  await ajouterColonneSiAbsente('lots', 'createur_id', 'INTEGER');
+  await ajouterColonneSiAbsente('lots', 'modifie_apres_validation', 'INTEGER DEFAULT 0');
+  await ajouterColonneSiAbsente('historique_lots', 'utilisateur', 'TEXT');
+  await ajouterColonneSiAbsente('historique_lots', 'motif', 'TEXT');
+  await ajouterColonneSiAbsente('signalements', 'justification', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'date_calibration', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'statut_service', "TEXT DEFAULT 'en_service'");
   await ajouterColonneSiAbsente('utilisateurs', 'identifiant', 'TEXT');
   await ajouterColonneSiAbsente('utilisateurs', 'mot_de_passe', 'TEXT');
   await ajouterColonneSiAbsente('utilisateurs', 'email', 'TEXT');
   await ajouterColonneSiAbsente('utilisateurs', 'statut', "TEXT DEFAULT 'valide'");
   await ajouterColonneSiAbsente('utilisateurs', 'role_demande', 'TEXT');
   await ajouterColonneSiAbsente('utilisateurs', 'google_id', 'TEXT');
+
+  await run(`CREATE TABLE IF NOT EXISTS tentatives_connexion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    identifiant TEXT NOT NULL,
+    reussie INTEGER DEFAULT 0,
+    date TEXT DEFAULT (datetime('now'))
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS patients_identite (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nom TEXT NOT NULL,
+    prenom TEXT NOT NULL,
+    date_naissance TEXT,
+    sexe TEXT,
+    nir_fictif TEXT,
+    departement TEXT
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS patients_pseudo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    patient_id INTEGER NOT NULL,
+    psn TEXT UNIQUE,
+    identite_id INTEGER UNIQUE,
+    FOREIGN KEY (patient_id) REFERENCES patients_identite(id),
+    FOREIGN KEY (identite_id) REFERENCES patients_identite(id)
+  )`);
+
+  await run(`CREATE TABLE IF NOT EXISTS mesures_reference (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code_patient TEXT NOT NULL,
+    parametre TEXT,
+    valeur REAL,
+    unite TEXT,
+    date TEXT,
+    lot_id INTEGER
+  )`);
+
+  await ajouterColonneSiAbsente('patients_identite', 'numero_patient', 'TEXT');
+  await ajouterColonneSiAbsente('patients_identite', 'ville', 'TEXT');
+  await ajouterColonneSiAbsente('patients_identite', 'code_postal', 'TEXT');
+  await ajouterColonneSiAbsente('patients_identite', 'cree_par', 'TEXT');
+  await ajouterColonneSiAbsente('patients_identite', 'cree_le', 'TEXT');
+  await ajouterColonneSiAbsente('patients_pseudo', 'psn', 'TEXT');
+  await ajouterColonneSiAbsente('patients_pseudo', 'identite_id', 'INTEGER');
+  await run('CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_numero ON patients_identite(numero_patient)');
+  await run('CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_psn ON patients_pseudo(psn)');
+  await run('CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_identite_id ON patients_pseudo(identite_id)');
+  await run(`UPDATE patients_pseudo SET psn = code WHERE psn IS NULL OR psn = ''`);
+  await run(`UPDATE patients_pseudo SET identite_id = patient_id WHERE identite_id IS NULL`);
 
   const sansCode = await all(
     "SELECT id FROM lots WHERE code_verification IS NULL OR code_verification = ''"
@@ -178,32 +237,34 @@ async function init() {
   await run('CREATE UNIQUE INDEX IF NOT EXISTS idx_lots_code ON lots(code_verification)');
 
   const comptes = [
-    ['amrani', 'Dr. Amrani', 'biologiste'],
-    ['chen', 'Dr. Chen', 'biologiste'],
-    ['elfassi', 'Dr. El Fassi', 'biologiste'],
-    ['samira', 'Samira K.', 'technicien'],
-    ['yanis', 'Yanis B.', 'technicien']
+    ['amrani', 'Dr. Amrani', 'biologiste', 'amrani@labo-demo.fr'],
+    ['chen', 'Dr. Chen', 'biologiste', 'chen@labo-demo.fr'],
+    ['elfassi', 'Dr. El Fassi', 'biologiste', 'elfassi@labo-demo.fr'],
+    ['samira', 'Samira K.', 'technicien', 'samira@labo-demo.fr'],
+    ['yanis', 'Yanis B.', 'technicien', 'yanis@labo-demo.fr'],
+    ['lea', 'Léa Martin', 'client', 'lea@labo-demo.fr']
   ];
   const motDePasseDemo = hasherMotDePasse('labo2026');
-  for (const [identifiant, nom, role] of comptes) {
+  for (const [identifiant, nom, role, email] of comptes) {
     const existant = await get(
       'SELECT id, mot_de_passe FROM utilisateurs WHERE identifiant = ? OR nom = ?',
       [identifiant, nom]
     );
     if (!existant) {
       await run(
-        `INSERT INTO utilisateurs (nom, role, identifiant, mot_de_passe, statut, role_demande)
-         VALUES (?, ?, ?, ?, 'valide', ?)`,
-        [nom, role, identifiant, motDePasseDemo, role]
+        `INSERT INTO utilisateurs (nom, role, identifiant, mot_de_passe, email, statut, role_demande)
+         VALUES (?, ?, ?, ?, ?, 'valide', ?)`,
+        [nom, role, identifiant, motDePasseDemo, email, role]
       );
     } else {
       await run(
         `UPDATE utilisateurs SET identifiant = COALESCE(identifiant, ?),
           mot_de_passe = COALESCE(NULLIF(mot_de_passe, ''), ?),
           role = ?, statut = COALESCE(NULLIF(statut, ''), 'valide'),
-          role_demande = COALESCE(role_demande, ?)
+          role_demande = COALESCE(role_demande, ?),
+          email = COALESCE(NULLIF(email, ''), ?)
          WHERE id = ?`,
-        [identifiant, motDePasseDemo, role, role, existant.id]
+        [identifiant, motDePasseDemo, role, role, email, existant.id]
       );
     }
   }
@@ -212,26 +273,6 @@ async function init() {
     await require('./lib/donnees-demo').remplir({ run, get, all });
   } catch (err) {
     console.error('Chargement des données de démonstration :', err);
-  }
-
-  const lotsExistants = await all('SELECT * FROM lots');
-  for (const lot of lotsExistants) {
-    let sensibles = [];
-    if (lot.colonnes_csv) {
-      try { sensibles = colonnesSensibles(JSON.parse(lot.colonnes_csv) || []); } catch { sensibles = []; }
-    }
-    const problemes = problemesLot({
-      machine_id: lot.machine_id,
-      date: lot.date,
-      conditions: lot.conditions,
-      anonymise: lot.anonymise,
-      sensibles
-    });
-    await run('UPDATE lots SET statut = ? WHERE id = ?', [problemes.length ? 'douteux' : 'ok', lot.id]);
-    await run('DELETE FROM signalements WHERE lot_id = ?', [lot.id]);
-    for (const raison of problemes) {
-      await run('INSERT INTO signalements (lot_id, raison) VALUES (?, ?)', [lot.id, raison]);
-    }
   }
 }
 
