@@ -167,6 +167,10 @@ function icone(nom) {
     lot: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l8-3 8 3v10l-8 3-8-3z"/><path d="M12 4v16M4 7l8 3 8-3"/></svg>',
     regle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v4H5zM5 11h10v4H5zM5 17h7v2H5z"/></svg>',
     alerte: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 16H3z"/><path d="M12 10v4m0 2v1"/></svg>',
+    thermo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14.5V6a2 2 0 1 1 4 0v8.5a3.5 3.5 0 1 1-4 0z"/><path d="M12 17v-7"/></svg>',
+    cadenas: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+    signature: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M5 16l9-9 3 3-9 9H5z"/></svg>',
+    tri: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>',
     analyseur: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="11" rx="2"/><path d="M7 8V6h10v2M8 12h3m2 0h3M8 16h8"/></svg>',
     centrifugeuse: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/></svg>',
     pipeteur: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v7l3 11H7l3-11z"/></svg>'
@@ -177,9 +181,20 @@ function icone(nom) {
 function htmlJauge(score, libelle = 'Score de confiance', detail, opts = {}) {
   const n = Number(score) || 0;
   const modePct = opts.mode === 'pourcent';
+  const classe = n >= 80 ? 'ok' : n >= 50 ? 'moyen' : 'faible';
+  if (opts.mini) {
+    const r = 16;
+    const c = 2 * Math.PI * r;
+    const offset = c - (n / 100) * c;
+    return `<svg class="jauge jauge-mini ${classe}" viewBox="0 0 48 48" aria-label="${echap(libelle)} ${n} sur 100">
+      <circle class="jauge-fond" cx="24" cy="24" r="${r}"></circle>
+      <circle class="jauge-arc" cx="24" cy="24" r="${r}"
+        stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"></circle>
+      <text x="24" y="27" text-anchor="middle">${n}</text>
+    </svg>`;
+  }
   const c = 2 * Math.PI * 42;
   const offset = c - (n / 100) * c;
-  const classe = n >= 80 ? 'ok' : n >= 50 ? 'moyen' : 'faible';
   const lignes = Array.isArray(detail) ? `<details class="score-detail"><summary>Voir le calcul</summary><ul>${
     detail.map((l) => `<li>${l.ok ? '✓' : '✗'} ${echap(l.label)} <strong>${l.points}/${l.max}</strong></li>`).join('')
   }</ul></details>` : '';
@@ -251,10 +266,22 @@ function htmlChaineTracabilite(lot) {
   const valTxt = val ? echap(val.nom_biologiste) : 'En attente';
   return `
     <div class="chaine" aria-label="Parcours des données">
-      <div class="chaine-box"><strong>Origine</strong><span>${echap(origine)}</span></div>
-      <div class="chaine-box"><strong>Machine</strong><span>${echap(machine)}</span></div>
-      <div class="chaine-box ${Number(lot.anonymise) ? '' : 'attente'}"><strong>Pseudonymisation</strong><span>${echap(anon)}</span></div>
-      <div class="chaine-box ${val ? '' : 'attente'}"><strong>Validation</strong><span>${valTxt}</span></div>
+      <div class="chaine-box">
+        <span class="chaine-icone">${icone('thermo')}</span>
+        <strong>Origine</strong><span>${echap(origine)}</span>
+      </div>
+      <div class="chaine-box">
+        <span class="chaine-icone">${icone('analyseur')}</span>
+        <strong>Machine</strong><span>${echap(machine)}</span>
+      </div>
+      <div class="chaine-box ${Number(lot.anonymise) ? '' : 'attente'}">
+        <span class="chaine-icone">${icone('cadenas')}</span>
+        <strong>Pseudonymisation</strong><span>${echap(anon)}</span>
+      </div>
+      <div class="chaine-box ${val ? '' : 'attente'}">
+        <span class="chaine-icone">${icone('signature')}</span>
+        <strong>Validation</strong><span>${valTxt}</span>
+      </div>
     </div>`;
 }
 

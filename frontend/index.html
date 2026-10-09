@@ -28,6 +28,7 @@
       </div>
       <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
+    <div class="lots-toolbar">
     <div class="pills" id="pills">
       <button type="button" class="secondary active" data-filtre="">Tous</button>
       <button type="button" class="secondary" data-filtre="brouillon">Brouillons</button>
@@ -42,7 +43,8 @@
       <input type="date" id="filtre-date">
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
-    <div id="liste-lots" class="entry-list"><p class="empty">Chargement…</p></div>
+    </div>
+    <div id="liste-lots" class="lots-grille"><p class="empty">Chargement…</p></div>
     <div id="pagination-lots" class="pagination"></div>
     <p class="only-biologiste hint" style="margin-top:24px;">Ouvrez un lot pour le valider.</p>
   </main>
@@ -51,7 +53,7 @@
 <script>
 let filtreStatutAffiche = new URLSearchParams(location.search).get('filtre') || '';
 let pageLots = 1;
-const PAGE_LOTS = 8;
+const PAGE_LOTS = 9;
 
 async function remplirMachines() {
   const machines = await api('/machines');
@@ -92,13 +94,15 @@ async function chargerLots() {
     if (pageLots > pages) pageLots = pages;
     const slice = lots.slice((pageLots - 1) * PAGE_LOTS, pageLots * PAGE_LOTS);
     conteneur.innerHTML = slice.map((lot) => `
-      <a class="entry" href="lot.html?id=${lot.id}">
-        <span class="ref">${refLot(lot.id)}</span>
-        <span>
-          <span class="nom">${echap(lot.nom)}${Number(lot.est_test) ? ' · TEST' : ''}</span>
-          <div class="meta">${echap(lot.machine_nom || 'machine non renseignée')} · ${formatDate(lot.date)}</div>
-        </span>
+      <a class="lot-carte" href="lot.html?id=${lot.id}">
         <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+        <strong class="lot-carte-nom">${echap(lot.nom)}${Number(lot.est_test) ? ' · TEST' : ''}</strong>
+        <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
+        <span class="lot-carte-date">${formatDate(lot.date)}</span>
+        <span class="lot-carte-pied">
+          ${htmlJauge(lot.score_confiance, 'Score de confiance', null, { mini: true })}
+          <span class="lot-carte-ref">${refLot(lot.id)}</span>
+        </span>
       </a>
     `).join('');
     const pag = document.getElementById('pagination-lots');

@@ -27,6 +27,7 @@
       <form id="form-numero">
         <label for="numero">Numéro patient</label>
         <input type="text" id="numero" placeholder="NP-2026-000123" autocomplete="off">
+        <p id="erreur-numero" class="message erreur champ-erreur" hidden></p>
         <button type="submit">Chercher le numéro</button>
       </form>
       <form id="form-nom" style="margin-top:16px">
@@ -35,6 +36,7 @@
           <input type="text" id="nom" placeholder="Nom">
           <input type="date" id="date_naissance">
         </div>
+        <p id="erreur-nom" class="message erreur champ-erreur" hidden></p>
         <button type="submit">Retrouver le PSN</button>
       </form>
       <div id="resultat-recherche"></div>
@@ -144,22 +146,30 @@ async function identifier(corps) {
 
 document.getElementById('form-numero').addEventListener('submit', async (e) => {
   e.preventDefault();
+  afficherMessage('erreur-numero', '');
+  afficherMessage('erreur-nom', '');
+  afficherMessage('erreur-page', '');
   try {
     await identifier({ numero_patient: document.getElementById('numero').value });
   } catch (err) {
-    afficherMessage('erreur-page', err.message);
+    afficherMessage('erreur-numero', err.message);
+    document.getElementById('numero').focus();
   }
 });
 
 document.getElementById('form-nom').addEventListener('submit', async (e) => {
   e.preventDefault();
+  afficherMessage('erreur-numero', '');
+  afficherMessage('erreur-nom', '');
+  afficherMessage('erreur-page', '');
   try {
     await identifier({
       nom: document.getElementById('nom').value,
       date_naissance: document.getElementById('date_naissance').value
     });
   } catch (err) {
-    afficherMessage('erreur-page', err.message);
+    afficherMessage('erreur-nom', err.message);
+    document.getElementById('nom').focus();
   }
 });
 

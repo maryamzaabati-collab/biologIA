@@ -3,8 +3,7 @@
   "private": true,
   "description": "Lance biologIA depuis la racine (Replit / GitHub).",
   "scripts": {
-    "start": "node backend/start.js",
-    "postinstall": "npm install --prefix backend"
+    "start": "node backend/start.js"
   },
   "engines": {
     "node": ">=20"

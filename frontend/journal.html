@@ -31,6 +31,33 @@
 const PAGE = 15;
 let page = 1;
 let cache = { lignes: [], actions: [] };
+let tri = { col: 'date', dir: -1 };
+
+function valeurTri(ligne, col) {
+  if (col === 'date') return ligne.date || ligne.date_paris || '';
+  if (col === 'qui') return String(ligne.nom_affiche || '').toLowerCase();
+  if (col === 'action') return String(ligne.action || '').toLowerCase();
+  return String(ligne.cible_lisible || ligne.cible || '').toLowerCase();
+}
+
+function lignesTriees() {
+  const lignes = [...(cache.lignes || [])];
+  const { col, dir } = tri;
+  lignes.sort((a, b) => {
+    const va = valeurTri(a, col);
+    const vb = valeurTri(b, col);
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+  return lignes;
+}
+
+function enteteTri(col, libelle) {
+  const actif = tri.col === col;
+  const fleche = !actif ? '↕' : (tri.dir === 1 ? '↑' : '↓');
+  return `<th><button type="button" class="tri-th ${actif ? 'actif' : ''}" data-tri="${col}">${libelle} <span>${fleche}</span></button></th>`;
+}
 
 function classeAction(action) {
   const a = String(action || '').toLowerCase();
@@ -70,7 +97,7 @@ async function charger() {
 }
 
 function afficherPage() {
-  const lignes = cache.lignes || [];
+  const lignes = lignesTriees();
   const box = document.getElementById('liste');
   if (!lignes.length) {
     box.innerHTML = '<p class="empty">Aucune action enregistrée pour l’instant.</p>';
@@ -80,7 +107,7 @@ function afficherPage() {
   const pages = Math.max(1, Math.ceil(lignes.length / PAGE));
   if (page > pages) page = pages;
   const slice = lignes.slice((page - 1) * PAGE, page * PAGE);
-  box.innerHTML = `<table class="table-audit"><thead><tr><th>Date</th><th>Qui</th><th>Action</th><th>Cible</th></tr></thead><tbody>${
+  box.innerHTML = `<table class="table-audit"><thead><tr>${enteteTri('date', 'Date')}${enteteTri('qui', 'Qui')}${enteteTri('action', 'Action')}${enteteTri('cible', 'Cible')}</tr></thead><tbody>${
     slice.map((l) => {
       const cible = l.lot_id
         ? `<a href="lot.html?id=${l.lot_id}">${echap(l.cible_lisible || l.cible)}</a>`
@@ -99,6 +126,16 @@ function afficherPage() {
        <button type="button" class="secondary" data-p="${page + 1}" ${page >= pages ? 'disabled' : ''}>Suivant</button>`
     : '';
 }
+
+document.getElementById('liste').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-tri]');
+  if (!btn) return;
+  const col = btn.dataset.tri;
+  tri.dir = tri.col === col ? -tri.dir : (col === 'date' ? -1 : 1);
+  tri.col = col;
+  page = 1;
+  afficherPage();
+});
 
 document.getElementById('pagination').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-p]');
