@@ -4,8 +4,9 @@ const db = require('../database');
 const { formaterParis, isoUtc } = require('../lib/dates');
 const { csvAvecBom } = require('../lib/tracabilite');
 
-function refLot(id) {
-  return 'L-' + String(id).padStart(3, '0');
+function libelleLot(lot) {
+  if (!lot) return '';
+  return lot.code_verification ? `${lot.nom} (${lot.code_verification})` : lot.nom;
 }
 
 function filtres(req) {
@@ -37,7 +38,7 @@ function mapper(l, parId) {
     date_paris: formaterParis(l.date),
     lot_id: lotId,
     cible_lisible: lot
-      ? `Lot ${refLot(lot.id)} — ${lot.nom}`
+      ? libelleLot(lot)
       : compte
         ? (l.details ? String(l.details).split('→')[0].trim() : l.cible)
         : (l.cible || '—')
@@ -55,7 +56,7 @@ router.get('/', async (req, res) => {
       `SELECT * FROM journal_audit ${where} ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`,
       [...params, taille, offset]
     );
-    const lots = await db.all('SELECT id, nom FROM lots');
+    const lots = await db.all('SELECT id, nom, code_verification FROM lots');
     const parId = new Map(lots.map((l) => [Number(l.id), l]));
     const actions = await db.all('SELECT DISTINCT action FROM journal_audit ORDER BY action');
     res.json({
@@ -77,7 +78,7 @@ router.get('/csv', async (req, res) => {
       `SELECT * FROM journal_audit ${where} ORDER BY date DESC, id DESC LIMIT 2000`,
       params
     );
-    const lots = await db.all('SELECT id, nom FROM lots');
+    const lots = await db.all('SELECT id, nom, code_verification FROM lots');
     const parId = new Map(lots.map((l) => [Number(l.id), l]));
     const csv = [['date', 'qui', 'action', 'cible', 'details']].concat(
       lignes.map((l) => {

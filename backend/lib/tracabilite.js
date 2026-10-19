@@ -292,12 +292,23 @@ function genererCodeVerification() {
   return code;
 }
 
+function etiquettePointControle(i, dates) {
+  const d = dates && dates[i];
+  if (d && /^\d{4}-\d{2}-\d{2}/.test(String(d))) {
+    const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d);
+  }
+  return `point ${i + 1}`;
+}
+
 function pointsControle(moyennes) {
-  const m = moyenne(moyennes);
-  const sd = ecartType(moyennes);
+  const ref = (moyennes || []).slice(0, MIN_POINTS_CONTROLE);
+  const m = moyenne(ref);
+  const sd = ecartType(ref);
   return {
     moyenne: m,
     ecart_type: sd,
+    nb_reference: ref.length,
     limite_1s_bas: m === null ? null : m - sd,
     limite_1s_haut: m === null ? null : m + sd,
     limite_2s_bas: m === null ? null : m - 2 * sd,
@@ -308,7 +319,7 @@ function pointsControle(moyennes) {
   };
 }
 
-function westgard(valeurs, m, sd) {
+function westgard(valeurs, m, sd, dates = []) {
   const alertes = [];
   if (!sd) return alertes;
   (valeurs || []).forEach((v, i) => {
@@ -316,7 +327,7 @@ function westgard(valeurs, m, sd) {
       alertes.push({
         regle: '1-3s',
         index: i,
-        message: `Règle 1-3s : le point ${i + 1} sort de ±3σ`
+        message: `Règle 1-3s : le ${etiquettePointControle(i, dates)} sort de ±3σ`
       });
     }
   });
@@ -327,7 +338,7 @@ function westgard(valeurs, m, sd) {
       alertes.push({
         regle: '2-2s',
         index: i,
-        message: `Règle 2-2s : les points ${i} et ${i + 1} sont consécutifs hors ±2σ du même côté`
+        message: `Règle 2-2s : ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)} sont consécutifs hors ±2σ du même côté`
       });
     }
   }
@@ -342,7 +353,7 @@ function carteLeveyJennings(valeurs, dates = []) {
       suffisant: false,
       message: messageInsuffisant,
       nb_points: vals.length,
-      nb_reference: vals.length,
+      nb_reference: Math.min(vals.length, MIN_POINTS_CONTROLE),
       moyenne: null,
       ecart_type: 0,
       limite_1s_bas: null,
@@ -367,7 +378,7 @@ function carteLeveyJennings(valeurs, dates = []) {
       suffisant: false,
       message: 'Écart-type nul : les valeurs du CSV sont identiques, limites non calculables',
       nb_points: vals.length,
-      nb_reference: vals.length,
+      nb_reference: Math.min(vals.length, MIN_POINTS_CONTROLE),
       moyenne: stats.moyenne,
       ecart_type: 0,
       limite_1s_bas: null,
@@ -386,7 +397,7 @@ function carteLeveyJennings(valeurs, dates = []) {
       }))
     };
   }
-  const alertes = westgard(vals, stats.moyenne, stats.ecart_type);
+  const alertes = westgard(vals, stats.moyenne, stats.ecart_type, dates);
   const indicesWestgard = new Set();
   for (const a of alertes) {
     indicesWestgard.add(a.index);
@@ -397,7 +408,7 @@ function carteLeveyJennings(valeurs, dates = []) {
     suffisant: true,
     message: null,
     nb_points: vals.length,
-    nb_reference: vals.length,
+    nb_reference: stats.nb_reference || MIN_POINTS_CONTROLE,
     ...stats,
     hors_norme: hors,
     westgard: alertes,

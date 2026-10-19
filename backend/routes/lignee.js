@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
         db.all('SELECT id, parametre, seuil_bas, seuil_haut, unite, statut, validee_par, date_validation_regle FROM regles_alerte WHERE lot_id = ?', [lot.id]),
         db.all('SELECT nom_biologiste, date_validation FROM validations WHERE lot_id = ? ORDER BY date_validation DESC', [lot.id]),
         db.all('SELECT raison, date FROM signalements WHERE lot_id = ? AND resolu = 0', [lot.id]),
-        db.all('SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ? LIMIT 5', [lot.id])
+        db.all('SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ?', [lot.id])
       ]);
       const vu = libelleStatut(lot, validations, signalements.length);
       resultat.push({
@@ -39,11 +39,11 @@ router.get('/', async (req, res) => {
         etapes: [
           {
             type: 'patient',
-            libelle: 'Patient pseudonymisé',
-            valeur: mesures[0] ? mesures[0].code_patient : (Number(lot.anonymise) ? 'Codes PSN du CSV' : 'non confirmé'),
+            libelle: 'Patients du lot',
+            valeur: mesures.length ? `${mesures.length} patient(s)` : (Number(lot.anonymise) ? 'Codes PSN du CSV' : 'non confirmé'),
             date: lot.date,
-            href: mesures[0] ? `identifiants.html?q=${encodeURIComponent(mesures[0].code_patient)}` : 'identifiants.html',
-            auteur: lot.conditions ? 'saisie lot' : null
+            href: 'identifiants.html',
+            details: mesures.map((m) => m.code_patient)
           },
           {
             type: 'mesures',
@@ -79,8 +79,7 @@ router.get('/', async (req, res) => {
             type: 'validation',
             libelle: 'Validation',
             valeur: validations[0] ? validations[0].nom_biologiste : 'en attente',
-            date: validations[0] && validations[0].date_validation,
-            auteur: validations[0] && validations[0].nom_biologiste
+            date: validations[0] && validations[0].date_validation
           }
         ]
       });

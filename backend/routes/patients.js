@@ -31,6 +31,27 @@ function peutAfficherIdentite(role) {
   return role === 'biologiste';
 }
 
+const quotasNom = new Map();
+function tropDeRecherchesNom(req, res, body) {
+  if (!String(body.nom || '').trim()) return false;
+  const uid = req.utilisateur && req.utilisateur.id ? req.utilisateur.id : req.ip;
+  const minute = Math.floor(Date.now() / 60000);
+  const cle = `${uid}:${minute}`;
+  const n = (quotasNom.get(cle) || 0) + 1;
+  quotasNom.set(cle, n);
+  if (n > 10) {
+    res.status(429).json({ erreur: 'Trop de recherches nom + date (10 par minute).' });
+    return true;
+  }
+  return false;
+}
+
+function detailsRecherche(r) {
+  if (r.refuse) return 'numéro refusé';
+  if (r.trouve) return 'trouvé';
+  return 'inconnu';
+}
+
 async function ligneParPsn(psn) {
   const code = String(psn || '').trim().toUpperCase();
   if (!code) return null;
@@ -62,7 +83,7 @@ async function identifierInterne(body) {
         refuse: true,
         message: lu.raison === 'controle'
           ? 'Numéro refusé : chiffre de contrôle invalide'
-          : 'Numéro refusé : format attendu NP-AAAA-000123'
+          : 'Numéro refusé : format attendu NP-2026-000123'
       };
     }
     const ligne = await db.get(
@@ -116,17 +137,19 @@ async function lignesIdentifiants(q) {
     ORDER BY psn
   `);
   const mesures = await db.all(
-    `SELECT upper(code_patient) AS psn, COUNT(*) AS nb_mesures, COUNT(DISTINCT lot_id) AS nb_lots
+    `SELECT upper(code_patient) AS psn, COUNT(*) AS nb_mesures, COUNT(DISTINCT lot_id) AS nb_lots,
+      MAX(date) AS date_derniere
      FROM mesures_reference GROUP BY upper(code_patient)`
   );
   const parPsn = new Map(mesures.map((m) => [m.psn, m]));
   let liste = rows.map((r) => {
-    const stats = parPsn.get(String(r.psn).toUpperCase()) || { nb_mesures: 0, nb_lots: 0 };
+    const stats = parPsn.get(String(r.psn).toUpperCase()) || { nb_mesures: 0, nb_lots: 0, date_derniere: null };
     return {
       psn: r.psn,
       numero_patient: r.numero_patient,
       nb_lots: Number(stats.nb_lots) || 0,
-      nb_mesures: Number(stats.nb_mesures) || 0
+      nb_mesures: Number(stats.nb_mesures) || 0,
+      date_derniere: stats.date_derniere || null
     };
   });
   if (recherche) {
@@ -163,13 +186,14 @@ router.get('/', async (req, res) => {
     const tranche = toutes.slice((page - 1) * taille, page * taille);
     const identifiants = tranche.map((l) => {
       if (role === 'technicien') {
-        return { psn: l.psn, nb_mesures: l.nb_mesures };
+        return { psn: l.psn, nb_mesures: l.nb_mesures, nb_lots: l.nb_lots, date_derniere: l.date_derniere };
       }
       return {
         psn: l.psn,
         numero_patient: l.numero_patient,
         nb_lots: l.nb_lots,
         nb_mesures: l.nb_mesures,
+        date_derniere: l.date_derniere,
         identite_masquee: true
       };
     });
@@ -185,8 +209,8 @@ router.get('/export.csv', async (req, res) => {
     const role = roleDe(req);
     const toutes = await lignesIdentifiants(req.query.q);
     const lignes = role === 'technicien'
-      ? [['psn', 'nb_mesures'], ...toutes.map((l) => [l.psn, l.nb_mesures])]
-      : [['psn', 'numero_patient', 'nb_lots', 'nb_mesures'], ...toutes.map((l) => [l.psn, l.numero_patient, l.nb_lots, l.nb_mesures])];
+      ? [['psn', 'nb_lots', 'nb_mesures', 'date_derniere'], ...toutes.map((l) => [l.psn, l.nb_lots, l.nb_mesures, l.date_derniere || ''])]
+      : [['psn', 'numero_patient', 'nb_lots', 'nb_mesures', 'date_derniere'], ...toutes.map((l) => [l.psn, l.numero_patient, l.nb_lots, l.nb_mesures, l.date_derniere || ''])];
     await journal.enregistrer(req, 'export identifiants', 'patients', `${toutes.length} lignes`);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="identifiants-patients.csv"');
@@ -199,10 +223,11 @@ router.get('/export.csv', async (req, res) => {
 router.post('/identifier', async (req, res) => {
   try {
     if (interditClient(req, res)) return;
-    const r = await identifierInterne(req.body || {});
+    const body = req.body || {};
+    if (tropDeRecherchesNom(req, res, body)) return;
+    const r = await identifierInterne(body);
     if (r.erreur) return res.status(r.erreur).json({ erreur: r.message });
-    const cible = r.psn || String(req.body.numero_patient || req.body.nom || '');
-    await journal.enregistrer(req, 'recherche patient', cible, r.message);
+    await journal.enregistrer(req, 'recherche patient', 'identification', detailsRecherche(r));
     res.json({
       trouve: r.trouve,
       refuse: r.refuse || false,
@@ -218,10 +243,11 @@ router.post('/identifier', async (req, res) => {
 router.post('/recherche', async (req, res) => {
   try {
     if (interditClient(req, res)) return;
-    const r = await identifierInterne(req.body || {});
+    const body = req.body || {};
+    if (tropDeRecherchesNom(req, res, body)) return;
+    const r = await identifierInterne(body);
     if (r.erreur) return res.status(r.erreur).json({ erreur: r.message });
-    const cible = r.psn || String(req.body.numero_patient || req.body.code || req.body.nom || '');
-    await journal.enregistrer(req, 'recherche patient', cible, r.message);
+    await journal.enregistrer(req, 'recherche patient', 'identification', detailsRecherche(r));
     res.json({
       trouve: r.trouve,
       refuse: r.refuse || false,

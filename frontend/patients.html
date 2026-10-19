@@ -19,6 +19,8 @@
       <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
       <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
       <button type="button" class="secondary" data-onglet="tester">Tester l’identification</button>
+      <button type="button" class="secondary only-biologiste" data-onglet="anonymiser">Générer le jeu anonymisé</button>
+      <button type="button" class="secondary" data-onglet="tester-anon">Tester l’anonymisation (k ≥ 5)</button>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
 
@@ -86,6 +88,28 @@
       <p class="hint">Rapport OK/KO exécuté sur le serveur (numéro, chiffre de contrôle, inconnu, accents, doublon, droits technicien).</p>
       <button type="button" id="btn-tests">Lancer la suite de tests</button>
       <div id="rapport-tests"></div>
+    </section>
+
+    <section class="card panneau only-biologiste" id="panneau-anonymiser" hidden>
+      <h2>Générer le jeu anonymisé</h2>
+      <p class="hint">Table irréversible : tranche d’âge, sexe, territoire, paramètre, valeur. Les groupes k &lt; 5 sont généralisés puis exclus. Aucun PSN.</p>
+      <p id="statut-anon" class="hint">Chargement…</p>
+      <button type="button" id="btn-generer-anon">Générer / régénérer</button>
+      <a class="btn-link" href="/api/anonymisation/export-anonyme">Exporter CSV anonymisé</a>
+      <div id="resultat-anon"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-tester-anon" hidden>
+      <h2>Tester l’anonymisation (k ≥ 5)</h2>
+      <p class="hint">Contrôles : k-anonymat, absence de colonnes identifiantes, absence de PSN, ré-identification.</p>
+      <div class="actions">
+        <button type="button" id="btn-test-propre">Tester le jeu généré</button>
+        <button type="button" class="secondary" id="btn-test-piege">CSV piège (doit échouer)</button>
+      </div>
+      <label for="csv-anon">Ou coller un CSV</label>
+      <textarea id="csv-anon" rows="6" placeholder="tranche_age;sexe;territoire;parametre;valeur;unite;mois"></textarea>
+      <button type="button" class="secondary" id="btn-test-csv">Analyser ce CSV</button>
+      <div id="rapport-anon"></div>
     </section>
   </main>
 </div>
@@ -195,6 +219,53 @@ document.getElementById('form-creer').addEventListener('submit', async (e) => {
     document.getElementById('resultat-creer').innerHTML =
       `<p class="message erreur">${echap(err.message)}</p>`;
   }
+});
+
+async function chargerStatutAnon() {
+  try {
+    const s = await api('/anonymisation/statut');
+    document.getElementById('statut-anon').textContent = s.genere
+      ? `Dernier jeu : ${s.nb_lignes} lignes, k min = ${s.meta.k_min} (${s.meta.genere_le || ''})`
+      : 'Aucun jeu généré pour l’instant.';
+  } catch (err) {
+    document.getElementById('statut-anon').textContent = err.message;
+  }
+}
+chargerStatutAnon();
+
+document.getElementById('btn-generer-anon').addEventListener('click', async () => {
+  try {
+    const r = await api('/anonymisation/generer', { method: 'POST', body: '{}' });
+    document.getElementById('resultat-anon').innerHTML =
+      `<p class="message ok">${r.nb_lignes} lignes · ${r.generalisees} généralisées · ${r.supprimees} exclues · k min = ${r.k_min}</p>`;
+    notifier('Jeu anonymisé généré', 'ok');
+    chargerStatutAnon();
+  } catch (err) {
+    document.getElementById('resultat-anon').innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
+
+function afficherRapportAnon(r) {
+  document.getElementById('rapport-anon').innerHTML = `
+    <p class="message ${r.ok ? 'ok' : 'erreur'}">${r.ok ? 'Rapport OK (k ≥ 5)' : 'Rapport KO'}</p>
+    <ul>${(r.controles || []).map((c) => `<li>${c.ok ? '✓' : '✗'} <strong>${echap(c.libelle)}</strong> — ${echap(c.detail || '')}</li>`).join('')}</ul>`;
+}
+
+document.getElementById('btn-test-propre').addEventListener('click', async () => {
+  try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'propre' }) })); }
+  catch (err) { afficherMessage('erreur-page', err.message); }
+});
+document.getElementById('btn-test-piege').addEventListener('click', async () => {
+  try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'piege' }) })); }
+  catch (err) { afficherMessage('erreur-page', err.message); }
+});
+document.getElementById('btn-test-csv').addEventListener('click', async () => {
+  try {
+    afficherRapportAnon(await api('/anonymisation/tester', {
+      method: 'POST',
+      body: JSON.stringify({ source: 'csv', csv_texte: document.getElementById('csv-anon').value })
+    }));
+  } catch (err) { afficherMessage('erreur-page', err.message); }
 });
 
 document.getElementById('btn-tests').addEventListener('click', async () => {

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node start.js",
     "seed": "node reset-demo.js",
-    "test": "node --test tests/tracabilite.test.js tests/lots.test.js tests/auth.test.js tests/patients.test.js"
+    "test": "node --test tests/tracabilite.test.js tests/lots.test.js tests/auth.test.js tests/patients.test.js tests/anonymisation.test.js"
   },
   "engines": {
     "node": ">=20"

@@ -30,6 +30,7 @@
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="stats" class="stats-row"></div>
+    <div class="card" id="a-faire" style="margin-bottom:18px"></div>
     <div class="dash-grid">
       <div class="card">
         <h2>Derniers lots</h2>
@@ -86,7 +87,10 @@ document.getElementById('form-code').addEventListener('submit', async (e) => {
       <a class="stat stat-alert" href="index.html?filtre=signale"><div class="valeur">${s.lotsDouteux || 0}</div><div class="label">Signalés</div></a>
       <a class="stat stat-alert" href="signalements.html"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements ouverts</div></a>
     `;
-    const recents = [...lots].sort((a, b) => Number(a.statut_affiche === 'valide') - Number(b.statut_affiche === 'valide')).slice(0, 6);
+    const recents = [...lots]
+      .filter((l) => !Number(l.est_test))
+      .sort((a, b) => String(b.date || b.date_creation || '').localeCompare(String(a.date || a.date_creation || '')))
+      .slice(0, 6);
     const box = document.getElementById('urgence');
     if (!recents.length) {
       box.innerHTML = '<p class="empty">Aucun lot pour le moment.</p>';
@@ -98,11 +102,15 @@ document.getElementById('form-code').addEventListener('submit', async (e) => {
         </a>
       `).join('');
     }
+    const taches = lots.filter((l) => !Number(l.est_test) && ['a_valider', 'a_revalider', 'signale'].includes(l.statut_affiche));
+    document.getElementById('a-faire').innerHTML = `<h2>À faire aujourd’hui</h2>` + (taches.length
+      ? `<ul>${taches.slice(0, 8).map((l) => `<li><a href="lot.html?id=${l.id}">${echap(l.nom)}</a> — ${echap(l.statut_libelle)}</li>`).join('')}</ul>`
+      : '<p class="empty">Rien en attente.</p>');
     document.getElementById('qualite').innerHTML = htmlJauge(s.pourcentageValides, 'Lots validés', null, {
         mode: 'pourcent',
         sousTitre: `${s.lotsValides} lot${s.lotsValides > 1 ? 's' : ''} sur ${s.totalLots}`
       }) +
-      `<p class="hint">${s.lotsSansValidation} lot(s) en attente de validation biologiste. ${s.signalementsEnCours} signalement(s) ouvert(s).</p>`;
+      `<p class="hint">${s.lotsAValider || 0} à valider, ${s.lotsARevalider || 0} à revalider. ${s.signalementsEnCours} signalement(s) ouvert(s) (hors lot TEST).</p>`;
   } catch (err) {
     afficherMessage('erreur-page', err.message);
     document.getElementById('urgence').innerHTML = '';

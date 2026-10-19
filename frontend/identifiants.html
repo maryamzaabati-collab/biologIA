@@ -16,7 +16,7 @@
     <h1>Identifiants</h1>
     <p class="page-intro">Correspondance PSN ↔ numéro. Le technicien ne voit que le PSN et le nombre de mesures. Les noms restent masqués tant qu’un biologiste ne clique pas sur Afficher (journalisé).</p>
     <div class="filtres">
-      <input type="search" id="filtre-q" placeholder="Rechercher un PSN ou un numéro">
+      <input type="search" id="filtre-q" placeholder="Rechercher un PSN ou un numéro" autocomplete="off" name="recherche-psn">
       <a class="btn-link" id="lien-export" href="/api/patients/export.csv">Exporter CSV</a>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
@@ -47,8 +47,8 @@ async function charger() {
       return;
     }
     const entete = bio
-      ? '<th>PSN</th><th>Numéro</th><th>Lots</th><th>Mesures</th><th></th>'
-      : '<th>PSN</th><th>Mesures</th>';
+      ? '<th>PSN</th><th>Numéro</th><th>Lots</th><th>Mesures</th><th>Dernière mesure</th><th></th>'
+      : '<th>PSN</th><th>Lots</th><th>Mesures</th><th>Dernière mesure</th>';
     box.innerHTML = `<table class="table-audit"><thead><tr>${entete}</tr></thead><tbody>
       ${data.identifiants.map((l) => bio
         ? `<tr>
@@ -56,9 +56,10 @@ async function charger() {
             <td class="mono">${echap(l.numero_patient || '')}</td>
             <td>${l.nb_lots}</td>
             <td>${l.nb_mesures}</td>
+            <td>${l.date_derniere ? formatDate(l.date_derniere) : '—'}</td>
             <td><button type="button" class="secondary" data-psn="${echap(l.psn)}">Afficher</button></td>
           </tr>`
-        : `<tr><td class="mono">${echap(l.psn)}</td><td>${l.nb_mesures}</td></tr>`
+        : `<tr><td class="mono">${echap(l.psn)}</td><td>${l.nb_lots || 0}</td><td>${l.nb_mesures}</td><td>${l.date_derniere ? formatDate(l.date_derniere) : '—'}</td></tr>`
       ).join('')}
     </tbody></table>`;
     const pages = Math.max(1, Math.ceil(data.total / taille));

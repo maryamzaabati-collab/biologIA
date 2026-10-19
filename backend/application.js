@@ -84,7 +84,14 @@ app.use('/api', (req, res, next) => {
     return next();
   }
 
-  if (url.includes('/tester') || url.includes('/analyser-csv') || url.includes('/anonymisation')) {
+  if (url.includes('/analyser-csv')) {
+    return next();
+  }
+
+  if (url.includes('/anonymisation')) {
+    if (url.includes('/generer') && role !== 'biologiste') {
+      return res.status(403).json({ erreur: 'Seul un biologiste génère le jeu anonymisé.' });
+    }
     return next();
   }
 

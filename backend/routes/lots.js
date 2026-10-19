@@ -182,10 +182,11 @@ router.get('/', async (req, res) => {
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const lots = await db.all(`
       SELECT lots.*, machines.nom AS machine_nom,
-        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
+        (SELECT COUNT(DISTINCT code_patient) FROM mesures_reference WHERE lot_id = lots.id) AS nb_patients
       FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
       ${where}
-      ORDER BY lots.date_creation DESC
+      ORDER BY COALESCE(lots.date, lots.date_creation) DESC, lots.id DESC
     `, params);
 
     const enrichis = [];
@@ -260,8 +261,7 @@ router.get('/:id/certificat', async (req, res) => {
     doc.moveDown(1.2);
     doc.fillColor('#16241E').fontSize(12);
     doc.text(`Lot : ${lot.nom}`);
-    doc.text(`Référence interne : L-${String(lot.id).padStart(3, '0')}`);
-    doc.text(`Code de vérification : ${lot.code_verification || 'n/r'}`);
+    doc.text(`Code de traçabilité : ${lot.code_verification || 'n/r'}`);
     doc.text(`Machine : ${lot.machine_nom || 'non renseignée'} (${lot.machine_type || 'type n/r'})`);
     doc.text(`Date de mesure : ${formaterJour(lot.date)}`);
     doc.text(`Conditions : ${lot.conditions || 'non renseignées'}`);
@@ -296,7 +296,8 @@ router.get('/:id', async (req, res) => {
   try {
     const lot = await db.get(`
       SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type,
-        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
+        (SELECT COUNT(DISTINCT code_patient) FROM mesures_reference WHERE lot_id = lots.id) AS nb_patients
       FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
       WHERE lots.id = ?
     `, [req.params.id]);
@@ -319,7 +320,7 @@ router.get('/:id', async (req, res) => {
       [req.params.id]
     );
     const codes = await db.all(
-      'SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ? LIMIT 8',
+      'SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ?',
       [req.params.id]
     );
     res.json({
@@ -526,6 +527,11 @@ router.post('/:id/validations', async (req, res) => {
       [req.params.id, biologiste.nom, horlogeParis()]
     );
     await db.run('UPDATE lots SET modifie_apres_validation = 0 WHERE id = ?', [req.params.id]);
+    await db.run(
+      `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+       VALUES (?, 'validation', '', ?, ?, ?, 'signature biologiste')`,
+      [req.params.id, biologiste.nom, horlogeParis(), biologiste.nom]
+    );
     await journal.enregistrer(req, 'validation lot', `lot ${req.params.id}`, biologiste.nom);
     res.status(201).json({ id, nom_biologiste: biologiste.nom });
   } catch (err) {

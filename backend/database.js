@@ -205,6 +205,27 @@ async function init() {
     FOREIGN KEY (identite_id) REFERENCES patients_identite(id)
   )`);
 
+  await run(`CREATE TABLE IF NOT EXISTS donnees_anonymisees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tranche_age TEXT,
+    sexe TEXT,
+    territoire TEXT,
+    parametre TEXT,
+    valeur REAL,
+    unite TEXT,
+    mois TEXT
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS anonymisation_meta (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    genere_le TEXT,
+    genere_par TEXT,
+    nb_lignes INTEGER,
+    generalisees INTEGER,
+    supprimees INTEGER,
+    k_min INTEGER,
+    dernier_test TEXT
+  )`);
+
   await run(`CREATE TABLE IF NOT EXISTS mesures_reference (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code_patient TEXT NOT NULL,

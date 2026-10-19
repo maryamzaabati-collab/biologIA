@@ -12,13 +12,15 @@ router.get('/', async (req, res) => {
     const validations = await db.get('SELECT COUNT(*) AS n FROM validations');
     const hashOk = true;
     const accesOk = Boolean(req.utilisateur) && Number(sessions && sessions.n) >= 0 && hashOk;
+    const anon = await db.get('SELECT k_min, nb_lignes FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
+    const kOk = anon && Number(anon.k_min) >= 5 && Number(anon.nb_lignes) > 0;
 
     const items = [
       {
         code: 'acces',
         titre: 'Contrôle des accès',
-        detail: 'Sessions, rôles serveur (technicien / biologiste / client) et mots de passe hachés.',
-        statut: accesOk ? 'mis_en_place' : 'partiel'
+        detail: 'Sessions, rôles serveur et mots de passe hachés (scrypt). Il manque encore CSRF, Helmet, limitation de débit HTTP globale et la réinitialisation de mot de passe.',
+        statut: 'partiel'
       },
       {
         code: 'rgpd',
@@ -46,7 +48,15 @@ router.get('/', async (req, res) => {
         code: 'ai_act',
         titre: 'AI Act — transparence',
         detail: 'Aucun diagnostic n’est posé. Les seuils d’alerte sont des exemples pédagogiques ; la décision finale reste humaine. Classification de risque à confirmer avec l’enseignant.',
-        statut: 'mis_en_place'
+        statut: 'partiel'
+      },
+      {
+        code: 'anonymisation',
+        titre: 'Anonymisation (k ≥ 5)',
+        detail: kOk
+          ? `Jeu généré : ${anon.nb_lignes} lignes, k minimum = ${anon.k_min}.`
+          : 'Générez le jeu anonymisé (onglet Patients) puis lancez le test k ≥ 5.',
+        statut: kOk ? 'mis_en_place' : 'partiel'
       }
     ];
 

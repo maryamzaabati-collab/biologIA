@@ -38,16 +38,26 @@ async function chargerSignalements() {
         : '<p class="empty">Aucun signalement ouvert, bravo.</p>';
       return;
     }
-    conteneur.innerHTML = signalements.map((s) => `
+    const groupes = [];
+    const vus = new Map();
+    signalements.forEach((s) => {
+      if (!vus.has(s.lot_id)) {
+        vus.set(s.lot_id, { lot_id: s.lot_id, lot_nom: s.lot_nom, raisons: [], ids: [] });
+        groupes.push(vus.get(s.lot_id));
+      }
+      vus.get(s.lot_id).raisons.push(s.raison);
+      vus.get(s.lot_id).ids.push(s.id);
+    });
+    conteneur.innerHTML = groupes.map((g) => `
       <div class="signalement-row">
         <div>
-          <a class="lien-lot" href="lot.html?id=${s.lot_id}&edit=1">${echap(s.lot_nom)}</a>
-          <div class="raison">${echap(s.raison)}</div>
+          <a class="lien-lot" href="lot.html?id=${g.lot_id}&edit=1">${echap(g.lot_nom)}</a>
+          <ul class="raison">${g.raisons.map((r) => `<li>${echap(r)}</li>`).join('')}</ul>
         </div>
         <div class="actions">
-          <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${resolus === '1' ? 'Résolu' : 'Ouvert'}</span>
-          <a class="btn-link primary" href="lot.html?id=${s.lot_id}&edit=1">Corriger</a>
-          ${resolus === '0' ? '<button class="btn-ghost only-biologiste" data-id="' + s.id + '">Clôturer (biologiste)</button>' : ''}
+          <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${g.raisons.length} ${resolus === '1' ? 'résolu(s)' : 'ouvert(s)'}</span>
+          <a class="btn-link primary" href="lot.html?id=${g.lot_id}&edit=1">Corriger</a>
+          ${resolus === '0' ? '<button class="btn-ghost only-biologiste" data-id="' + g.ids[0] + '">Clôturer (biologiste)</button>' : ''}
         </div>
       </div>
     `).join('');

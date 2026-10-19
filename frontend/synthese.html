@@ -42,22 +42,23 @@ async function chargerSynthese() {
   afficherMessage('erreur-page', '');
   try {
     const s = await api('/synthese');
-    const lots = await api('/lots');
+    const lots = (s.lots || []).filter((l) => !Number(l.est_test));
     const max = Math.max(s.totalLots, 1);
     document.getElementById('stats').innerHTML = `
       <div class="stats-row">
         <div class="stat stat-ok"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></div>
         <div class="stat stat-ok"><div class="valeur">${s.pourcentageValides}%</div><div class="label">Lots validés par un biologiste</div></div>
-        <div class="stat"><div class="valeur">${s.pourcentageAnonymises}%</div><div class="label">Lots pseudonymisés</div></div>
+        <div class="stat stat-ok"><div class="valeur">${s.pourcentageAnonymises}%</div><div class="label">Lots pseudonymisés</div></div>
         <div class="stat stat-alert"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements en cours</div></div>
         <div class="stat stat-alert"><div class="valeur">${s.lotsAlerteIdentite}</div><div class="label">Alertes colonnes identifiantes</div></div>
       </div>
       <h2>Répartition</h2>
       <div class="barres">
-        <div class="barre"><span>Validés</span><i style="width:${s.pourcentageValides}%"></i><b>${s.lotsValides} (${s.pourcentageValides} %)</b></div>
-        <div class="barre"><span>À valider</span><i class="wait" style="width:${Math.round(((s.lotsAValider || 0) / max) * 100)}%"></i><b>${s.lotsAValider || 0}</b></div>
-        <div class="barre"><span>À revalider</span><i class="wait" style="width:${Math.round(((s.lotsARevalider || 0) / max) * 100)}%"></i><b>${s.lotsARevalider || 0}</b></div>
-        <div class="barre"><span>Signalés</span><i class="flag" style="width:${Math.round(((s.lotsDouteux || 0) / max) * 100)}%"></i><b>${s.lotsDouteux || 0}</b></div>
+        <div class="barre barre-ok"><span>Validés</span><i style="width:${s.pourcentageValides}%"></i><b>${s.lotsValides} (${s.pourcentageValides} %)</b></div>
+        <div class="barre barre-valider"><span>À valider</span><i style="width:${Math.round(((s.lotsAValider || 0) / max) * 100)}%"></i><b>${s.lotsAValider || 0}</b></div>
+        <div class="barre barre-revalider"><span>À revalider</span><i style="width:${Math.round(((s.lotsARevalider || 0) / max) * 100)}%"></i><b>${s.lotsARevalider || 0}</b></div>
+        <div class="barre barre-brouillon"><span>Brouillons</span><i style="width:${Math.round(((s.lotsBrouillon || 0) / max) * 100)}%"></i><b>${s.lotsBrouillon || 0}</b></div>
+        <div class="barre barre-signale"><span>Signalés</span><i style="width:${Math.round(((s.lotsDouteux || 0) / max) * 100)}%"></i><b>${s.lotsDouteux || 0}</b></div>
       </div>
       <h2 style="margin-top:24px">Lots</h2>
       <table class="table-audit"><thead><tr><th>Lot</th><th>Machine</th><th>Statut</th><th>Score</th></tr></thead>

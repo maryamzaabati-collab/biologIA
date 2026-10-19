@@ -4,7 +4,7 @@ const db = require('../db');
 
 router.get('/', async (req, res) => {
   const q = String(req.query.q || '').trim();
-  if (!q) return res.json({ lots: [], machines: [], signalements: [] });
+  if (!q) return res.json({ lots: [], machines: [], signalements: [], patients: [] });
   const like = `%${q}%`;
   try {
     const lots = await db.all(
@@ -24,7 +24,12 @@ router.get('/', async (req, res) => {
        ORDER BY signalements.date DESC LIMIT 8`,
       [like, like]
     );
-    res.json({ lots, machines, signalements });
+    const patients = await db.all(
+      `SELECT COALESCE(psn, code) AS psn FROM patients_pseudo
+       WHERE COALESCE(psn, code) LIKE ? ORDER BY id LIMIT 8`,
+      [like.toUpperCase()]
+    );
+    res.json({ lots, machines, signalements, patients });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }

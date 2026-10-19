@@ -19,7 +19,8 @@
     <div class="filtres">
       <input type="search" id="filtre-qui" placeholder="Utilisateur">
       <select id="filtre-action"><option value="">Toutes les actions</option></select>
-      <input type="date" id="filtre-date">
+      <input type="date" id="filtre-date" placeholder="jj/mm/aaaa">
+      <button type="button" class="secondary" id="btn-date-clear">Effacer</button>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="liste"><p class="empty">Chargement…</p></div>
@@ -146,6 +147,11 @@ document.getElementById('pagination').addEventListener('click', (e) => {
 ['filtre-qui', 'filtre-action', 'filtre-date'].forEach((id) => {
   document.getElementById(id).addEventListener('input', () => { page = 1; charger(); });
   document.getElementById(id).addEventListener('change', () => { page = 1; charger(); });
+});
+document.getElementById('btn-date-clear').addEventListener('click', () => {
+  document.getElementById('filtre-date').value = '';
+  page = 1;
+  charger();
 });
 charger();
 </script>

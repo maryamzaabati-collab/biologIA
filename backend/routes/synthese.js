@@ -69,7 +69,7 @@ async function chiffres() {
     lotsBrouillon: parStatut('brouillon'),
     lotsAValider: parStatut('a_valider'),
     lotsARevalider: parStatut('a_revalider'),
-    lotsSansValidation: parStatut('a_valider') + parStatut('brouillon'),
+    lotsSansValidation: parStatut('a_valider') + parStatut('a_revalider'),
     pourcentageValides: total ? Math.round((valides / total) * 100) : 0,
     pourcentageAnonymises: total ? Math.round((anonymises / total) * 100) : 0,
     par_machine: Object.values(machines),

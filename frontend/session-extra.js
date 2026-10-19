@@ -41,7 +41,7 @@
         + `<p class="hint">${serie.nb_points || 0} valeur(s) CSV — minimum 20 pour un seul analyte.</p>`;
     }
     const note = serie.nb_reference
-      ? `<p class="hint">Moyenne et écart-type calculés sur ${serie.nb_reference} valeurs du CSV importé (un seul analyte).</p>`
+      ? `<p class="hint">Limites calculées sur les ${serie.nb_reference} premiers points (période de référence), puis appliquées à toute la série.</p>`
       : '';
     return titre + note + dessinerCarte(serie);
   }
@@ -129,7 +129,7 @@
     bar.className = 'topbar';
     bar.innerHTML = `
       <div class="recherche-globale">
-        <input type="search" id="recherche-globale" placeholder="Rechercher lots, machines, signalements" autocomplete="off">
+        <input type="search" id="recherche-globale" name="recherche-labo" placeholder="Lots, machines, signalements, PSN (⌘K)" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
         <div id="recherche-resultats" class="recherche-resultats" hidden></div>
       </div>
       <button type="button" id="btn-theme" class="theme-btn" aria-label="Changer de thème"></button>
@@ -150,13 +150,14 @@
         try {
           const r = await api(`/recherche?q=${encodeURIComponent(q)}`);
           const lignes = [];
-          r.lots.forEach((l) => lignes.push(`<a href="lot.html?id=${l.id}">Lot · ${echap(l.nom)}</a>`));
-          r.machines.forEach((m) => lignes.push(`<a href="machines.html">Machine · ${echap(m.nom)}</a>`));
-          r.signalements.forEach((s) => lignes.push(`<a href="lot.html?id=${s.lot_id}&edit=1">Signalement · ${echap(s.lot_nom)}</a>`));
+          (r.lots || []).forEach((l) => lignes.push(`<a href="lot.html?id=${l.id}">Lot · ${echap(l.nom)}</a>`));
+          (r.machines || []).forEach((m) => lignes.push(`<a href="machines.html">Machine · ${echap(m.nom)}</a>`));
+          (r.signalements || []).forEach((s) => lignes.push(`<a href="lot.html?id=${s.lot_id}&edit=1">Signalement · ${echap(s.lot_nom)}</a>`));
+          (r.patients || []).forEach((p) => lignes.push(`<a href="identifiants.html?q=${encodeURIComponent(p.psn)}">Patient · ${echap(p.psn)}</a>`));
           const groupes = [];
           if (r.lots.length) groupes.push(`<p class="hint">Lots</p>`);
           box.innerHTML = lignes.length
-            ? `<p class="hint">${r.lots.length} lot(s) · ${r.machines.length} machine(s) · ${r.signalements.length} signalement(s)</p>${lignes.join('')}`
+            ? `<p class="hint">${(r.lots||[]).length} lot(s) · ${(r.machines||[]).length} machine(s) · ${(r.signalements||[]).length} signalement(s) · ${(r.patients||[]).length} PSN</p>${lignes.join('')}`
             : '<p class="empty">Aucun résultat.</p>';
           box.hidden = false;
         } catch (err) {
@@ -170,6 +171,12 @@
       appliquerTheme();
     });
     appliquerTheme();
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        document.getElementById('recherche-globale')?.focus();
+      }
+    });
   }
 
   async function installerSession() {

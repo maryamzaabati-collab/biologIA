@@ -68,6 +68,10 @@ function formatDate(chaineISO) {
 
 function formatDateHeure(chaineISO) {
   if (!chaineISO) return '-';
+  const s = String(chaineISO).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s) || /T00:00:00/.test(s) || / 00:00:00/.test(s)) {
+    return formatDate(s);
+  }
   const d = analyserHorodatage(chaineISO);
   if (!d) return chaineISO;
   return d.toLocaleString('fr-FR', {
@@ -80,8 +84,11 @@ function formatDateHeure(chaineISO) {
   });
 }
 
-function refLot(id) {
-  return 'L-' + String(id).padStart(3, '0');
+function refLot(lotOuId) {
+  if (lotOuId && typeof lotOuId === 'object') {
+    return lotOuId.code_verification || lotOuId.nom || '';
+  }
+  return '';
 }
 
 function echap(s) {
@@ -136,7 +143,9 @@ function appliquerTheme() {
 
 function classeBadge(code) {
   if (code === 'ok' || code === 'valide') return 'ok';
-  if (code === 'a_valider' || code === 'a_revalider' || code === 'brouillon' || code === 'archive') return 'attente';
+  if (code === 'a_valider') return 'a-valider';
+  if (code === 'a_revalider') return 'a-revalider';
+  if (code === 'brouillon' || code === 'archive') return 'brouillon';
   return 'douteux';
 }
 
@@ -181,7 +190,9 @@ function icone(nom) {
 function htmlJauge(score, libelle = 'Score de confiance', detail, opts = {}) {
   const n = Number(score) || 0;
   const modePct = opts.mode === 'pourcent';
-  const classe = n >= 80 ? 'ok' : n >= 50 ? 'moyen' : 'faible';
+  const classe = modePct
+    ? (n >= 40 ? 'ok' : 'moyen')
+    : (n >= 80 ? 'ok' : n >= 50 ? 'moyen' : 'faible');
   if (opts.mini) {
     const r = 16;
     const c = 2 * Math.PI * r;
@@ -341,19 +352,26 @@ function htmlCarteControle(serie) {
        <ul class="urgence">${hors.map((p) => `<li>${echap(p.nom || serie.nom || '')} · ${p.date ? formatDate(p.date) : '#' + p.index} · ${p.moyenne_controle}</li>`).join('')}</ul>`
     : '<p class="hint">Aucun point hors ±2σ sur cette série.</p>';
   return `
+    <div class="lj-grille">
     <svg class="carte-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Carte de contrôle Levey-Jennings">
       ${ligne(serie.moyenne, '0', 'var(--ink-soft)', 1.6)}
       ${ligne(serie.limite_1s_haut, '2 4', 'var(--wait)')}${ligne(serie.limite_1s_bas, '2 4', 'var(--wait)')}
       ${ligne(serie.limite_2s_haut, '5 4', 'var(--flag)')}${ligne(serie.limite_2s_bas, '5 4', 'var(--flag)')}
       ${ligne(serie.limite_3s_haut, '8 5', 'var(--flag)', 1.4)}${ligne(serie.limite_3s_bas, '8 5', 'var(--flag)', 1.4)}
       ${etiquette(serie.moyenne, 'x̄')}${etiquette(serie.limite_1s_haut, '+1σ')}${etiquette(serie.limite_2s_haut, '+2σ')}${etiquette(serie.limite_3s_haut, '+3σ')}
+      ${etiquette(serie.limite_1s_bas, '−1σ')}${etiquette(serie.limite_2s_bas, '−2σ')}${etiquette(serie.limite_3s_bas, '−3σ')}
       <path d="${path}" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
       ${cercles}
       ${labels}
       ${yTicks}
+      <text x="16" y="${h / 2}" font-size="10" fill="currentColor" transform="rotate(-90 16 ${h / 2})">${echap(serie.unite || serie.parametre || 'valeur')}</text>
     </svg>
-    ${listeHors}
-    ${west ? `<p class="hint">Règles de Westgard :</p><ul>${west}</ul>` : ''}`;
+    <div class="lj-panneau">
+      <h3>Règles de Westgard déclenchées</h3>
+      ${west ? `<ul>${west}</ul>` : '<p class="hint">Aucune règle 1-3s / 2-2s sur cette série.</p>'}
+      ${listeHors}
+    </div>
+    </div>`;
 }
 
 function installerRole() {

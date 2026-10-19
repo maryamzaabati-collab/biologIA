@@ -994,3 +994,55 @@ html[data-theme="sombre"] .theme-btn {
   .sidebar nav a { white-space: nowrap; }
   main { margin: 0 12px 12px; padding: 24px 18px; }
 }
+
+button.danger {
+  background: #8B3A32;
+  color: #fff !important;
+  border: 1px solid #6e2e28;
+}
+.badge.a-valider { background: #E8C48A; color: #2C2725; }
+.badge.a-revalider { background: #8C6046; color: #F1E4CC; }
+.badge.brouillon { background: #C4C0B6; color: #2C2725; }
+html[data-theme="sombre"] .badge.ok { background: #9BB07A; color: #151a12; }
+
+.page-identifiants .filtres input { max-width: none; flex: 1; min-width: min(100%, 320px); }
+
+.lot-carte { box-shadow: inset 5px 0 0 var(--ink-soft); transition: transform .15s ease, box-shadow .15s ease; }
+.lot-carte.statut-valide { box-shadow: inset 5px 0 0 var(--ok); }
+.lot-carte.statut-a_valider { box-shadow: inset 5px 0 0 #D0893B; }
+.lot-carte.statut-a_revalider { box-shadow: inset 5px 0 0 #8C6046; }
+.lot-carte.statut-brouillon { box-shadow: inset 5px 0 0 #9A958A; }
+.lot-carte.statut-signale { box-shadow: inset 5px 0 0 var(--flag); }
+.lot-carte:hover { transform: translateY(-3px); }
+
+.barre i { display: block; height: 8px; border-radius: 99px; background: var(--ink-soft); }
+.barre-ok i { background: var(--ok); }
+.barre-valider i { background: #D0893B; }
+.barre-revalider i { background: #8C6046; }
+.barre-brouillon i { background: #9A958A; }
+.barre-signale i { background: var(--flag); }
+
+.schema-lignee { flex-direction: column; max-width: 420px; }
+.schema-lignee span { max-width: none; }
+.fleche-lignee { color: var(--ink-soft); }
+
+.lj-grille { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
+.lj-panneau { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; }
+@media (max-width: 900px) { .lj-grille { grid-template-columns: 1fr; } }
+
+select, input[type="date"] {
+  background: var(--field, var(--card));
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+input[type="date"]:invalid, input[type="date"]:placeholder-shown { color: var(--ink-soft); }
+
+.onglets-page { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.onglets-page .actif { background: var(--accent); color: var(--cream, #F1E4CC); }
+
+html[data-theme="clair"] .btn-link.primary,
+html[data-theme="clair"] button:not(.secondary):not(.danger):not(.theme-btn) {
+  color: #1C1A16;
+}

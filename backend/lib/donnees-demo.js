@@ -1,10 +1,39 @@
-const { analyserCsv, genererCodeVerification, codePseudo } = require('./tracabilite');
+const { analyserCsv } = require('./tracabilite');
 const { composerNumero } = require('./patients');
+const { genererJeu } = require('./anonymiser');
 
-function csvPoints(parametre, unite, points, codes = []) {
+const ALPHABET_CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let tirage = Math.random;
+function initialiserHasard(graine) {
+  let s = graine >>> 0;
+  tirage = () => {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+function codeDepuisHasard(prefixe, n) {
+  let code = prefixe;
+  for (let i = 0; i < n; i++) code += ALPHABET_CODE[Math.floor(tirage() * ALPHABET_CODE.length)];
+  return code;
+}
+function codeVerificationStable(nom) {
+  let s = 20261009;
+  const t = String(nom);
+  for (let i = 0; i < t.length; i++) s = (Math.imul(s, 33) + t.charCodeAt(i)) >>> 0;
+  let code = 'LT-';
+  for (let i = 0; i < 8; i++) {
+    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
+    code += ALPHABET_CODE[s % ALPHABET_CODE.length];
+  }
+  return code;
+}
+
+function csvPoints(parametre, unite, points, codes = [], debut = 0) {
   const lignes = ['code_patient;parametre;valeur;unite;date'];
   points.forEach((p, i) => {
-    const code = codes.length ? codes[i % codes.length] : `PSN-${String(i + 1).padStart(8, '0')}`;
+    const code = codes.length
+      ? codes[(debut + i) % codes.length]
+      : `PSN-${String(i + 1).padStart(8, '0')}`;
     lignes.push(`${code};${parametre};${p.valeur};${unite};${p.date}`);
   });
   return lignes.join('\n');
@@ -122,7 +151,7 @@ function nirFictif(sexe, i) {
 
 async function insererPatient(run, fiche, seq) {
   const numero = composerNumero(2026, seq);
-  const psn = codePseudo();
+  const psn = codeDepuisHasard('PSN-', 8);
   const { id } = await run(
     `INSERT INTO patients_identite (nom, prenom, date_naissance, sexe, nir_fictif, departement,
       numero_patient, ville, code_postal, cree_par, cree_le)
@@ -176,6 +205,7 @@ async function remplirPatients({ run, get, all }) {
 }
 
 async function remplir({ run, get, all }) {
+  initialiserHasard(20261009);
   const machines = [
     ['Cobas 8000', 'biochimie', '2026-09-01', 'en_service'],
     ['Sysmex XN-1000', 'hematologie', '2026-08-12', 'en_service'],
@@ -205,15 +235,22 @@ async function remplir({ run, get, all }) {
   const pseudos = await all('SELECT COALESCE(psn, code) AS code FROM patients_pseudo ORDER BY id');
   const codesPsn = (pseudos || []).map((p) => p.code);
 
-  const csvGlycemie = csvPoints('Glycémie à jeun', 'g/L', serieGlycemie(), codesPsn);
-  const csvHba1c = csvPoints('HbA1c', '%', [
+  let decalagePsn = 0;
+  function csvDecale(parametre, unite, points) {
+    const csv = csvPoints(parametre, unite, points, codesPsn, decalagePsn);
+    decalagePsn += Math.max(1, points.length);
+    return csv;
+  }
+
+  const csvGlycemie = csvDecale('Glycémie à jeun', 'g/L', serieGlycemie());
+  const csvHba1c = csvDecale('HbA1c', '%', [
     5.4, 5.6, 5.5, 5.8, 5.3, 5.7, 5.4, 5.6, 5.5, 5.9,
     5.4, 5.5, 5.7, 5.6, 5.4, 5.8, 5.5, 5.6, 5.3, 5.7, 5.5, 5.4, 5.6, 5.8, 5.5
-  ].map((valeur, i) => ({ valeur, date: `2026-03-${String(i + 1).padStart(2, '0')}` })), codesPsn);
-  const csvHb = csvPoints('Hémoglobine', 'g/dL', [
+  ].map((valeur, i) => ({ valeur, date: `2026-03-${String(i + 1).padStart(2, '0')}` })));
+  const csvHb = csvDecale('Hémoglobine', 'g/dL', [
     13.2, 13.8, 14.1, 13.5, 13.9, 14.0, 13.4, 13.6, 13.7, 13.9,
     13.3, 13.8, 14.0, 13.5, 13.6, 13.9, 13.4, 13.7, 13.8, 14.1, 13.6, 13.5, 13.9, 13.7, 13.4
-  ].map((valeur, i) => ({ valeur, date: `2026-02-${String(i + 1).padStart(2, '0')}` })), codesPsn);
+  ].map((valeur, i) => ({ valeur, date: `2026-02-${String(i + 1).padStart(2, '0')}` })));
 
   const lots = [
     {
@@ -248,7 +285,7 @@ async function remplir({ run, get, all }) {
       machine: 'Architect i2000SR',
       date: '2026-04-08',
       conditions: 'Température 4°C, Lot de réactifs I-90, Calibration journalière',
-      csv: csvPoints('TSH', 'mUI/L', [1.2, 1.8, 2.1, 1.5, 1.9, 2.0, 1.4, 1.7, 1.6, 1.9, 1.5, 1.8, 2.0, 1.6, 1.7, 1.9, 1.4, 1.8, 1.6, 2.0, 1.7, 1.5, 1.9, 1.6, 1.8].map((valeur, i) => ({ valeur, date: `2026-04-${String(i + 1).padStart(2, '0')}` })), codesPsn),
+      csv: csvDecale('TSH', 'mUI/L', [1.2, 1.8, 2.1, 1.5, 1.9, 2.0, 1.4, 1.7, 1.6, 1.9, 1.5, 1.8, 2.0, 1.6, 1.7, 1.9, 1.4, 1.8, 1.6, 2.0, 1.7, 1.5, 1.9, 1.6, 1.8].map((valeur, i) => ({ valeur, date: `2026-04-${String(i + 1).padStart(2, '0')}` }))),
       biologiste: 'Dr. Amrani',
       regles: [{ parametre: 'TSH', seuil_bas: '0.3', seuil_haut: '4.5', unite: 'mUI/L' }]
     },
@@ -257,7 +294,7 @@ async function remplir({ run, get, all }) {
       machine: 'Cobas 8000',
       date: '2026-05-12',
       conditions: 'Température 22°C, Lot de réactifs C-18, Calibration journalière',
-      csv: csvPoints('CRP', 'mg/L', [2.1, 3.4, 1.8, 4.2, 2.9, 3.1, 2.4, 2.8, 3.0, 2.6, 2.2, 3.3, 2.7, 2.9, 3.1, 2.5, 2.8, 3.2, 2.4, 2.7, 3.0, 2.6, 2.9, 3.1, 2.5].map((valeur, i) => ({ valeur, date: `2026-05-${String(i + 1).padStart(2, '0')}` })), codesPsn),
+      csv: csvDecale('CRP', 'mg/L', [2.1, 3.4, 1.8, 4.2, 2.9, 3.1, 2.4, 2.8, 3.0, 2.6, 2.2, 3.3, 2.7, 2.9, 3.1, 2.5, 2.8, 3.2, 2.4, 2.7, 3.0, 2.6, 2.9, 3.1, 2.5].map((valeur, i) => ({ valeur, date: `2026-05-${String(i + 1).padStart(2, '0')}` }))),
       biologiste: 'Dr. Amrani',
       regles: [{ parametre: 'CRP', seuil_bas: null, seuil_haut: '5.0', unite: 'mg/L' }]
     },
@@ -275,9 +312,10 @@ async function remplir({ run, get, all }) {
       machine: 'Vitek 2',
       date: '2026-08-11',
       conditions: 'Température 35°C, Lot de réactifs C-19, Calibration enceinte',
-      csv: csvPoints('Contrôle négatif', '', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].map((valeur, i) => ({ valeur, date: `2026-08-${String(i + 1).padStart(2, '0')}` })), codesPsn),
+      csv: csvDecale('Contrôle négatif', '', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0].map((valeur, i) => ({ valeur, date: `2025-08-${String(i + 1).padStart(2, '0')}` }))),
       biologiste: 'Dr. Amrani',
-      ancien: true,
+      date: '2025-08-11',
+      date_validation: '2025-08-12 09:00:00',
       regles: []
     },
     {
@@ -296,11 +334,11 @@ async function remplir({ run, get, all }) {
       machine: 'Cobas 8000',
       date: '2026-07-20',
       conditions: 'Température 21°C, Lot de réactifs K-22, Calibration 2 points',
-      csv: csvPoints('Potassium', 'mmol/L', serieJours(2026, 7, [
+      csv: csvDecale('Potassium', 'mmol/L', serieJours(2026, 7, [
         4.1, 4.2, 4.0, 4.3, 4.1, 4.2, 4.0, 4.1, 4.3, 4.2,
         4.1, 4.0, 4.2, 4.3, 4.1, 4.2, 6.9, 4.1, 4.0, 4.2,
         4.1, 4.3, 4.2, 4.0, 4.1
-      ]), codesPsn),
+      ])),
       biologiste: 'Dr. Chen',
       regles: [{ parametre: 'Potassium', seuil_bas: '3.5', seuil_haut: '5.1', unite: 'mmol/L' }]
     },
@@ -309,7 +347,7 @@ async function remplir({ run, get, all }) {
       machine: 'Architect i2000SR',
       date: '2026-09-04',
       conditions: '21',
-      csv: csvPoints('Créatinine', 'µmol/L', serieJours(2026, 9, [78, 82, 80, 85, 79, 81, 83, 80]), codesPsn),
+      csv: csvDecale('Créatinine', 'µmol/L', serieJours(2026, 9, [78, 82, 80, 85, 79, 81, 83, 80])),
       biologiste: null,
       regles: [{ parametre: 'Créatinine', seuil_bas: '45', seuil_haut: '105', unite: 'µmol/L' }]
     },
@@ -328,11 +366,11 @@ async function remplir({ run, get, all }) {
       machine: 'ABL90 FLEX',
       date: null,
       conditions: 'Température 22°C, Lot de réactifs G-07, Calibration gaz',
-      csv: csvPoints('pH', '', serieJours(2026, 8, [
+      csv: csvDecale('pH', '', serieJours(2026, 8, [
         7.38, 7.40, 7.39, 7.41, 7.38, 7.40, 7.39, 7.42, 7.38, 7.40,
         7.39, 7.41, 7.40, 7.38, 7.39, 7.41, 7.40, 7.38, 7.39, 7.40,
         7.41, 7.38, 7.40, 7.39, 7.41
-      ]), codesPsn),
+      ])),
       biologiste: null,
       regles: [{ parametre: 'pH', seuil_bas: '7.35', seuil_haut: '7.45', unite: '' }]
     },
@@ -341,11 +379,11 @@ async function remplir({ run, get, all }) {
       machine: 'Cobas 8000',
       date: '2026-08-28',
       conditions: 'Température 21°C, Lot de réactifs L-11, Calibration hebdomadaire',
-      csv: csvPoints('Cholestérol total', 'g/L', serieJours(2026, 8, [
+      csv: csvDecale('Cholestérol total', 'g/L', serieJours(2026, 8, [
         1.82, 1.90, 1.86, 1.88, 1.84, 1.91, 1.87, 1.85, 1.89, 1.86,
         1.84, 1.90, 1.88, 1.85, 1.87, 1.89, 1.86, 1.84, 1.91, 1.88,
         1.85, 1.87, 1.90, 1.86, 1.88
-      ]), codesPsn),
+      ])),
       biologiste: 'Dr. El Fassi',
       regles: [{ parametre: 'Cholestérol total', seuil_bas: null, seuil_haut: '2.00', unite: 'g/L' }]
     },
@@ -354,13 +392,14 @@ async function remplir({ run, get, all }) {
       machine: 'Sysmex XN-1000',
       date: '2026-09-18',
       conditions: 'Température 22°C, Lot de réactifs S-18, Calibration 3 niveaux',
-      csv: csvPoints('Plaquettes', 'G/L', serieJours(2026, 9, [
+      csv: csvDecale('Plaquettes', 'G/L', serieJours(2026, 9, [
         245, 252, 238, 260, 241, 255, 248, 250, 243, 257,
         246, 251, 239, 258, 244, 249, 253, 247, 242, 256,
         250, 248, 245, 252, 249
-      ]), codesPsn),
+      ])),
       biologiste: 'Dr. Amrani',
-      ancien: true,
+      date: '2026-09-18',
+      date_validation: '2026-09-20 10:15:00',
       regles: [{ parametre: 'Plaquettes', seuil_bas: '150', seuil_haut: '400', unite: 'G/L' }]
     }
   ];
@@ -421,7 +460,7 @@ async function remplir({ run, get, all }) {
         anonymise,
         JSON.stringify(colonnes),
         alerte,
-        genererCodeVerification(),
+        codeVerificationStable(lot.nom),
         moyenne,
         valeurs.length ? JSON.stringify(valeurs) : null,
         dates && dates.length ? JSON.stringify(dates) : null,
@@ -432,18 +471,20 @@ async function remplir({ run, get, all }) {
       id = ins.id;
     }
 
+    await run('UPDATE lots SET code_verification = ? WHERE id = ?', [codeVerificationStable(lot.nom), id]);
+
     if (lot.biologiste) {
-      const dateVal = lot.ancien ? "datetime('now', '-14 months')" : "datetime('now')";
+      const dateVal = lot.date_validation || `${lot.date || '2026-01-25'} 16:00:00`;
       const dejaVal = await get('SELECT id FROM validations WHERE lot_id = ? AND nom_biologiste = ?', [id, lot.biologiste]);
       if (!dejaVal) {
         await run(
-          `INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ${dateVal})`,
-          [id, lot.biologiste]
+          'INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ?)',
+          [id, lot.biologiste, dateVal]
         );
-      } else if (lot.ancien) {
+      } else {
         await run(
-          `UPDATE validations SET date_validation = ${dateVal} WHERE lot_id = ? AND nom_biologiste = ?`,
-          [id, lot.biologiste]
+          'UPDATE validations SET date_validation = ? WHERE lot_id = ? AND nom_biologiste = ?',
+          [dateVal, id, lot.biologiste]
         );
       }
     }
@@ -459,7 +500,8 @@ async function remplir({ run, get, all }) {
     }
 
     const lignesCsv = String(lot.csv || '').split(/\r?\n/).filter((l) => l.trim());
-    if (!dejaExistant && lignesCsv.length > 1 && /code_patient/i.test(lignesCsv[0])) {
+    if (lignesCsv.length > 1 && /code_patient/i.test(lignesCsv[0])) {
+      await run('DELETE FROM mesures_reference WHERE lot_id = ?', [id]);
       const cols = lignesCsv[0].split(';');
       const iCode = cols.findIndex((c) => /code_patient/i.test(c));
       const iPar = cols.findIndex((c) => /parametre/i.test(c));
@@ -476,11 +518,83 @@ async function remplir({ run, get, all }) {
         );
       }
     }
+
+    const dateCrea = lot.date ? `${lot.date} 08:30:00` : '2026-01-10 08:30:00';
+    const dejaHist = await get("SELECT id FROM historique_lots WHERE lot_id = ? AND champ = 'création'", [id]);
+    if (!dejaHist) {
+      await run(
+        `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+         VALUES (?, 'création', '', ?, ?, 'système', 'jeu de démonstration')`,
+        [id, lot.nom, dateCrea]
+      );
+    }
+    if (lot.biologiste) {
+      const dejaValH = await get("SELECT id FROM historique_lots WHERE lot_id = ? AND champ = 'validation'", [id]);
+      if (!dejaValH) {
+        await run(
+          `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+           VALUES (?, 'validation', '', ?, ?, ?, 'signature du lot')`,
+          [id, lot.biologiste, lot.date_validation || `${lot.date || '2026-01-25'} 16:00:00`, lot.biologiste]
+        );
+      }
+    }
+    if (lot.archive) {
+      const dejaArch = await get("SELECT id FROM historique_lots WHERE lot_id = ? AND champ = 'archivage'", [id]);
+      if (!dejaArch) {
+        await run(
+          `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+           VALUES (?, 'archivage', 'actif', 'archivé', ?, 'système', 'jeu de démonstration')`,
+          [id, lot.date ? `${lot.date} 18:00:00` : dateCrea]
+        );
+      }
+    }
+    const dejaJ = await get("SELECT id FROM journal_audit WHERE cible = ? AND action = 'création lot'", [`lot ${id}`]);
+    if (!dejaJ) {
+      await run(
+        `INSERT INTO journal_audit (utilisateur_id, nom_affiche, action, cible, details, date)
+         VALUES (NULL, 'système', 'création lot', ?, ?, ?)`,
+        [`lot ${id}`, lot.nom, dateCrea]
+      );
+    }
+    if (lot.biologiste) {
+      const dejaJv = await get("SELECT id FROM journal_audit WHERE cible = ? AND action = 'validation lot'", [`lot ${id}`]);
+      if (!dejaJv) {
+        await run(
+          `INSERT INTO journal_audit (utilisateur_id, nom_affiche, action, cible, details, date)
+           VALUES (NULL, ?, 'validation lot', ?, ?, ?)`,
+          [lot.biologiste, `lot ${id}`, lot.biologiste, lot.date_validation || `${lot.date || '2026-01-25'} 16:00:00`]
+        );
+      }
+    }
   }
 
   await run("UPDATE lots SET archive = 1 WHERE lower(nom) LIKE 'loot%' OR nom IN ('Glycémie — série incomplète','Créatinine — données manquantes')");
 
   await synchroniserSignalements({ run, get, all });
+
+  const brutes = await all(`
+    SELECT patients_identite.date_naissance, patients_identite.sexe, patients_identite.departement,
+      patients_identite.code_postal, mesures_reference.parametre, mesures_reference.valeur,
+      mesures_reference.unite, mesures_reference.date
+    FROM mesures_reference
+    JOIN patients_pseudo ON upper(COALESCE(patients_pseudo.psn, patients_pseudo.code)) = upper(mesures_reference.code_patient)
+    JOIN patients_identite ON patients_identite.id = COALESCE(patients_pseudo.identite_id, patients_pseudo.patient_id)
+  `);
+  const jeu = genererJeu(brutes || []);
+  await run('DELETE FROM donnees_anonymisees');
+  for (const l of jeu.lignes) {
+    await run(
+      `INSERT INTO donnees_anonymisees (tranche_age, sexe, territoire, parametre, valeur, unite, mois)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [l.tranche_age, l.sexe, l.territoire, l.parametre, l.valeur, l.unite, l.mois]
+    );
+  }
+  await run('DELETE FROM anonymisation_meta');
+  await run(
+    `INSERT INTO anonymisation_meta (genere_le, genere_par, nb_lignes, generalisees, supprimees, k_min)
+     VALUES (?, 'système', ?, ?, ?, ?)`,
+    ['2026-09-21 11:00:00', jeu.nb_lignes, jeu.generalisees, jeu.supprimees, jeu.k_min]
+  );
 
   const nbPatients = await compter(get, 'SELECT COUNT(*) AS n FROM patients_identite');
   console.log(`Données de démonstration chargées (machines, lots, ${nbPatients} patients fictifs).`);

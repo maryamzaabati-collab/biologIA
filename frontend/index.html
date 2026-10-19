@@ -29,6 +29,15 @@
       <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
     <div class="lots-toolbar">
+    <div class="actions" style="margin:0 0 12px">
+      <button type="button" class="secondary actif" id="vue-cartes">Cartes</button>
+      <button type="button" class="secondary" id="vue-tableau">Tableau</button>
+      <select id="tri-lots">
+        <option value="date">Plus récents</option>
+        <option value="nom">Nom</option>
+        <option value="statut">Statut</option>
+      </select>
+    </div>
     <div class="pills" id="pills">
       <button type="button" class="secondary active" data-filtre="">Tous</button>
       <button type="button" class="secondary" data-filtre="brouillon">Brouillons</button>
@@ -38,7 +47,7 @@
       <button type="button" class="secondary" data-filtre="signale">Signalés</button>
     </div>
     <div class="filtres">
-      <input type="search" id="filtre-q" placeholder="Rechercher un lot">
+      <input type="search" id="filtre-q" placeholder="Rechercher un lot" autocomplete="off" name="recherche-lot">
       <select id="filtre-machine"><option value="">Toutes les machines</option></select>
       <input type="date" id="filtre-date">
     </div>
@@ -53,6 +62,7 @@
 <script>
 let filtreStatutAffiche = new URLSearchParams(location.search).get('filtre') || '';
 let pageLots = 1;
+let vueLots = 'cartes';
 const PAGE_LOTS = 9;
 
 async function remplirMachines() {
@@ -85,6 +95,12 @@ async function chargerLots() {
   try {
     let lots = await api(queryLots());
     if (filtreStatutAffiche) lots = lots.filter((l) => l.statut_affiche === filtreStatutAffiche);
+    const tri = document.getElementById('tri-lots')?.value || 'date';
+    lots.sort((a, b) => {
+      if (tri === 'nom') return String(a.nom).localeCompare(b.nom);
+      if (tri === 'statut') return String(a.statut_libelle).localeCompare(b.statut_libelle);
+      return String(b.date || '').localeCompare(String(a.date || ''));
+    });
     if (lots.length === 0) {
       conteneur.innerHTML = '<p class="empty">Aucun lot ne correspond à ces critères.</p>';
       document.getElementById('pagination-lots').innerHTML = '';
@@ -93,18 +109,34 @@ async function chargerLots() {
     const pages = Math.max(1, Math.ceil(lots.length / PAGE_LOTS));
     if (pageLots > pages) pageLots = pages;
     const slice = lots.slice((pageLots - 1) * PAGE_LOTS, pageLots * PAGE_LOTS);
-    conteneur.innerHTML = slice.map((lot) => `
-      <a class="lot-carte" href="lot.html?id=${lot.id}">
+    if (vueLots === 'tableau') {
+      conteneur.className = '';
+      conteneur.innerHTML = `<table class="table-audit"><thead><tr><th>Lot</th><th>Code</th><th>Machine</th><th>Date</th><th>Patients</th><th>Statut</th></tr></thead><tbody>
+        ${slice.map((lot) => `<tr>
+          <td><a href="lot.html?id=${lot.id}">${echap(lot.nom)}</a></td>
+          <td class="mono">${echap(lot.code_verification || '')}</td>
+          <td>${echap(lot.machine_nom || '')}</td>
+          <td>${formatDate(lot.date)}</td>
+          <td>${lot.nb_patients || 0}</td>
+          <td><span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span></td>
+        </tr>`).join('')}
+      </tbody></table>`;
+    } else {
+      conteneur.className = 'lots-grille';
+      conteneur.innerHTML = slice.map((lot) => `
+      <a class="lot-carte statut-${echap(lot.statut_affiche)}" href="lot.html?id=${lot.id}">
         <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
         <strong class="lot-carte-nom">${echap(lot.nom)}${Number(lot.est_test) ? ' · TEST' : ''}</strong>
+        <span class="lot-carte-ref">${echap(lot.code_verification || '')}</span>
         <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
-        <span class="lot-carte-date">${formatDate(lot.date)}</span>
+        <span class="lot-carte-date">${formatDate(lot.date)} · ${lot.nb_patients || 0} patient(s)</span>
         <span class="lot-carte-pied">
           ${htmlJauge(lot.score_confiance, 'Score de confiance', null, { mini: true })}
-          <span class="lot-carte-ref">${refLot(lot.id)}</span>
+          ${lot.nb_signalements ? `<span class="badge douteux">${lot.nb_signalements} signalement(s)</span>` : ''}
         </span>
       </a>
     `).join('');
+    }
     const pag = document.getElementById('pagination-lots');
     pag.innerHTML = pages > 1
       ? `<button type="button" class="secondary" data-p="${pageLots - 1}" ${pageLots <= 1 ? 'disabled' : ''}>Précédent</button>
@@ -133,9 +165,21 @@ document.getElementById('pagination-lots').addEventListener('click', (e) => {
   chargerLots();
 });
 
-['filtre-q', 'filtre-machine', 'filtre-date'].forEach((id) => {
+['filtre-q', 'filtre-machine', 'filtre-date', 'tri-lots'].forEach((id) => {
   document.getElementById(id).addEventListener('input', () => { pageLots = 1; chargerLots(); });
   document.getElementById(id).addEventListener('change', () => { pageLots = 1; chargerLots(); });
+});
+document.getElementById('vue-cartes').addEventListener('click', () => {
+  vueLots = 'cartes';
+  document.getElementById('vue-cartes').classList.add('actif');
+  document.getElementById('vue-tableau').classList.remove('actif');
+  chargerLots();
+});
+document.getElementById('vue-tableau').addEventListener('click', () => {
+  vueLots = 'tableau';
+  document.getElementById('vue-tableau').classList.add('actif');
+  document.getElementById('vue-cartes').classList.remove('actif');
+  chargerLots();
 });
 
 (async () => {

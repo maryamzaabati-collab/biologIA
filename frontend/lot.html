@@ -50,7 +50,12 @@ function libelleChamp(champ) {
     date: 'Date',
     conditions: 'Conditions',
     anonymise: 'Pseudonymisation',
-    colonnes_csv: 'Colonnes CSV'
+    colonnes_csv: 'Colonnes CSV',
+    création: 'Création',
+    validation: 'Validation',
+    revalidation: 'Revalidation',
+    archivage: 'Archivage',
+    règle: 'Règle d’alerte'
   };
   return map[champ] || champ;
 }
@@ -63,11 +68,13 @@ async function charger() {
     return;
   }
   try {
-    const [lot, listeMachines, listeBio] = await Promise.all([
+    const [lot, listeMachines, listeBio, moi] = await Promise.all([
       api(`/lots/${idLot}`),
       api('/machines'),
-      api('/utilisateurs?role=biologiste')
+      api('/utilisateurs?role=biologiste'),
+      api('/auth/moi').catch(() => window.__utilisateur)
     ]);
+    window.__utilisateur = moi || window.__utilisateur;
     machines = listeMachines;
     biologistes = listeBio;
     document.title = `${lot.nom} — biologIA`;
@@ -83,7 +90,7 @@ async function charger() {
       <div class="entete-lot">
         <div>
           <h1>${echap(lot.nom)}</h1>
-          <p class="mono" style="color:var(--ink-soft)">${refLot(lot.id)}</p>
+          <p class="mono" style="color:var(--ink-soft)">${echap(lot.code_verification || '')}</p>
           <p>
             <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
             ${Number(lot.est_test) ? '<span class="badge attente">Lot TEST — hors statistiques</span>' : ''}
@@ -97,6 +104,18 @@ async function charger() {
       <p class="mono code-verif">Code ${echap(lot.code_verification || 'n/r')}</p>
       ${lot.code_verification ? svgCode39(lot.code_verification) : ''}
 
+      ${lot.nb_patients ? `<details class="card" style="margin-bottom:16px"><summary>${lot.nb_patients} patient(s) dans ce lot</summary>
+        <p class="hint">${(lot.codes_patients || []).map((c) => echap(c)).join(' · ') || 'PSN du CSV'}</p>
+      </details>` : ''}
+
+      <div class="onglets-page" id="onglets-lot">
+        <button type="button" class="secondary actif" data-onglet="resume">Résumé</button>
+        <button type="button" class="secondary" data-onglet="mesures">Mesures</button>
+        <button type="button" class="secondary" data-onglet="alertes">Alertes</button>
+        <button type="button" class="secondary" data-onglet="historique">Historique</button>
+        <button type="button" class="secondary" data-onglet="certificat">Certificat</button>
+      </div>
+      <section class="panneau-lot" data-panneau="resume">
       <h2 style="margin-top:8px;">Parcours des données</h2>
       ${htmlChaineTracabilite(lot)}
 
@@ -105,6 +124,8 @@ async function charger() {
         <div class="card"><strong>Contrôle automatique</strong><p class="hint" style="margin:8px 0 0">${Number(lot.nb_signalements) ? lot.nb_signalements + ' point(s) à vérifier' : 'Aucun signalement ouvert'}</p></div>
       </div>
 
+      </section>
+      <section class="panneau-lot" data-panneau="mesures" hidden>
       <h2>Origine</h2>
       <dl class="fiche-dl">
         <div><dt>Machine</dt><dd>${echap(lot.machine_nom || 'non renseignée')}</dd></div>
@@ -115,7 +136,9 @@ async function charger() {
         <div><dt>Péremption des validations</dt><dd>${lot.mois_peremption} mois (ISO 15189)</dd></div>
       </dl>
       ${lot.alerte_identite ? '<p class="message erreur">Alerte RGPD : des colonnes identifiantes ont été détectées dans le CSV. Retirez-les puis réimportez un fichier pseudonymisé.</p>' : ''}
-      ${(lot.signalements && lot.signalements.length) ? `<div class="card" style="margin-bottom:16px"><strong>Signalements ouverts</strong><ul>${lot.signalements.map((s) => `<li>${echap(s.raison)}</li>`).join('')}</ul><p class="hint">Corrigez le lot : le statut « Signalé » disparaît quand ces points sont levés.</p></div>` : ''}
+      </section>
+      <section class="panneau-lot" data-panneau="alertes" hidden>
+      ${(lot.signalements && lot.signalements.length) ? `<div class="card" style="margin-bottom:16px"><strong>Signalements ouverts</strong><ul>${lot.signalements.map((s) => `<li>${echap(s.raison)}</li>`).join('')}</ul><p class="hint">Corrigez le lot : le statut « Signalé » disparaît quand ces points sont levés.</p></div>` : '<p class="empty">Aucun signalement ouvert.</p>'}
 
       <div class="actions only-technicien">
         <button type="button" class="secondary" id="btn-modifier">Modifier</button>
@@ -179,11 +202,13 @@ async function charger() {
       <form id="form-validation" class="only-biologiste" style="max-width:340px;">
         <p id="erreur-validation" class="message erreur" hidden></p>
         <p id="ok-validation" class="message ok" hidden></p>
-        <p class="hint">La signature utilise le biologiste connecté (${echap(window.__utilisateur?.nom || '')}).</p>
+        <p class="hint">La signature utilise le biologiste connecté (${echap((moi && moi.nom) || '')}).</p>
         <button type="submit">${lot.validations.length ? 'Revalider' : 'Valider ce lot'}</button>
       </form>
       <p class="only-technicien hint">Passez en rôle biologiste pour valider ce lot.</p>
 
+      </section>
+      <section class="panneau-lot" data-panneau="historique" hidden>
       <h2 style="margin-top:32px;">Historique des modifications</h2>
       <p class="hint">Registre en ajout seul : une ligne d’historique ne se modifie ni ne se supprime.</p>
       <div id="historique" class="frise"></div>
@@ -191,10 +216,26 @@ async function charger() {
       <div class="zone-archive only-biologiste" id="zone-archive" ${Number(lot.archive) ? 'hidden' : ''}>
         <h2>Archiver ce lot</h2>
         <p class="hint">Dans un outil de traçabilité on n’efface pas : on archive. Le lot reste dans l’historique.</p>
-        <button type="button" class="danger" id="btn-archiver">Archiver le lot</button>
+        <button type="button" class="danger" id="btn-archiver">Archiver ce lot</button>
         <p id="erreur-archive" class="message erreur" hidden></p>
       </div>
+      </section>
+      <section class="panneau-lot" data-panneau="certificat" hidden>
+        <p class="hint">Ouvrir le certificat imprimable ou le PDF de traçabilité.</p>
+        <div class="actions">
+          <a class="btn-link primary" href="certificat.html?id=${lot.id}">Certificat imprimable</a>
+          <a class="btn-link" href="/api/lots/${lot.id}/certificat">PDF</a>
+        </div>
+      </section>
     `;
+    document.getElementById('onglets-lot')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-onglet]');
+      if (!btn) return;
+      document.querySelectorAll('#onglets-lot [data-onglet]').forEach((b) => b.classList.toggle('actif', b === btn));
+      document.querySelectorAll('.panneau-lot').forEach((p) => {
+        p.hidden = p.dataset.panneau !== btn.dataset.onglet;
+      });
+    });
 
     const conteneurRegles = document.getElementById('regles-alerte');
     if (!lot.reglesAlerte || lot.reglesAlerte.length === 0) {
