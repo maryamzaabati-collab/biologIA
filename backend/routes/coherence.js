@@ -11,14 +11,25 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/lot/:id', async (req, res) => {
+async function jsonLot(req, res) {
   try {
     const lot = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
-    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (!lot) {
+      return res.json({
+        lot_id: req.params.id,
+        anomalies: [],
+        score_qualite: { completude: null, coherence: null, conformite: null, global: null },
+        vide: true
+      });
+    }
     res.json(await analyserLot(db, lot));
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
-});
+}
+
+router.get('/lot/:id', jsonLot);
+router.get('/lots/:id', jsonLot);
+router.get('/:id', jsonLot);
 
 module.exports = router;

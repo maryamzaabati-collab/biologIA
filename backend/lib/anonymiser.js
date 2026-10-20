@@ -135,7 +135,13 @@ function enrichirRapport(csvTexte, identites = []) {
   const kMin = groupes.size ? Math.min(...groupes.values()) : null;
 
   const kCtrl = base.controles.find((c) => c.code === 'k_anonymat');
-  if (kCtrl && petits.length) {
+  const nbDonnees = Math.max(0, lignes.length - 1);
+  if (kCtrl && (nbDonnees === 0 || iAge < 0 || iSexe < 0 || iTer < 0)) {
+    kCtrl.ok = false;
+    kCtrl.detail = nbDonnees === 0
+      ? 'CSV sans lignes de données — test non testable'
+      : 'Colonnes tranche d’âge, sexe et territoire absentes — test non testable';
+  } else if (kCtrl && petits.length) {
     kCtrl.detail = `k minimum : ${kMin}. Groupes < 5 : ${petits.slice(0, 8).join(' ; ')}`;
     kCtrl.ok = false;
   } else if (kCtrl && kMin != null) {
@@ -172,8 +178,11 @@ function enrichirRapport(csvTexte, identites = []) {
     detail: `${reident} ligne(s) n’ont qu’un seul candidat dans patients_identite (doit être 0)`
   });
 
-  base.ok = base.controles.every((c) => c.ok || c.code === 'irreversible');
-  base.ok = base.controles.filter((c) => c.code !== 'irreversible').every((c) => c.ok);
+  const nonTestable = nbDonnees === 0 || iAge < 0 || iSexe < 0 || iTer < 0;
+  const metier = base.controles.filter((c) => c.code !== 'irreversible');
+  const conforme = !nonTestable && metier.every((c) => c.ok);
+  base.ok = conforme;
+  base.statut = nonTestable ? 'non_testable' : (conforme ? 'conforme' : 'non_conforme');
   base.k_min = kMin;
   base.groupes_faibles = petits;
   return base;

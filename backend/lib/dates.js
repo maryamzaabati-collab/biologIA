@@ -52,4 +52,10 @@ function isoUtc(valeur) {
   return Number.isNaN(d.getTime()) ? s : d.toISOString();
 }
 
-module.exports = { formaterParis, formaterJour, horlogeParis, isoUtc };
+function jourCivilParis(valeur) {
+  const s = formaterParis(valeur);
+  const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+}
+
+module.exports = { formaterParis, formaterJour, horlogeParis, isoUtc, jourCivilParis };

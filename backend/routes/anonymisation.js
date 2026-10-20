@@ -58,15 +58,27 @@ router.post('/generer', async (req, res) => {
   }
 });
 
+async function statutJson() {
+  const meta = await db.get('SELECT * FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
+  const n = await db.get('SELECT COUNT(*) AS n FROM donnees_anonymisees');
+  return {
+    genere: Boolean(meta) && Number(n && n.n) > 0,
+    meta: meta || null,
+    nb_lignes: Number(n && n.n) || 0
+  };
+}
+
+router.get('/', async (req, res) => {
+  try {
+    res.json(await statutJson());
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
 router.get('/statut', async (req, res) => {
   try {
-    const meta = await db.get('SELECT * FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
-    const n = await db.get('SELECT COUNT(*) AS n FROM donnees_anonymisees');
-    res.json({
-      genere: Boolean(meta),
-      meta: meta || null,
-      nb_lignes: Number(n && n.n) || 0
-    });
+    res.json(await statutJson());
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }
@@ -86,7 +98,13 @@ router.post('/tester', async (req, res) => {
       texte = csvPiege();
     }
     const rapport = enrichirRapport(texte, await identites());
-    await journal.enregistrer(req, 'test anonymisation', source, rapport.ok ? 'OK' : 'KO');
+    await journal.enregistrer(req, 'test anonymisation', source, rapport.statut || (rapport.ok ? 'conforme' : 'non_conforme'));
+    try {
+      await db.run(
+        'UPDATE anonymisation_meta SET dernier_test = ? WHERE id = (SELECT MAX(id) FROM anonymisation_meta)',
+        [JSON.stringify({ statut: rapport.statut, k_min: rapport.k_min, le: new Date().toISOString() })]
+      );
+    } catch { /* colonne optionnelle */ }
     res.json({ ...rapport, source, csv_texte: source === 'csv' ? undefined : texte });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
@@ -95,10 +113,21 @@ router.post('/tester', async (req, res) => {
 
 router.get('/export-anonyme', async (req, res) => {
   try {
+    const meta = await db.get('SELECT * FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
     const lignes = await db.all('SELECT tranche_age, sexe, territoire, parametre, valeur, unite, mois FROM donnees_anonymisees');
+    if (!lignes.length) {
+      return res.status(409).json({ erreur: 'Aucun jeu anonymisé. Cliquez sur Générer.' });
+    }
+    if (!meta || Number(meta.k_min) < 5) {
+      return res.status(409).json({ erreur: 'Export refusé : k minimum inférieur à 5. Régénérez le jeu.' });
+    }
     const csvLignes = [['tranche_age', 'sexe', 'territoire', 'parametre', 'valeur', 'unite', 'mois']];
     for (const l of lignes) {
       csvLignes.push([l.tranche_age, l.sexe, l.territoire, l.parametre, l.valeur, l.unite, l.mois]);
+    }
+    const entete = csvLignes[0].join(';').toLowerCase();
+    if (/code_patient|psn|numero_patient|nir|prenom|^nom$/.test(entete)) {
+      return res.status(500).json({ erreur: 'Refus : colonnes identifiantes détectées dans l’export.' });
     }
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="jeu-anonymise.csv"');

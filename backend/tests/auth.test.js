@@ -110,6 +110,23 @@ describe('authentification', () => {
     assert.match(val.data.nom_biologiste, /Amrani/);
   });
 
+  it('refuse un e-mail sans point dans le domaine', async () => {
+    resetCookie();
+    for (const email of ['maryam@biol', 'mary@biologie']) {
+      const r = await json('/api/auth/inscription', {
+        method: 'POST',
+        body: JSON.stringify({
+          nom: 'Test',
+          identifiant: 'u' + Math.random().toString(16).slice(2),
+          email,
+          mot_de_passe: 'labo2026x',
+          role_demande: 'client'
+        })
+      });
+      assert.equal(r.status, 400);
+    }
+  });
+
   it('interdit au technicien d archiver', async () => {
     resetCookie();
     await json('/api/auth/connexion', {

@@ -43,7 +43,7 @@
       : '';
     if (serie.suffisant === false) {
       return titre + '<p class="empty">Pas assez de données pour calculer les limites</p>'
-        + `<p class="hint">${serie.nb_points || 0} valeur(s) CSV — minimum 20 pour un seul analyte.</p>`;
+        + `<p class="hint">${pluriel(serie.nb_points || 0, 'valeur')} CSV — minimum 20 pour un seul analyte.</p>`;
     }
     const note = serie.nb_reference
       ? `<p class="hint">Limites calculées sur les ${serie.nb_reference} premiers points (période de référence), puis appliquées à toute la série.</p>`
@@ -139,6 +139,8 @@
         <div id="recherche-resultats" class="recherche-resultats" hidden></div>
       </div>
       <button type="button" id="btn-theme" class="theme-btn" aria-label="Changer de thème"></button>
+      <button type="button" id="btn-avatar" class="avatar-top" aria-label="Compte" hidden></button>
+      <div id="menu-compte" class="menu-compte" hidden></div>
     `;
     main.prepend(bar);
     const input = document.getElementById('recherche-globale');
@@ -163,7 +165,7 @@
           const groupes = [];
           if (r.lots.length) groupes.push(`<p class="hint">Lots</p>`);
           box.innerHTML = lignes.length
-            ? `<p class="hint">${(r.lots||[]).length} lot(s) · ${(r.machines||[]).length} machine(s) · ${(r.signalements||[]).length} signalement(s) · ${(r.patients||[]).length} PSN</p>${lignes.join('')}`
+            ? `<p class="hint">${pluriel((r.lots||[]).length, 'lot')} · ${pluriel((r.machines||[]).length, 'machine')} · ${pluriel((r.signalements||[]).length, 'signalement')} · ${(r.patients||[]).length} PSN</p>${lignes.join('')}`
             : '<p class="empty">Aucun résultat.</p>';
           box.hidden = false;
         } catch (err) {
@@ -213,20 +215,15 @@
         }
         bande.textContent = 'Session bientôt expirée — enregistrez votre travail et reconnectez-vous.';
       }
-      const aside = document.querySelector('.sidebar');
-      if (aside && !document.getElementById('bloc-session')) {
-        const bloc = document.createElement('div');
-        bloc.id = 'bloc-session';
-        bloc.className = 'user-card';
-        bloc.innerHTML = `
-          <span class="avatar">${echap(initiales(moi.nom))}</span>
-          <div>
-            <strong>${echap(moi.nom)}</strong>
-            <p class="hint" style="margin:0">${echap(moi.role)}</p>
-          </div>
-          <button type="button" id="btn-deconnexion" class="lien-discret">Déconnexion</button>`;
-        aside.appendChild(bloc);
-        document.getElementById('btn-deconnexion').addEventListener('click', async () => {
+      const av = document.getElementById('btn-avatar');
+      const menu = document.getElementById('menu-compte');
+      if (av && menu) {
+        av.hidden = false;
+        av.textContent = initiales(moi.nom);
+        menu.innerHTML = `<p class="hint" style="margin:0 8px 8px">${echap(moi.nom)} · ${echap(moi.role)}</p>
+          <button type="button" class="secondary" id="btn-deconnexion">Déconnexion</button>`;
+        av.onclick = () => { menu.hidden = !menu.hidden; };
+        document.getElementById('btn-deconnexion')?.addEventListener('click', async () => {
           try { await api('/auth/deconnexion', { method: 'POST' }); } catch { /* ignore */ }
           window.location.href = 'connexion.html';
         });
@@ -235,6 +232,7 @@
     } catch {
       remplirNav('');
     }
+    window.dispatchEvent(new Event('session-prete'));
   }
 
   if (document.readyState === 'loading') {

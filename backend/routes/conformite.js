@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
+const csrf = require('../lib/csrf');
+const { limiter } = require('../lib/debit');
 
 router.get('/', async (req, res) => {
   try {
@@ -8,18 +10,35 @@ router.get('/', async (req, res) => {
     const journal = await db.get('SELECT COUNT(*) AS n FROM journal_audit');
     const patients = await db.get('SELECT COUNT(*) AS n FROM patients_pseudo');
     const identiteSeparee = Number(patients && patients.n) > 0;
-    const lots = await db.get('SELECT COUNT(*) AS n FROM lots WHERE COALESCE(archive, 0) = 0');
+    const lots = await db.get('SELECT COUNT(*) AS n FROM lots WHERE COALESCE(archive, 0) = 0 AND COALESCE(est_test, 0) = 0');
     const validations = await db.get('SELECT COUNT(*) AS n FROM validations');
-    const hashOk = true;
-    const accesOk = Boolean(req.utilisateur) && Number(sessions && sessions.n) >= 0 && hashOk;
-    const anon = await db.get('SELECT k_min, nb_lignes FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
-    const kOk = anon && Number(anon.k_min) >= 5 && Number(anon.nb_lignes) > 0;
+    const hashCol = await db.all("PRAGMA table_info(journal_audit)");
+    const hashOk = hashCol.some((c) => c.name === 'hash');
+    const csrfOk = Boolean(csrf && csrf.middleware);
+    const debitOk = typeof limiter === 'function';
+    const resetTable = await db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='reset_mdp'");
+    const manquesAcces = [];
+    if (!csrfOk) manquesAcces.push('jeton CSRF');
+    if (!debitOk) manquesAcces.push('limitation de débit');
+    if (!resetTable) manquesAcces.push('réinitialisation de mot de passe');
+    manquesAcces.push('paquet Helmet (en-têtes manuels en place, non couverts par un test dédié)');
+    manquesAcces.push('limitation HTTP globale (seule la connexion est limitée)');
+
+    const anon = await db.get('SELECT k_min, nb_lignes, dernier_test FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
+    let dernierK = anon ? Number(anon.k_min) : null;
+    if (anon && anon.dernier_test) {
+      try {
+        const t = JSON.parse(anon.dernier_test);
+        if (t && t.k_min != null) dernierK = Number(t.k_min);
+      } catch { /* ignore */ }
+    }
+    const kOk = dernierK != null && dernierK >= 5 && Number(anon && anon.nb_lignes) > 0;
 
     const items = [
       {
         code: 'acces',
         titre: 'Contrôle des accès',
-        detail: 'Sessions, rôles serveur et mots de passe hachés (scrypt). Il manque encore CSRF, Helmet, limitation de débit HTTP globale et la réinitialisation de mot de passe.',
+        detail: `Présent : sessions (${Number(sessions && sessions.n) || 0}), rôles serveur, scrypt, CSRF, en-têtes (nosniff/frame/CSP), reset MDP, limite de connexion. Manque ou non testé : ${manquesAcces.join(' ; ')}.`,
         statut: 'partiel'
       },
       {
@@ -34,9 +53,9 @@ router.get('/', async (req, res) => {
         code: 'journal',
         titre: 'Journal de validation',
         detail: Number(journal && journal.n)
-          ? `${journal.n} événement(s) d’audit. Validations biologiste nominatives.`
+          ? `${journal.n} événements d’audit. Chaîne SHA-256 ${hashOk ? 'en place' : 'absente'}. Validations biologiste nominatives.`
           : 'Le journal est prêt, aucune action enregistrée pour l’instant.',
-        statut: Number(validations && validations.n) ? 'mis_en_place' : 'partiel'
+        statut: Number(validations && validations.n) && hashOk ? 'mis_en_place' : 'partiel'
       },
       {
         code: 'iso',
@@ -47,15 +66,17 @@ router.get('/', async (req, res) => {
       {
         code: 'ai_act',
         titre: 'AI Act — transparence',
-        detail: 'Aucun diagnostic n’est posé. Les seuils d’alerte sont des exemples pédagogiques ; la décision finale reste humaine. Classification de risque à confirmer avec l’enseignant.',
+        detail: 'Aucun diagnostic n’est posé. Les seuils d’alerte sont des exemples pédagogiques ; la décision finale reste humaine. Classification de risque : à confirmer avec l’enseignant.',
         statut: 'partiel'
       },
       {
         code: 'anonymisation',
         titre: 'Anonymisation (k ≥ 5)',
         detail: kOk
-          ? `Jeu généré : ${anon.nb_lignes} lignes, k minimum = ${anon.k_min}.`
-          : 'Générez le jeu anonymisé (onglet Patients) puis lancez le test k ≥ 5.',
+          ? `Dernier jeu / test : ${anon.nb_lignes} lignes, k minimum = ${dernierK}.`
+          : (anon
+            ? `Dernier k = ${dernierK}. Générez à nouveau ou relancez le test k ≥ 5.`
+            : 'Aucun test k enregistré. Générez le jeu (onglet Patients) puis lancez le test.'),
         statut: kOk ? 'mis_en_place' : 'partiel'
       }
     ];

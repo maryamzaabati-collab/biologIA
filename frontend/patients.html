@@ -13,8 +13,12 @@
     <nav></nav>
   </aside>
   <main>
-    <h1>Patients</h1>
-    <p class="page-intro">Données 100 % fictives. Le technicien identifie un numéro et obtient un PSN, jamais un nom. Le biologiste peut afficher l’identité avec un motif, écrit dans le journal.</p>
+    <div class="page-head">
+      <div>
+        <h1>Patients</h1>
+      </div>
+      <button type="button" class="only-biologiste" data-onglet="creer" id="btn-nouveau-patient">+ Nouveau patient</button>
+    </div>
     <div class="onglets-page">
       <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
       <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
@@ -36,7 +40,7 @@
         <label>Ou nom + date de naissance (normalisés, sans accents)</label>
         <div class="grid-2">
           <input type="text" id="nom" placeholder="Nom">
-          <input type="date" id="date_naissance">
+          <input type="date" id="date_naissance" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
         </div>
         <p id="erreur-nom" class="message erreur champ-erreur" hidden></p>
         <button type="submit">Retrouver le PSN</button>
@@ -58,7 +62,7 @@
           </div>
           <div>
             <label for="c-date">Date de naissance</label>
-            <input type="date" id="c-date" required>
+            <input type="date" id="c-date" required placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
           </div>
           <div>
             <label for="c-sexe">Sexe</label>
@@ -93,9 +97,9 @@
     <section class="card panneau only-biologiste" id="panneau-anonymiser" hidden>
       <h2>Générer le jeu anonymisé</h2>
       <p class="hint">Table irréversible : tranche d’âge, sexe, territoire, paramètre, valeur. Les groupes k &lt; 5 sont généralisés puis exclus. Aucun PSN.</p>
-      <p id="statut-anon" class="hint">Chargement…</p>
+      <p id="statut-anon" class="hint">Aucun jeu généré. Cliquez sur Générer.</p>
       <button type="button" id="btn-generer-anon">Générer / régénérer</button>
-      <a class="btn-link" href="/api/anonymisation/export-anonyme">Exporter CSV anonymisé</a>
+      <button type="button" class="secondary" id="btn-export-anon">Exporter CSV anonymisé</button>
       <div id="resultat-anon"></div>
     </section>
 
@@ -126,6 +130,7 @@ function montrerOnglet(id) {
 document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
   b.addEventListener('click', () => montrerOnglet(b.dataset.onglet));
 });
+document.getElementById('btn-nouveau-patient')?.addEventListener('click', () => montrerOnglet('creer'));
 
 function blocResultat(r) {
   if (!r.trouve) {
@@ -226,9 +231,9 @@ async function chargerStatutAnon() {
     const s = await api('/anonymisation/statut');
     document.getElementById('statut-anon').textContent = s.genere
       ? `Dernier jeu : ${s.nb_lignes} lignes, k min = ${s.meta.k_min} (${s.meta.genere_le || ''})`
-      : 'Aucun jeu généré pour l’instant.';
-  } catch (err) {
-    document.getElementById('statut-anon').textContent = err.message;
+      : 'Aucun jeu généré. Cliquez sur Générer.';
+  } catch {
+    document.getElementById('statut-anon').textContent = 'Aucun jeu généré. Cliquez sur Générer.';
   }
 }
 chargerStatutAnon();
@@ -245,11 +250,37 @@ document.getElementById('btn-generer-anon').addEventListener('click', async () =
   }
 });
 
-function afficherRapportAnon(r) {
-  document.getElementById('rapport-anon').innerHTML = `
-    <p class="message ${r.ok ? 'ok' : 'erreur'}">${r.ok ? 'Rapport OK (k ≥ 5)' : 'Rapport KO'}</p>
-    <ul>${(r.controles || []).map((c) => `<li>${c.ok ? '✓' : '✗'} <strong>${echap(c.libelle)}</strong> — ${echap(c.detail || '')}</li>`).join('')}</ul>`;
+function iconeControle(c) {
+  if (c.ok) return '✓';
+  if (/non testable|non applicable/i.test(c.detail || '')) return '⚠';
+  return '✗';
 }
+function afficherRapportAnon(r) {
+  const statut = r.statut || (r.ok ? 'conforme' : 'non_conforme');
+  const titre = statut === 'conforme' ? 'Conforme' : (statut === 'non_testable' ? 'Non testable' : 'Non conforme');
+  const cls = statut === 'conforme' ? 'ok' : 'erreur';
+  const okN = (r.controles || []).filter((c) => c.ok).length;
+  const tot = (r.controles || []).length;
+  document.getElementById('rapport-anon').innerHTML = `
+    <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>
+    <ul>${(r.controles || []).map((c) => `<li>${iconeControle(c)} <strong>${echap(c.libelle)}</strong> — ${echap(c.detail || '')}</li>`).join('')}</ul>`;
+}
+document.getElementById('btn-export-anon')?.addEventListener('click', async () => {
+  try {
+    const r = await fetch('/api/anonymisation/export-anonyme', { credentials: 'include' });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      throw new Error(data.erreur || 'Export impossible.');
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jeu-anonymise.csv';
+    a.click();
+  } catch (err) {
+    document.getElementById('resultat-anon').innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
 
 document.getElementById('btn-test-propre').addEventListener('click', async () => {
   try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'propre' }) })); }

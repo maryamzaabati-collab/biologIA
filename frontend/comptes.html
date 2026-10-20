@@ -57,7 +57,7 @@ async function charger() {
         <div class="machine-head">
           <span class="avatar" style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:0.8rem">${echap(initiales(c.nom))}</span>
           <div>
-            <strong>${echap(c.nom)}</strong> · <span class="mono">${echap(c.identifiant || '')}</span>
+            <strong>${echap(c.nom)}</strong>${c.identifiant && c.identifiant !== c.nom ? ` <span class="mono">(${echap(c.identifiant)})</span>` : ''}
             <div class="hint">${c.email ? echap(c.email) : 'E-mail non renseigné'}</div>
             <div class="hint">Rôle demandé : ${echap(libelleRole(c.role_demande || c.role))}</div>
           </div>

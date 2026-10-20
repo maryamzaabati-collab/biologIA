@@ -37,6 +37,9 @@ router.post('/inscription', async (req, res) => {
   if (!email) {
     return res.status(400).json({ erreur: 'L’e-mail est obligatoire (réinitialisation et journal).' });
   }
+  if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) {
+    return res.status(400).json({ erreur: 'Indiquez un e-mail valide (ex. nom@laboratoire.fr).' });
+  }
   if (!ROLES.includes(roleDemande)) {
     return res.status(400).json({ erreur: 'Choisissez un rôle : client, technicien ou biologiste.' });
   }

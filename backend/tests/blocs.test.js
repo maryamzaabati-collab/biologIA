@@ -60,6 +60,14 @@ describe('Westgard étendu', () => {
     assert.ok(c.moyenne > 4.9 && c.moyenne < 5.2);
     assert.equal(c.points[24].hors_norme, true);
   });
+
+  it('étiquette Westgard avec la date du point', () => {
+    const vals = Array.from({ length: 22 }, () => 5);
+    vals[21] = 20;
+    const dates = Array.from({ length: 22 }, (_, i) => `2026-01-${String(i + 1).padStart(2, '0')}`);
+    const w = westgard(vals, 5, 1, dates);
+    assert.ok(w.some((a) => /22\/01\/2026/.test(a.message)));
+  });
 });
 
 describe('unités et machines', () => {
@@ -123,6 +131,57 @@ describe('API authentifiée (blocs)', () => {
     });
     assert.equal(ok.status, 200);
     assert.ok(ok.data.token_demo);
+  });
+
+  it('lots exposent des patients distincts et une dernière mesure', async () => {
+    const r = await json('/api/lots');
+    assert.equal(r.status, 200);
+    const lot = (r.data || []).find((l) => l.nom === 'LOT-2026-001');
+    assert.ok(lot);
+    assert.ok(Number(lot.nb_patients) > 0);
+    assert.ok(lot.derniere_mesure || lot.date);
+  });
+
+  it('valideurs affichés existent dans les comptes', async () => {
+    const vals = await db.all('SELECT DISTINCT nom_biologiste AS nom FROM validations');
+    const comptes = await db.all('SELECT nom FROM utilisateurs');
+    const connus = new Set(comptes.map((c) => c.nom));
+    assert.ok(vals.length > 0);
+    for (const v of vals) {
+      assert.ok(connus.has(v.nom), `valideur inconnu : ${v.nom}`);
+    }
+  });
+
+  it('cohérence lot ne renvoie pas 404 au technicien', async () => {
+    const lots = await json('/api/lots');
+    const id = lots.data[0].id;
+    const r = await json(`/api/coherence/lot/${id}`);
+    assert.notEqual(r.status, 404);
+    assert.ok(Array.isArray(r.data.anomalies));
+  });
+
+  it('anonymisation statut est vide sans erreur', async () => {
+    await json('/api/auth/connexion', {
+      method: 'POST',
+      body: JSON.stringify({ identifiant: 'amrani', mot_de_passe: 'labo2026' })
+    });
+    const r = await json('/api/anonymisation/statut');
+    assert.equal(r.status, 200);
+    assert.equal(typeof r.data.genere, 'boolean');
+  });
+
+  it('export anonymisé refuse k<5 et n’a pas d’identifiant', async () => {
+    const r = await json('/api/anonymisation/export-anonyme');
+    if (r.status === 409) {
+      assert.match(r.data.erreur || '', /k minimum|Aucun jeu/i);
+      return;
+    }
+    assert.equal(r.status, 200);
+    const texte = typeof r.data === 'string' ? r.data : String(r.data);
+    const entete = texte.split(/\r?\n/)[0].toLowerCase();
+    assert.match(entete, /tranche_age/);
+    assert.match(entete, /territoire/);
+    assert.equal(/code_patient|psn|numero_patient/.test(entete), false);
   });
 
   it('journal hash chain intègre', async () => {

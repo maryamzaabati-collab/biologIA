@@ -56,8 +56,38 @@ function analyserHorodatage(chaine) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+function pluriel(n, singulier, formePlurielle) {
+  const nb = Number(n) || 0;
+  const pl = formePlurielle || `${singulier}s`;
+  return `${nb} ${nb > 1 ? pl : singulier}`;
+}
+
+function attendreSession() {
+  if (window.__utilisateur) return Promise.resolve(window.__utilisateur);
+  return new Promise((resolve) => {
+    const fin = () => resolve(window.__utilisateur || null);
+    window.addEventListener('session-prete', fin, { once: true });
+    setTimeout(fin, 2000);
+  });
+}
+
+function libelleConditions(lot) {
+  const c = String(lot && lot.conditions != null ? lot.conditions : '').trim();
+  if (!c || /^\d+$/.test(c)) return 'Non renseignées';
+  return c;
+}
+
+async function copierTexte(texte) {
+  try {
+    await navigator.clipboard.writeText(texte);
+    notifier('Copié', 'ok');
+  } catch {
+    notifier('Impossible de copier', 'erreur');
+  }
+}
+
 function formatDate(chaineISO) {
-  if (!chaineISO) return 'non renseignée';
+  if (!chaineISO) return '—';
   const s = String(chaineISO).trim();
   const jour = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (jour && !/[zZ]/.test(s)) return `${jour[3]}/${jour[2]}/${jour[1]}`;
@@ -270,7 +300,7 @@ function svgCode39(texte) {
 }
 
 function htmlChaineTracabilite(lot) {
-  const origine = lot.conditions || lot.machine_nom || 'non renseignée';
+  const origine = lot.date ? formatDate(lot.date) : 'Non renseignée';
   const machine = lot.machine_nom || 'non renseignée';
   const anon = Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'Confirmée' : (Number(lot.anonymise) ? 'À vérifier' : 'En attente');
   const val = lot.validations?.[0];
@@ -299,7 +329,7 @@ function htmlChaineTracabilite(lot) {
 function htmlCarteControle(serie) {
   if (serie && serie.suffisant === false) {
     return `<p class="empty">Pas assez de données pour calculer les limites</p>
-      <p class="hint">${serie.nb_points || 0} point(s) dans ce lot — il en faut au moins 20, issus du CSV d’un seul analyte.</p>`;
+      <p class="hint">${pluriel(serie.nb_points || 0, 'point')} dans ce lot — il en faut au moins 20, issus du CSV d’un seul analyte.</p>`;
   }
   const pts = (serie.points || []).map((p) => ({
     ...p,
@@ -404,6 +434,22 @@ function installerNav() {}
 
 function installerChrome() {
   appliquerTheme();
+  if (!document.body.dataset.datesVides) {
+    document.body.dataset.datesVides = '1';
+    document.querySelectorAll('input[type="date"]').forEach((el) => {
+      if (!el.getAttribute('value') && !el.defaultValue) el.value = '';
+      el.setAttribute('placeholder', 'jj/mm/aaaa');
+      el.setAttribute('title', 'jj/mm/aaaa');
+    });
+  }
+  if (!document.body.dataset.copierBind) {
+    document.body.dataset.copierBind = '1';
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-copier]');
+      if (!btn) return;
+      copierTexte(btn.dataset.copier);
+    });
+  }
 }
 
 if (document.readyState === 'loading') {

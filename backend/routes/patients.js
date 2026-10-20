@@ -137,9 +137,13 @@ async function lignesIdentifiants(q) {
     ORDER BY psn
   `);
   const mesures = await db.all(
-    `SELECT upper(code_patient) AS psn, COUNT(*) AS nb_mesures, COUNT(DISTINCT lot_id) AS nb_lots,
-      MAX(date) AS date_derniere
-     FROM mesures_reference GROUP BY upper(code_patient)`
+    `SELECT upper(m.code_patient) AS psn,
+      COUNT(*) AS nb_mesures,
+      COUNT(DISTINCT m.lot_id) AS nb_lots,
+      MAX(COALESCE(NULLIF(trim(m.date), ''), lots.date)) AS date_derniere
+     FROM mesures_reference m
+     LEFT JOIN lots ON lots.id = m.lot_id
+     GROUP BY upper(m.code_patient)`
   );
   const parPsn = new Map(mesures.map((m) => [m.psn, m]));
   let liste = rows.map((r) => {

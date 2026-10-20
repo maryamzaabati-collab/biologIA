@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
-const { formaterParis, isoUtc } = require('../lib/dates');
+const { formaterParis, isoUtc, jourCivilParis } = require('../lib/dates');
 const { csvAvecBom } = require('../lib/tracabilite');
 const { verifierIntegrite } = require('../lib/journal');
 
@@ -21,10 +21,7 @@ function filtres(req) {
     clauses.push('action = ?');
     params.push(req.query.action);
   }
-  if (req.query.date) {
-    clauses.push("substr(replace(date, 'T', ' '), 1, 10) = ?");
-    params.push(req.query.date);
-  }
+  // Le filtre jour est appliqué après mapping (calendrier de Paris).
   return { clauses, params, where: clauses.length ? `WHERE ${clauses.join(' AND ')}` : '' };
 }
 
@@ -42,7 +39,8 @@ function mapper(l, parId) {
       ? libelleLot(lot)
       : compte
         ? (l.details ? String(l.details).split('→')[0].trim() : l.cible)
-        : (l.cible || '—')
+        : (l.cible || '—'),
+    jour_civil: jourCivilParis(l.date)
   };
 }
 
@@ -51,21 +49,24 @@ router.get('/', async (req, res) => {
     const { params, where } = filtres(req);
     const page = Math.max(1, Number(req.query.page) || 1);
     const taille = Math.min(100, Math.max(10, Number(req.query.taille) || 50));
-    const offset = (page - 1) * taille;
-    const totalRow = await db.get(`SELECT COUNT(*) AS n FROM journal_audit ${where}`, params);
-    const lignes = await db.all(
-      `SELECT * FROM journal_audit ${where} ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`,
-      [...params, taille, offset]
-    );
     const lots = await db.all('SELECT id, nom, code_verification FROM lots');
     const parId = new Map(lots.map((l) => [Number(l.id), l]));
+    const jour = String(req.query.date || '').trim();
+    let lignes = await db.all(
+      `SELECT * FROM journal_audit ${where} ORDER BY date DESC, id DESC LIMIT 2000`,
+      params
+    );
+    lignes = lignes.map((l) => mapper(l, parId));
+    if (jour) lignes = lignes.filter((l) => l.jour_civil === jour);
+    const total = lignes.length;
+    const offset = (page - 1) * taille;
     const actions = await db.all('SELECT DISTINCT action FROM journal_audit ORDER BY action');
     res.json({
       page,
       taille,
-      total: Number(totalRow && totalRow.n) || 0,
+      total,
       actions: actions.map((a) => a.action),
-      lignes: lignes.map((l) => mapper(l, parId))
+      lignes: lignes.slice(offset, offset + taille)
     });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
@@ -81,11 +82,11 @@ router.get('/csv', async (req, res) => {
     );
     const lots = await db.all('SELECT id, nom, code_verification FROM lots');
     const parId = new Map(lots.map((l) => [Number(l.id), l]));
+    const jour = String(req.query.date || '').trim();
+    let mapped = lignes.map((l) => mapper(l, parId));
+    if (jour) mapped = mapped.filter((l) => l.jour_civil === jour);
     const csv = [['date', 'qui', 'action', 'cible', 'details']].concat(
-      lignes.map((l) => {
-        const m = mapper(l, parId);
-        return [m.date_paris, m.nom_affiche, m.action, m.cible_lisible, m.details || ''];
-      })
+      mapped.map((m) => [m.date_paris, m.nom_affiche, m.action, m.cible_lisible, m.details || ''])
     );
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="journal-audit.csv"');

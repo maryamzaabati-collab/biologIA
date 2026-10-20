@@ -63,8 +63,11 @@ function enteteTri(col, libelle) {
 
 function classeAction(action) {
   const a = String(action || '').toLowerCase();
+  if (a.includes('échou') || a.includes('echec') || a.includes('échec')) return 'echec';
+  if (a.includes('inscription')) return 'inscription';
+  if (a.includes('accord')) return 'accord';
   if (a.includes('connexion')) return 'connexion';
-  if (a.includes('valid') || a.includes('accord')) return 'validation';
+  if (a.includes('valid')) return 'validation';
   if (a.includes('refus') || a.includes('suspen')) return 'refus';
   return 'attente';
 }
@@ -114,11 +117,14 @@ function afficherPage() {
       const cible = l.lot_id
         ? `<a href="lot.html?id=${l.lot_id}">${echap(l.cible_lisible || l.cible)}</a>`
         : echap(l.cible_lisible || l.cible || '—');
+      const details = String(l.details || '').trim();
+      const cibleTxt = String(l.cible_lisible || l.cible || '');
+      const extra = details && !cibleTxt.includes(details) && details !== cibleTxt ? ' · ' + echap(details) : '';
       return `<tr>
         <td>${echap(l.date_paris || formatDateHeure(l.date))}</td>
         <td>${echap(l.nom_affiche)}</td>
         <td><span class="badge-action ${classeAction(l.action)}">${echap(l.action)}</span></td>
-        <td>${cible}${l.details ? ' · ' + echap(l.details) : ''}</td>
+        <td>${cible}${extra}</td>
       </tr>`;
     }).join('')
   }</tbody></table>`;
@@ -161,8 +167,8 @@ document.getElementById('btn-integrite')?.addEventListener('click', async () => 
     el.hidden = false;
     el.className = 'message ' + (r.ok ? 'ok' : 'erreur');
     el.textContent = r.ok
-      ? `Chaîne intègre (${r.nb} événement(s)).`
-      : `Rupture détectée sur ${r.fautes.length} ligne(s).`;
+      ? `Chaîne intègre (${pluriel(r.nb, 'événement')}).`
+      : `Rupture détectée sur ${pluriel(r.fautes.length, 'ligne')}.`;
   } catch (err) {
     el.hidden = false;
     el.className = 'message erreur';

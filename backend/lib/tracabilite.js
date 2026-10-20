@@ -298,6 +298,7 @@ function etiquettePointControle(i, dates) {
     const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[3]}/${m[2]}/${m[1]}` : String(d);
   }
+  if (d) return String(d);
   return `point ${i + 1}`;
 }
 
@@ -581,9 +582,11 @@ function testerAnonymisation(csvTexte) {
   controles.push({
     code: 'k_anonymat',
     ok: kOk,
-    libelle: 'Chaque combinaison (âge + sexe + département) apparaît au moins 5 fois (k ≥ 5)',
+    libelle: 'Chaque combinaison (âge + sexe + territoire) apparaît au moins 5 fois (k ≥ 5)',
     detail: kMin === null
-      ? 'Colonnes tranche d’âge, sexe et département absentes — test non applicable'
+      ? (lignes.length <= 1
+        ? 'CSV sans lignes de données — test non testable'
+        : 'Colonnes tranche d’âge, sexe et territoire absentes — test non testable')
       : `k minimum observé : ${kMin}`
   });
 
@@ -596,12 +599,21 @@ function testerAnonymisation(csvTexte) {
       : 'Seuls des codes PSN ou des attributs généralisés sont présents'
   });
 
-  const applicables = controles.filter((c) => c.code !== 'k_anonymat' || kMin !== null);
+  const nbLignes = Math.max(0, lignes.length - 1);
+  const nonTestable = nbLignes === 0 || kMin === null;
+  if (nonTestable) {
+    const kCtrl = controles.find((c) => c.code === 'k_anonymat');
+    if (kCtrl) kCtrl.ok = false;
+  }
+  const echecs = controles.filter((c) => c.code !== 'irreversible' && c.ok === false);
+  const conforme = !nonTestable && echecs.length === 0;
   return {
-    ok: applicables.every((c) => c.ok),
+    ok: conforme,
+    statut: nonTestable ? 'non_testable' : (conforme ? 'conforme' : 'non_conforme'),
     controles,
     colonnes: analyse.colonnes,
-    nb_lignes: Math.max(0, lignes.length - 1)
+    nb_lignes: nbLignes,
+    k_min: kMin
   };
 }
 

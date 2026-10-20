@@ -55,7 +55,7 @@ async function chargerSignalements() {
           <ul class="raison">${g.raisons.map((r) => `<li>${echap(r)}</li>`).join('')}</ul>
         </div>
         <div class="actions">
-          <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${g.raisons.length} ${resolus === '1' ? 'résolu(s)' : 'ouvert(s)'}</span>
+          <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${pluriel(g.raisons.length, resolus === '1' ? 'résolu' : 'ouvert')}</span>
           <a class="btn-link primary" href="lot.html?id=${g.lot_id}&edit=1">Corriger</a>
           ${resolus === '0' ? '<button class="btn-ghost only-biologiste" data-id="' + g.ids[0] + '">Clôturer (biologiste)</button>' : ''}
         </div>

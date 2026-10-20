@@ -24,7 +24,7 @@
     <div class="page-head">
       <div>
         <h1>Lots</h1>
-        <p class="page-intro">Tous les jeux de données de référence.</p>
+        <p class="page-intro" hidden></p>
       </div>
       <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
@@ -49,7 +49,8 @@
     <div class="filtres">
       <input type="search" id="filtre-q" placeholder="Rechercher un lot" autocomplete="off" name="recherche-lot">
       <select id="filtre-machine"><option value="">Toutes les machines</option></select>
-      <input type="date" id="filtre-date">
+      <input type="date" id="filtre-date" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+      <button type="button" class="secondary" id="btn-date-clear">Effacer</button>
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
     </div>
@@ -116,7 +117,7 @@ async function chargerLots() {
           <td><a href="lot.html?id=${lot.id}">${echap(lot.nom)}</a></td>
           <td class="mono">${echap(lot.code_verification || '')}</td>
           <td>${echap(lot.machine_nom || '')}</td>
-          <td>${formatDate(lot.date)}</td>
+          <td>${formatDate(lot.derniere_mesure || lot.date)}</td>
           <td>${lot.nb_patients || 0}</td>
           <td><span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span></td>
         </tr>`).join('')}
@@ -125,15 +126,13 @@ async function chargerLots() {
       conteneur.className = 'lots-grille';
       conteneur.innerHTML = slice.map((lot) => `
       <a class="lot-carte statut-${echap(lot.statut_affiche)}" href="lot.html?id=${lot.id}">
-        <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+        ${lot.nb_signalements ? `<span class="lot-alerte" title="${pluriel(lot.nb_signalements, 'signalement')}">⚠ ${lot.nb_signalements}</span>` : ''}
+        <span class="badge badge-statut ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
         <strong class="lot-carte-nom">${echap(lot.nom)}${Number(lot.est_test) ? ' · TEST' : ''}</strong>
         <span class="lot-carte-ref">${echap(lot.code_verification || '')}</span>
         <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
-        <span class="lot-carte-date">${formatDate(lot.date)} · ${lot.nb_patients || 0} patient(s)</span>
-        <span class="lot-carte-pied">
-          ${htmlJauge(lot.score_confiance, 'Score de confiance', null, { mini: true })}
-          ${lot.nb_signalements ? `<span class="badge douteux">${lot.nb_signalements} signalement(s)</span>` : ''}
-        </span>
+        <span class="lot-carte-date">${formatDate(lot.derniere_mesure || lot.date)}</span>
+        <span class="score-ligne"><span>Score ${lot.score_confiance ?? '—'}/100</span><span class="piste"><i style="width:${Number(lot.score_confiance)||0}%"></i></span></span>
       </a>
     `).join('');
     }
@@ -168,6 +167,11 @@ document.getElementById('pagination-lots').addEventListener('click', (e) => {
 ['filtre-q', 'filtre-machine', 'filtre-date', 'tri-lots'].forEach((id) => {
   document.getElementById(id).addEventListener('input', () => { pageLots = 1; chargerLots(); });
   document.getElementById(id).addEventListener('change', () => { pageLots = 1; chargerLots(); });
+});
+document.getElementById('btn-date-clear').addEventListener('click', () => {
+  document.getElementById('filtre-date').value = '';
+  pageLots = 1;
+  chargerLots();
 });
 document.getElementById('vue-cartes').addEventListener('click', () => {
   vueLots = 'cartes';

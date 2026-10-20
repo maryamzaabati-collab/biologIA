@@ -8,8 +8,9 @@ router.get('/', async (req, res) => {
   try {
     const machines = await db.all(`
       SELECT machines.*,
-        (SELECT MAX(lots.date) FROM lots WHERE lots.machine_id = machines.id) AS derniere_mesure,
-        (SELECT COUNT(*) FROM lots WHERE lots.machine_id = machines.id AND COALESCE(lots.archive, 0) = 0) AS nb_lots
+        (SELECT MAX(lots.date) FROM lots WHERE lots.machine_id = machines.id AND COALESCE(lots.est_test, 0) = 0) AS derniere_mesure,
+        (SELECT COUNT(*) FROM lots WHERE lots.machine_id = machines.id AND COALESCE(lots.archive, 0) = 0 AND COALESCE(lots.est_test, 0) = 0) AS nb_lots,
+        (SELECT COUNT(*) FROM lots WHERE lots.machine_id = machines.id AND COALESCE(lots.archive, 0) = 0 AND COALESCE(lots.est_test, 0) = 1) AS nb_test
       FROM machines ORDER BY nom
     `);
     res.json(machines.map((m) => {

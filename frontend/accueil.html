@@ -24,23 +24,19 @@
     <div class="page-head">
       <div>
         <h1 id="bonjour">Tableau de bord</h1>
-        <p class="page-intro">Voici l’état de tes lots de référence aujourd’hui.</p>
       </div>
       <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="stats" class="stats-row"></div>
-    <div class="card" id="a-faire" style="margin-bottom:18px"></div>
-    <div class="dash-grid">
-      <div class="card">
-        <h2>Derniers lots</h2>
-        <div id="urgence" class="urgence"><p class="empty">Chargement…</p></div>
+    <div class="card" style="margin-bottom:18px">
+      <div class="page-head" style="margin:0 0 8px">
+        <h2>À faire aujourd’hui</h2>
+        <a class="btn-link" href="index.html">Tout voir</a>
       </div>
-      <div class="card">
-        <h2>Qualité des données</h2>
-        <div id="qualite"></div>
-      </div>
+      <div id="urgence" class="urgence"><p class="empty">Chargement…</p></div>
     </div>
+    <div class="card" id="qualite"></div>
     <div class="card card-code">
       <form id="form-code">
         <label for="code-verif">Ouvrir un lot par code de vérification</label>
@@ -73,19 +69,21 @@ document.getElementById('form-code').addEventListener('submit', async (e) => {
 
 (async () => {
   try {
-    const [s, lots, moi] = await Promise.all([
+    const [s, lots, moi, machines] = await Promise.all([
       api('/synthese'),
       api('/lots'),
-      api('/auth/moi').catch(() => null)
+      api('/auth/moi').catch(() => null),
+      api('/machines').catch(() => [])
     ]);
     const prenom = moi?.nom || 'là';
     document.getElementById('bonjour').textContent = 'Bonjour ' + prenom;
+    const nMachines = Array.isArray(machines) ? machines.length : 0;
     document.getElementById('stats').innerHTML = `
-      <a class="stat stat-ok" href="index.html"><div class="valeur">${s.totalLots}</div><div class="label">Lots enregistrés</div></a>
-      <a class="stat stat-wait" href="index.html?filtre=a_valider"><div class="valeur">${s.lotsAValider ?? s.lotsSansValidation}</div><div class="label">À valider</div></a>
+      <a class="stat stat-wait" href="index.html?filtre=a_valider"><div class="valeur">${s.lotsAValider ?? 0}</div><div class="label">À valider</div></a>
       <a class="stat stat-reval" href="index.html?filtre=a_revalider"><div class="valeur">${s.lotsARevalider || 0}</div><div class="label">À revalider</div></a>
-      <a class="stat stat-alert" href="index.html?filtre=signale"><div class="valeur">${s.lotsDouteux || 0}</div><div class="label">Signalés</div></a>
-      <a class="stat stat-alert" href="signalements.html"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements ouverts</div></a>
+      <a class="stat stat-alert" href="index.html?filtre=signale"><div class="valeur">${s.lotsDouteux || 0}</div><div class="label">Signalé</div></a>
+      <a class="stat stat-teal" href="machines.html"><div class="valeur">${nMachines}</div><div class="label">Machines</div></a>
+      <a class="stat stat-alert" href="signalements.html"><div class="valeur">${s.signalementsEnCours}</div><div class="label">Signalements</div></a>
     `;
     const recents = [...lots]
       .filter((l) => !Number(l.est_test))
@@ -102,15 +100,17 @@ document.getElementById('form-code').addEventListener('submit', async (e) => {
         </a>
       `).join('');
     }
-    const taches = lots.filter((l) => !Number(l.est_test) && ['a_valider', 'a_revalider', 'signale'].includes(l.statut_affiche));
-    document.getElementById('a-faire').innerHTML = `<h2>À faire aujourd’hui</h2>` + (taches.length
-      ? `<ul>${taches.slice(0, 8).map((l) => `<li><a href="lot.html?id=${l.id}">${echap(l.nom)}</a> — ${echap(l.statut_libelle)}</li>`).join('')}</ul>`
-      : '<p class="empty">Rien en attente.</p>');
-    document.getElementById('qualite').innerHTML = htmlJauge(s.pourcentageValides, 'Lots validés', null, {
-        mode: 'pourcent',
-        sousTitre: `${s.lotsValides} lot${s.lotsValides > 1 ? 's' : ''} sur ${s.totalLots}`
-      }) +
-      `<p class="hint">${s.lotsAValider || 0} à valider, ${s.lotsARevalider || 0} à revalider. ${s.signalementsEnCours} signalement(s) ouvert(s) (hors lot TEST).</p>`;
+    const pct = s.totalLots ? Math.round(100 * (s.lotsValides || 0) / s.totalLots) : 0;
+    document.getElementById('qualite').innerHTML = `
+      <div class="page-head" style="margin:0">
+        <div>
+          <h2>Lots validés</h2>
+          <p class="hint" style="margin:0">${s.lotsValides || 0} sur ${s.totalLots} · hors lot TEST</p>
+        </div>
+        <strong>${pct} %</strong>
+      </div>
+      <div class="score-ligne" style="margin-top:12px"><span class="piste"><i style="width:${pct}%"></i></span></div>
+      <p class="hint">${pluriel(s.signalementsEnCours, 'signalement')} ${Number(s.signalementsEnCours) > 1 ? 'ouverts' : 'ouvert'}.</p>`;
   } catch (err) {
     afficherMessage('erreur-page', err.message);
     document.getElementById('urgence').innerHTML = '';

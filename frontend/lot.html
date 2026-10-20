@@ -21,7 +21,6 @@
     </nav>
   </aside>
   <main>
-    <a href="index.html" class="back-link">← Retour aux lots</a>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div id="detail">Chargement…</div>
   </main>
@@ -86,27 +85,23 @@ async function charger() {
       `<option value="${b.id}">${echap(b.nom)}</option>`
     ).join('');
 
+    const cond = libelleConditions(lot);
+    const parts = cond === 'Non renseignées' ? [] : cond.split(',').map((x) => x.trim());
+    const temp = (parts.find((p) => /temp/i.test(p)) || '').replace(/^Température\s*/i, '') || '—';
+    const react = (parts.find((p) => /réactif|reactif/i.test(p)) || '').replace(/^Lot de réactifs\s*/i, '') || '—';
+    const cal = (parts.find((p) => /calib/i.test(p)) || '').replace(/^Calibration\s*/i, '') || '—';
     document.getElementById('detail').innerHTML = `
       <div class="entete-lot">
         <div>
-          <h1>${echap(lot.nom)}</h1>
-          <p class="mono" style="color:var(--ink-soft)">${echap(lot.code_verification || '')}</p>
-          <p>
+          <p style="margin:0 0 8px"><a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:0.88rem">← Lots</a></p>
+          <h1>${echap(lot.nom)}
+            ${lot.code_verification ? `<button type="button" class="secondary" data-copier="${echap(lot.code_verification)}">Copier</button>` : ''}
             <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
-            ${Number(lot.est_test) ? '<span class="badge attente">Lot TEST — hors statistiques</span>' : ''}
-            ${Number(lot.archive) ? '<span class="badge attente">Archivé</span>' : ''}
-            ${lot.nb_signalements ? ` · ${lot.nb_signalements} signalement(s)` : ''}
-          </p>
+            ${Number(lot.est_test) ? '<span class="badge brouillon">Lot TEST</span>' : ''}
+          </h1>
         </div>
-          ${htmlJauge(lot.score_confiance, 'Score de confiance', lot.score_detail)}
+        ${htmlJauge(lot.score_confiance, 'Score', lot.score_detail, { mini: true })}
       </div>
-
-      <p class="mono code-verif">Code ${echap(lot.code_verification || 'n/r')}</p>
-      ${lot.code_verification ? svgCode39(lot.code_verification) : ''}
-
-      ${lot.nb_patients ? `<details class="card" style="margin-bottom:16px"><summary>${lot.nb_patients} patient(s) dans ce lot</summary>
-        <p class="hint">${(lot.codes_patients || []).map((c) => echap(c)).join(' · ') || 'PSN du CSV'}</p>
-      </details>` : ''}
 
       <div class="onglets-page" id="onglets-lot">
         <button type="button" class="secondary actif" data-onglet="resume">Résumé</button>
@@ -117,13 +112,24 @@ async function charger() {
         <button type="button" class="secondary" data-onglet="certificat">Certificat</button>
       </div>
       <section class="panneau-lot" data-panneau="resume">
-      <h2 style="margin-top:8px;">Parcours des données</h2>
       ${htmlChaineTracabilite(lot)}
 
       <div class="grid-2" style="margin-bottom:24px">
-        <div class="card"><strong>Conditions de mesure</strong><p class="hint" style="margin:8px 0 0">${echap(lot.conditions || 'non renseignées')}</p></div>
-        <div class="card"><strong>Contrôle automatique</strong><p class="hint" style="margin:8px 0 0">${Number(lot.nb_signalements) ? lot.nb_signalements + ' point(s) à vérifier' : 'Aucun signalement ouvert'}</p></div>
+        <div class="card">
+          <strong>Conditions de mesure</strong>
+          <dl class="cond-grid">
+            <div><dt>Température</dt><dd>${echap(temp)}</dd></div>
+            <div><dt>Lot de réactifs</dt><dd>${echap(react)}</dd></div>
+            <div><dt>Calibration</dt><dd>${echap(cal)}</dd></div>
+          </dl>
+        </div>
+        <div class="card">
+          <strong>${Number(lot.nb_signalements) ? pluriel(lot.nb_signalements, 'signalement') : 'Aucun signalement'}</strong>
+          ${(lot.signalements && lot.signalements[0]) ? `<p class="hint">${echap(lot.signalements[0].raison)}</p>` : '<p class="hint">Rien à signaler sur ce lot.</p>'}
+          ${Number(lot.nb_signalements) ? '<p><button type="button" class="secondary" data-onglet-lien="alertes">Voir la carte de contrôle</button></p>' : ''}
+        </div>
       </div>
+      ${Number(lot.nb_signalements) ? `<div class="bande-action"><strong>⚠ Action requise</strong><span class="hint">Vérifiez le lot et les résultats associés.</span></div>` : ''}
 
       </section>
       <section class="panneau-lot" data-panneau="mesures" hidden>
@@ -131,7 +137,7 @@ async function charger() {
       <dl class="fiche-dl">
         <div><dt>Machine</dt><dd>${echap(lot.machine_nom || 'non renseignée')}</dd></div>
         <div><dt>Date de mesure</dt><dd>${formatDate(lot.date)}</dd></div>
-        <div><dt>Conditions</dt><dd>${echap(lot.conditions || 'non renseignées')}</dd></div>
+        <div><dt>Conditions</dt><dd>${echap(libelleConditions(lot))}</dd></div>
         <div><dt>Pseudonymisation</dt><dd>${lot.anonymise ? 'oui' : 'non confirmé'}</dd></div>
         <div><dt>Colonnes CSV</dt><dd>${colonnes.length ? echap(colonnes.join(', ')) : 'aucun fichier analysé'}</dd></div>
         <div><dt>Péremption des validations</dt><dd>${lot.mois_peremption} mois (ISO 15189)</dd></div>
@@ -233,24 +239,38 @@ async function charger() {
         </div>
       </section>
     `;
+    function ouvrirOnglet(id) {
+      document.querySelectorAll('#onglets-lot [data-onglet]').forEach((b) => b.classList.toggle('actif', b.dataset.onglet === id));
+      document.querySelectorAll('.panneau-lot').forEach((p) => {
+        p.hidden = p.dataset.panneau !== id;
+      });
+    }
     document.getElementById('onglets-lot')?.addEventListener('click', (e) => {
       const btn = e.target.closest('[data-onglet]');
       if (!btn) return;
-      document.querySelectorAll('#onglets-lot [data-onglet]').forEach((b) => b.classList.toggle('actif', b === btn));
-      document.querySelectorAll('.panneau-lot').forEach((p) => {
-        p.hidden = p.dataset.panneau !== btn.dataset.onglet;
-      });
+      ouvrirOnglet(btn.dataset.onglet);
+    });
+    document.getElementById('detail')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-onglet-lien]');
+      if (!btn) return;
+      e.preventDefault();
+      ouvrirOnglet(btn.dataset.ongletLien);
     });
     api(`/coherence/lot/${lot.id}`).then((c) => {
       const el = document.getElementById('bloc-coherence');
       if (!el) return;
       const s = c.score_qualite || {};
-      const anoms = (c.anomalies || []).map((a) => `<li><strong>${echap(a.code)}</strong> — ${echap(a.detail)}</li>`).join('');
+      const liste = c.anomalies || [];
+      if (c.vide || (s.global == null && !liste.length)) {
+        el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';
+        return;
+      }
+      const anoms = liste.map((a) => `<tr><td>${echap(a.severite || '')}</td><td>${echap(a.code)}</td><td>${echap(a.detail)}</td></tr>`).join('');
       el.innerHTML = `<p>Complétude ${s.completude ?? '—'} · Cohérence ${s.coherence ?? '—'} · Conformité ${s.conformite ?? '—'} · Global ${s.global ?? '—'}</p>
-        ${anoms ? `<ul>${anoms}</ul>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
-    }).catch((err) => {
+        ${anoms ? `<table class="table-audit"><thead><tr><th>Sévérité</th><th>Code</th><th>Message</th></tr></thead><tbody>${anoms}</tbody></table>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
+    }).catch(() => {
       const el = document.getElementById('bloc-coherence');
-      if (el) el.innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
+      if (el) el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';
     });
 
     const conteneurRegles = document.getElementById('regles-alerte');

@@ -16,11 +16,15 @@
     </nav>
   </aside>
   <main>
-    <a href="index.html" class="back-link">← Retour aux lots</a>
-    <h1>Nouveau lot</h1>
-    <p class="page-intro">Renseigne l’origine pour garder une trace complète. Machine, date, nom normalisé et conditions structurées sont obligatoires.</p>
+    <p style="margin:0 0 8px"><a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:0.88rem">← Lots</a></p>
+    <div class="page-head">
+      <div>
+        <h1>Nouveau lot</h1>
+        <p class="page-intro">Machine, date, nom normalisé et conditions structurées sont obligatoires.</p>
+      </div>
+    </div>
     <p id="erreur-form" class="message erreur" hidden></p>
-    <form id="form-lot" class="only-technicien">
+    <form id="form-lot" class="only-technicien card">
       <div class="grid-2">
         <div>
           <label for="nom">Nom du lot</label>
@@ -33,7 +37,7 @@
         </div>
         <div>
           <label for="date">Date de mesure</label>
-          <input type="date" id="date" required>
+          <input type="date" id="date" required placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
         </div>
         <div>
           <label for="temperature">Température</label>
@@ -104,7 +108,7 @@ document.getElementById('csv').addEventListener('change', async () => {
       box.textContent = 'Aucune valeur numérique trouvée. La colonne « valeur » est obligatoire.';
     } else {
       box.className = 'message ok';
-      box.textContent = 'Colonnes : ' + a.colonnes.join(', ') + '. ' + a.nb_valeurs + ' valeur(s) importée(s).';
+      box.textContent = 'Colonnes : ' + a.colonnes.join(', ') + '. ' + pluriel(a.nb_valeurs, 'valeur') + ' importée' + (a.nb_valeurs > 1 ? 's' : '') + '.';
     }
   } catch (err) {
     box.className = 'message erreur';

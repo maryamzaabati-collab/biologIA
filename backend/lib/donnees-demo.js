@@ -319,7 +319,7 @@ async function remplir({ run, get, all }) {
       nom: 'TEST — données fictives',
       machine: 'Cobas 8000',
       date: null,
-      conditions: '30',
+      conditions: '',
       csv: 'nom;prenom;nir;parametre;valeur\nMartin;Léa;285057512345678;Glycémie à jeun;0.92',
       biologiste: null,
       est_test: 1,

@@ -1,6 +1,7 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const { genererJeu, enrichirRapport, csvPiege } = require('../lib/anonymiser');
+const { testerAnonymisation } = require('../lib/tracabilite');
 
 describe('anonymisation k>=5', () => {
   it('generalise puis exclut les groupes trop petits', () => {
@@ -34,5 +35,25 @@ describe('anonymisation k>=5', () => {
   it('le CSV piege echoue le test', () => {
     const r = enrichirRapport(csvPiege(), []);
     assert.equal(r.ok, false);
+    assert.equal(r.statut, 'non_conforme');
+  });
+
+  it('un CSV réduit à l’en-tête est non testable', () => {
+    const r = testerAnonymisation('tranche_age;sexe;territoire;parametre;valeur;unite;mois\n');
+    assert.equal(r.ok, false);
+    assert.equal(r.statut, 'non_testable');
+  });
+
+  it('n’est jamais conforme si un contrôle est faux', () => {
+    const r = enrichirRapport('tranche_age;sexe;territoire\n18-29;F;75\n', []);
+    assert.equal(r.ok, false);
+    assert.notEqual(r.statut, 'conforme');
+  });
+
+  it('parle de territoire, pas de département', () => {
+    const r = testerAnonymisation('tranche_age;sexe;territoire\n');
+    const k = r.controles.find((c) => c.code === 'k_anonymat');
+    assert.match(k.libelle, /territoire/);
+    assert.equal(/département/i.test(k.libelle), false);
   });
 });

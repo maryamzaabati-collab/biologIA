@@ -195,7 +195,8 @@ router.get('/', async (req, res) => {
     const lots = await db.all(`
       SELECT lots.*, machines.nom AS machine_nom,
         (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
-        (SELECT COUNT(DISTINCT code_patient) FROM mesures_reference WHERE lot_id = lots.id) AS nb_patients
+        (SELECT COUNT(DISTINCT upper(trim(replace(code_patient, char(13), '')))) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER) AND trim(COALESCE(code_patient, '')) != '') AS nb_patients,
+        (SELECT MAX(COALESCE(NULLIF(trim(date), ''), lots.date)) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER)) AS derniere_mesure
       FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
       ${where}
       ORDER BY COALESCE(lots.date, lots.date_creation) DESC, lots.id DESC
@@ -309,7 +310,8 @@ router.get('/:id', async (req, res) => {
     const lot = await db.get(`
       SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type,
         (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
-        (SELECT COUNT(DISTINCT code_patient) FROM mesures_reference WHERE lot_id = lots.id) AS nb_patients
+        (SELECT COUNT(DISTINCT upper(trim(replace(code_patient, char(13), '')))) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER) AND trim(COALESCE(code_patient, '')) != '') AS nb_patients,
+        (SELECT MAX(COALESCE(NULLIF(trim(date), ''), lots.date)) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER)) AS derniere_mesure
       FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
       WHERE lots.id = ?
     `, [req.params.id]);

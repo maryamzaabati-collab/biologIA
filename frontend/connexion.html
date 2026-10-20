@@ -25,7 +25,7 @@
   </section>
   <section class="landing-droite">
     <h1>Connexion</h1>
-    <p class="page-intro">Accède à ton espace de laboratoire. Un biologiste valide chaque nouveau compte.</p>
+    <p class="page-intro">Espace laboratoire. Un biologiste valide chaque nouveau compte.</p>
     <div class="onglets">
       <button type="button" class="secondary active" id="onglet-connexion">Connexion</button>
       <button type="button" class="secondary" id="onglet-inscription">Créer un compte</button>
@@ -56,7 +56,7 @@
       <label for="ins-identifiant">Identifiant</label>
       <input type="text" id="ins-identifiant" required>
       <label for="ins-email">E-mail</label>
-      <input type="email" id="ins-email" required>
+      <input type="email" id="ins-email" required pattern="[^\\s@]+@[^\\s@]+\\.[A-Za-z]{2,}" title="Ex. nom@laboratoire.fr">
       <label for="ins-role">Rôle demandé</label>
       <select id="ins-role" required>
         <option value="client">Client (consultation)</option>

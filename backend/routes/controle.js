@@ -60,12 +60,26 @@ async function chargerSeries(req) {
     for (const lot of filtrés) {
       const vals = valeursDuLot(lot);
       if (!vals.length) continue;
-      const dates = datesDuLot(lot);
+      let dates = datesDuLot(lot);
+      if (dates.length < vals.length) {
+        const mes = await db.all(
+          'SELECT date FROM mesures_reference WHERE lot_id = ? ORDER BY date ASC, id ASC',
+          [lot.id]
+        );
+        if (mes.length) dates = mes.map((m) => m.date);
+      }
       const opts = {
         refDebut: Number(req.query.ref_debut) || 0,
-        refN: Number(req.query.ref_n) || 0
+        refN: Number(req.query.ref_n) > 0 ? Number(req.query.ref_n) : 20
       };
-      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map(() => lot.date), opts);
+      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map((_, i) => {
+        if (lot.date && /^\d{4}-\d{2}-\d{2}$/.test(lot.date)) {
+          const d = new Date(`${lot.date}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + i);
+          return d.toISOString().slice(0, 10);
+        }
+        return lot.date;
+      }), opts);
       series.push({
         lot_id: lot.id,
         nom: lot.nom,
