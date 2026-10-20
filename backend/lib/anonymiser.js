@@ -140,6 +140,7 @@ function enrichirRapport(csvTexte, identites = []) {
     kCtrl.ok = false;
   } else if (kCtrl && kMin != null) {
     kCtrl.detail = `k minimum observé : ${kMin}`;
+    kCtrl.ok = kMin >= 5;
   }
 
   const lignesAnon = identites.length ? lignes.slice(1).map((ligne) => {

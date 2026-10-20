@@ -112,6 +112,7 @@ async function charger() {
         <button type="button" class="secondary actif" data-onglet="resume">Résumé</button>
         <button type="button" class="secondary" data-onglet="mesures">Mesures</button>
         <button type="button" class="secondary" data-onglet="alertes">Alertes</button>
+        <button type="button" class="secondary" data-onglet="coherence">Cohérence</button>
         <button type="button" class="secondary" data-onglet="historique">Historique</button>
         <button type="button" class="secondary" data-onglet="certificat">Certificat</button>
       </div>
@@ -208,6 +209,10 @@ async function charger() {
       <p class="only-technicien hint">Passez en rôle biologiste pour valider ce lot.</p>
 
       </section>
+      <section class="panneau-lot" data-panneau="coherence" hidden>
+        <h2>Cohérence des données</h2>
+        <div id="bloc-coherence"><p class="empty">Chargement…</p></div>
+      </section>
       <section class="panneau-lot" data-panneau="historique" hidden>
       <h2 style="margin-top:32px;">Historique des modifications</h2>
       <p class="hint">Registre en ajout seul : une ligne d’historique ne se modifie ni ne se supprime.</p>
@@ -235,6 +240,17 @@ async function charger() {
       document.querySelectorAll('.panneau-lot').forEach((p) => {
         p.hidden = p.dataset.panneau !== btn.dataset.onglet;
       });
+    });
+    api(`/coherence/lot/${lot.id}`).then((c) => {
+      const el = document.getElementById('bloc-coherence');
+      if (!el) return;
+      const s = c.score_qualite || {};
+      const anoms = (c.anomalies || []).map((a) => `<li><strong>${echap(a.code)}</strong> — ${echap(a.detail)}</li>`).join('');
+      el.innerHTML = `<p>Complétude ${s.completude ?? '—'} · Cohérence ${s.coherence ?? '—'} · Conformité ${s.conformite ?? '—'} · Global ${s.global ?? '—'}</p>
+        ${anoms ? `<ul>${anoms}</ul>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
+    }).catch((err) => {
+      const el = document.getElementById('bloc-coherence');
+      if (el) el.innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
     });
 
     const conteneurRegles = document.getElementById('regles-alerte');

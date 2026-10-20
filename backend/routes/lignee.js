@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
       const [regles, validations, signalements, mesures] = await Promise.all([
         db.all('SELECT id, parametre, seuil_bas, seuil_haut, unite, statut, validee_par, date_validation_regle FROM regles_alerte WHERE lot_id = ?', [lot.id]),
         db.all('SELECT nom_biologiste, date_validation FROM validations WHERE lot_id = ? ORDER BY date_validation DESC', [lot.id]),
-        db.all('SELECT raison, date FROM signalements WHERE lot_id = ? AND resolu = 0', [lot.id]),
+        db.all('SELECT raison, date, mesures_json, regle_id FROM signalements WHERE lot_id = ? AND resolu = 0', [lot.id]),
         db.all('SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ?', [lot.id])
       ]);
       const vu = libelleStatut(lot, validations, signalements.length);
@@ -34,7 +34,10 @@ router.get('/', async (req, res) => {
           ...v,
           date_paris: formaterParis(v.date_validation)
         })),
-        alertes: signalements,
+        alertes: signalements.map((s) => ({
+          ...s,
+          mesures: (() => { try { return s.mesures_json ? JSON.parse(s.mesures_json) : []; } catch { return []; } })()
+        })),
         patients: mesures.map((m) => m.code_patient),
         etapes: [
           {

@@ -368,7 +368,7 @@ function htmlCarteControle(serie) {
     </svg>
     <div class="lj-panneau">
       <h3>Règles de Westgard déclenchées</h3>
-      ${west ? `<ul>${west}</ul>` : '<p class="hint">Aucune règle 1-3s / 2-2s sur cette série.</p>'}
+      ${west ? `<ul>${west}</ul>` : '<p class="hint">Aucune règle 1-3s / 2-2s / 4-1s / R-4s / 10x̄ sur cette série.</p>'}
       ${listeHors}
     </div>
     </div>`;

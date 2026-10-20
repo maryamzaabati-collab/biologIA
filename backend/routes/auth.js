@@ -97,7 +97,7 @@ router.post('/connexion', async (req, res) => {
     }
     await db.run('INSERT INTO tentatives_connexion (identifiant, reussie) VALUES (?, 1)', [identifiant]);
     const sid = await creerSession(user.id);
-    res.setHeader('Set-Cookie', enteteCookie(sid));
+    res.append('Set-Cookie', enteteCookie(sid));
     await journal.enregistrer({ utilisateur: user }, 'connexion', `utilisateur ${user.id}`, user.identifiant);
     res.json(publicUtilisateur(user));
   } catch (err) {
@@ -107,7 +107,7 @@ router.post('/connexion', async (req, res) => {
 
 router.get('/moi', (req, res) => {
   if (!req.utilisateur) return res.status(401).json({ erreur: 'Connexion requise.' });
-  res.json(req.utilisateur);
+  res.json({ ...req.utilisateur, csrf: req.csrf || null });
 });
 
 router.post('/deconnexion', async (req, res) => {
@@ -117,8 +117,57 @@ router.post('/deconnexion', async (req, res) => {
       await db.run('DELETE FROM sessions WHERE id = ?', [cookies[NOM_COOKIE]]);
     }
   } catch { /* ignore */ }
-  res.setHeader('Set-Cookie', enteteCookie('', 0));
+  res.append('Set-Cookie', enteteCookie('', 0));
   res.json({ message: 'Déconnexion.' });
 });
 
+
+const crypto = require('crypto');
+
+router.post('/mot-de-passe-oublie', async (req, res) => {
+  const identifiant = String(req.body.identifiant || '').trim().toLowerCase();
+  try {
+    const user = identifiant
+      ? await db.get(
+          `SELECT * FROM utilisateurs WHERE lower(identifiant) = ? OR (email IS NOT NULL AND lower(email) = ?)`,
+          [identifiant, identifiant]
+        )
+      : null;
+    if (user) {
+      const token = crypto.randomBytes(24).toString('hex');
+      await db.run("INSERT INTO reset_mdp (token, utilisateur_id, expire_le) VALUES (?, ?, datetime('now', '+1 hour'))", [token, user.id]);
+      await journal.enregistrer({ utilisateur: null }, 'demande reset mdp', `utilisateur ${user.id}`, '');
+      if (process.env.NODE_ENV !== 'production') {
+        return res.json({ message: 'Si un compte existe, un lien a été préparé (démo).', token_demo: token });
+      }
+    }
+    res.json({ message: 'Si un compte existe, un lien de réinitialisation a été préparé.' });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.post('/reinitialiser', async (req, res) => {
+  const token = String(req.body.token || '').trim();
+  const motDePasse = String(req.body.mot_de_passe || '');
+  if (!token || motDePasse.length < 8) {
+    return res.status(400).json({ erreur: 'Jeton et mot de passe (8 caractères min.) obligatoires.' });
+  }
+  try {
+    const row = await db.get(
+      "SELECT * FROM reset_mdp WHERE token = ? AND utilise = 0 AND expire_le > datetime('now')",
+      [token]
+    );
+    if (!row) return res.status(400).json({ erreur: 'Jeton invalide ou expiré.' });
+    await db.run('UPDATE utilisateurs SET mot_de_passe = ? WHERE id = ?', [hasherMotDePasse(motDePasse), row.utilisateur_id]);
+    await db.run('UPDATE reset_mdp SET utilise = 1 WHERE token = ?', [token]);
+    await db.run('DELETE FROM sessions WHERE utilisateur_id = ?', [row.utilisateur_id]);
+    await journal.enregistrer({ utilisateur: { id: row.utilisateur_id, nom: 'compte' } }, 'reset mdp', `utilisateur ${row.utilisateur_id}`, '');
+    res.json({ message: 'Mot de passe mis à jour. Connectez-vous.' });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
 module.exports = router;
+

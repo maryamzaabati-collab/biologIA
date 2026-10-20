@@ -44,6 +44,14 @@ Si `npm` n’est pas reconnu dans VS Code, installe Node 22 depuis [nodejs.org](
 
 Si le Repl reste coincé (fichiers vides, Pull qui échoue) : crée un **nouveau** Repl → Import from GitHub → `maryamzaabati-collab/biologIA`.
 
+Comptes démo : `samira` (technicien), `amrani` (biologiste), `lea` (client) — mot de passe `labo2026`.
+
+Sécurité pédagogique : cookie de session HttpOnly, jeton CSRF (`X-CSRF-Token`), en-têtes type Helmet, limitation des tentatives de connexion, journal d’audit chaîné (SHA-256). Les scripts HTML restent en `'unsafe-inline'` (pages vanilla).
+
+Les lots marqués TEST sont exclus du tableau de bord, des cartes de contrôle et de la synthèse.
+
+Page scénario jury : `frontend/demo.html`.
+
 ## Tests
 
 ```bash

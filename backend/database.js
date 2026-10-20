@@ -177,6 +177,27 @@ async function init() {
   await ajouterColonneSiAbsente('utilisateurs', 'statut', "TEXT DEFAULT 'valide'");
   await ajouterColonneSiAbsente('utilisateurs', 'role_demande', 'TEXT');
   await ajouterColonneSiAbsente('utilisateurs', 'google_id', 'TEXT');
+  await ajouterColonneSiAbsente('regles_alerte', 'cree_par', 'TEXT');
+  await ajouterColonneSiAbsente('signalements', 'mesures_json', 'TEXT');
+  await ajouterColonneSiAbsente('signalements', 'regle_id', 'INTEGER');
+  await ajouterColonneSiAbsente('machines', 'date_maintenance', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'prochaine_calibration', 'TEXT');
+  await ajouterColonneSiAbsente('journal_audit', 'hash', 'TEXT');
+  await ajouterColonneSiAbsente('journal_audit', 'hash_precedent', 'TEXT');
+  await ajouterColonneSiAbsente('sessions', 'csrf', 'TEXT');
+  await run(`CREATE TABLE IF NOT EXISTS reset_mdp (
+    token TEXT PRIMARY KEY,
+    utilisateur_id INTEGER NOT NULL,
+    expire_le TEXT NOT NULL,
+    utilise INTEGER DEFAULT 0
+  )`);
+  await run(`CREATE TABLE IF NOT EXISTS calibrations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    commentaire TEXT,
+    FOREIGN KEY (machine_id) REFERENCES machines(id)
+  )`);
 
   await run(`CREATE TABLE IF NOT EXISTS tentatives_connexion (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

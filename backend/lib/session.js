@@ -43,17 +43,23 @@ async function attacherUtilisateur(req, res, next) {
   if (!sid) return next();
   try {
     const ligne = await db.get(
-      `SELECT utilisateurs.id, utilisateurs.nom, utilisateurs.role, utilisateurs.identifiant, utilisateurs.statut, sessions.id AS session_id
+      `SELECT utilisateurs.id, utilisateurs.nom, utilisateurs.role, utilisateurs.identifiant, utilisateurs.statut,
+              sessions.id AS session_id, sessions.expire_le
        FROM sessions JOIN utilisateurs ON utilisateurs.id = sessions.utilisateur_id
        WHERE sessions.id = ? AND sessions.expire_le > datetime('now') AND utilisateurs.statut = 'valide'`,
       [sid]
     );
     if (ligne) {
+      const expMs = ligne.expire_le
+        ? Date.parse(String(ligne.expire_le).replace(' ', 'T') + (String(ligne.expire_le).includes('Z') ? '' : 'Z'))
+        : NaN;
       req.utilisateur = {
         id: ligne.id,
         nom: ligne.nom,
         role: ligne.role,
-        identifiant: ligne.identifiant
+        identifiant: ligne.identifiant,
+        expire_le: ligne.expire_le || null,
+        secondes_restantes: Number.isFinite(expMs) ? Math.max(0, Math.floor((expMs - Date.now()) / 1000)) : null
       };
     }
   } catch {

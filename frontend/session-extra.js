@@ -4,10 +4,15 @@
   api = async function (chemin, options = {}) {
     let reponse;
     try {
+      const csrf = (window.__utilisateur && window.__utilisateur.csrf)
+        || (document.cookie.match(/labo_csrf=([^;]+)/) || [])[1]
+        || '';
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (csrf) headers['X-CSRF-Token'] = csrf;
       reponse = await fetch(`/api${chemin}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        ...options
+        ...options,
+        headers
       });
     } catch {
       throw new Error("Impossible de joindre le serveur. Vérifiez qu'il est bien lancé.");
@@ -108,6 +113,7 @@
       ${lienNav('identifiants.html', 'Identifiants', 'patients', page)}`}
       ${lienNav('synthese.html', 'Synthèse', 'synthese', page)}
       ${lienNav('conformite.html', 'Conformité', 'conformite', page)}
+      ${lienNav('demo.html', 'Démo', 'synthese', page)}
       ${admin}
     `;
   }
@@ -196,6 +202,17 @@
       window.__utilisateur = moi;
       document.body.dataset.role = moi.role;
       remplirNav(moi.role);
+      if (moi.secondes_restantes != null && moi.secondes_restantes < 15 * 60) {
+        let bande = document.getElementById('alerte-session');
+        if (!bande) {
+          bande = document.createElement('p');
+          bande.id = 'alerte-session';
+          bande.className = 'message erreur';
+          bande.setAttribute('role', 'alert');
+          document.querySelector('.layout > main')?.prepend(bande);
+        }
+        bande.textContent = 'Session bientôt expirée — enregistrez votre travail et reconnectez-vous.';
+      }
       const aside = document.querySelector('.sidebar');
       if (aside && !document.getElementById('bloc-session')) {
         const bloc = document.createElement('div');

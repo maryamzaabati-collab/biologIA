@@ -11,16 +11,19 @@ const db = require('../database');
 require('../lib/alias-db');
 const app = require('../application');
 const { composerNumero, analyserNumero, detecterDoublons, normaliserNom } = require('../lib/patients');
+const { creerJson } = require('./http');
 
 let server;
 let base;
-let cookie = '';
+const etat = { cookie: '' };
+let json;
 
 before(async () => {
   await db.init();
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', () => {
       base = `http://127.0.0.1:${server.address().port}`;
+      json = creerJson(() => base, etat);
       resolve();
     });
   });
@@ -32,24 +35,8 @@ after(async () => {
   try { fs.unlinkSync(dbFile); } catch { /* ignore */ }
 });
 
-async function json(chemin, options = {}) {
-  const r = await fetch(`${base}${chemin}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...(options.headers || {})
-    },
-    ...options
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  const type = r.headers.get('content-type') || '';
-  const data = type.includes('json') ? await r.json().catch(() => ({})) : await r.text();
-  return { status: r.status, data };
-}
-
 async function connexion(identifiant) {
-  cookie = '';
+  etat.cookie = '';
   return json('/api/auth/connexion', {
     method: 'POST',
     body: JSON.stringify({ identifiant, mot_de_passe: 'labo2026' })
@@ -186,11 +173,12 @@ describe('routes patients', () => {
   it('signale un PSN inconnu a l import CSV', async () => {
     await connexion('samira');
     const machines = await json('/api/machines');
+    const okM = (machines.data || []).find((m) => m.statut_service !== 'maintenance' && m.statut_service !== 'hors_service');
     const cree = await json('/api/lots', {
       method: 'POST',
       body: JSON.stringify({
         nom: 'LOT-2026-801',
-        machine_id: machines.data[0].id,
+        machine_id: (okM || machines.data[0]).id,
         date: '2026-03-01',
         temperature: '21°C',
         lot_reactifs: 'R-441',

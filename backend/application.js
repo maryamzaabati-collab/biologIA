@@ -2,19 +2,37 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const { attacherUtilisateur, exigerConnexion } = require('./lib/session');
+const csrf = require('./lib/csrf');
+const { limiter } = require('./lib/debit');
 const db = require('./database');
 
 const app = express();
 app.set('trust proxy', 1);
 
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self' 'unsafe-inline'; connect-src 'self'"
+  );
+  next();
+});
+
 app.use(express.json({ limit: '2mb' }));
 app.use(attacherUtilisateur);
+app.use(csrf.middleware);
 
 app.get('/api/sante', async (req, res) => {
   try {
     const machines = await db.get('SELECT COUNT(*) AS n FROM machines');
-    const lots = await db.get('SELECT COUNT(*) AS n FROM lots WHERE COALESCE(archive, 0) = 0');
-    const signalements = await db.get('SELECT COUNT(*) AS n FROM signalements WHERE resolu = 0');
+    const lots = await db.get('SELECT COUNT(*) AS n FROM lots WHERE COALESCE(archive, 0) = 0 AND COALESCE(est_test, 0) = 0');
+    const signalements = await db.get(`SELECT COUNT(*) AS n FROM signalements
+      JOIN lots ON lots.id = signalements.lot_id
+      WHERE signalements.resolu = 0 AND COALESCE(lots.est_test, 0) = 0 AND COALESCE(lots.archive, 0) = 0`);
     res.json({
       ok: true,
       machines: Number(machines && machines.n) || 0,
@@ -63,6 +81,7 @@ app.use(express.static(path.join(__dirname, '..', 'frontend'), {
   }
 }));
 
+app.use('/api/auth/connexion', limiter({ max: 20, fenetreMs: 60000, cle: (r) => 'login:' + (r.ip || 'x') }));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api', exigerConnexion);
 
@@ -70,6 +89,10 @@ app.use('/api', (req, res, next) => {
   const role = req.utilisateur && req.utilisateur.role;
   const url = req.originalUrl || '';
   const method = req.method;
+
+  if (url.includes('/journal') && role !== 'biologiste') {
+    return res.status(403).json({ erreur: 'Le journal d’audit est réservé aux biologistes.' });
+  }
 
   if (method === 'GET' || method === 'HEAD') return next();
 
@@ -169,6 +192,7 @@ app.use('/api/lignee', require('./routes/lignee'));
 app.use('/api/patients', require('./routes/patients'));
 app.use('/api/anonymisation', require('./routes/anonymisation'));
 app.use('/api/conformite', require('./routes/conformite'));
+app.use('/api/coherence', require('./routes/coherence'));
 app.use('/api/comptes', (req, res, next) => {
   if (!req.utilisateur || req.utilisateur.role !== 'biologiste') {
     return res.status(403).json({ erreur: 'Seuls les biologistes peuvent valider les comptes.' });
@@ -186,10 +210,14 @@ app.use((err, req, res, next) => {
   if ((req.path || '').startsWith('/api')) {
     return res.status(timeout ? 503 : 500).json({ erreur: message });
   }
-  res.status(timeout ? 503 : 500).type('html').send(
-    '<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>Indisponible</title></head>' +
-    '<body><p>Page temporairement indisponible. Rechargez dans un instant.</p></body></html>'
-  );
+  res.status(timeout ? 503 : 500).sendFile(path.join(__dirname, '..', 'frontend', '500.html'));
+});
+
+app.use((req, res) => {
+  if ((req.path || '').startsWith('/api')) {
+    return res.status(404).json({ erreur: 'Route introuvable.' });
+  }
+  res.status(404).sendFile(path.join(__dirname, '..', 'frontend', '404.html'));
 });
 
 module.exports = app;

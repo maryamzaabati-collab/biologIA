@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../database');
 const { formaterParis, isoUtc } = require('../lib/dates');
 const { csvAvecBom } = require('../lib/tracabilite');
+const { verifierIntegrite } = require('../lib/journal');
 
 function libelleLot(lot) {
   if (!lot) return '';
@@ -89,6 +90,14 @@ router.get('/csv', async (req, res) => {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="journal-audit.csv"');
     res.send(csvAvecBom(csv));
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.get('/integrite', async (req, res) => {
+  try {
+    res.json(await verifierIntegrite(db));
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }

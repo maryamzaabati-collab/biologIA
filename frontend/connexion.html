@@ -42,6 +42,12 @@
         <button type="button" class="oeil" id="voir-mdp" aria-label="Afficher le mot de passe">Afficher</button>
       </div>
       <button type="submit" style="width:100%">Se connecter</button>
+      <p class="hint"><button type="button" class="lien-discret" id="btn-oublie">Mot de passe oublié</button></p>
+    </form>
+    <form id="form-oublie" hidden>
+      <label for="oublie-id">Identifiant ou e-mail</label>
+      <input type="text" id="oublie-id" required>
+      <button type="submit" style="width:100%">Demander un lien (démo)</button>
     </form>
 
     <form id="form-inscription" hidden>
@@ -121,6 +127,22 @@ document.getElementById('form-inscription').addEventListener('submit', async (e)
     e.target.reset();
     document.getElementById('onglet-connexion').click();
     afficherMessage('message-page', r.message, 'ok');
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+document.getElementById('btn-oublie')?.addEventListener('click', () => {
+  document.getElementById('form-oublie').hidden = false;
+});
+document.getElementById('form-oublie')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-page', '');
+  try {
+    const r = await api('/auth/mot-de-passe-oublie', {
+      method: 'POST',
+      body: JSON.stringify({ identifiant: document.getElementById('oublie-id').value })
+    });
+    afficherMessage('message-page', r.message + (r.token_demo ? ` Jeton démo : ${r.token_demo}` : ''), 'ok');
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }

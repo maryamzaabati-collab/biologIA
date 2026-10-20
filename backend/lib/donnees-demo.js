@@ -1,6 +1,7 @@
 const { analyserCsv } = require('./tracabilite');
 const { composerNumero } = require('./patients');
 const { genererJeu } = require('./anonymiser');
+const { appliquerReglesSurLot } = require('./alerte-mesures');
 
 const ALPHABET_CODE = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let tirage = Math.random;
@@ -17,14 +18,10 @@ function codeDepuisHasard(prefixe, n) {
   return code;
 }
 function codeVerificationStable(nom) {
-  let s = 20261009;
-  const t = String(nom);
-  for (let i = 0; i < t.length; i++) s = (Math.imul(s, 33) + t.charCodeAt(i)) >>> 0;
+  const crypto = require('crypto');
+  const buf = crypto.createHash('sha256').update(`biologIA|${nom}|20261009`).digest();
   let code = 'LT-';
-  for (let i = 0; i < 8; i++) {
-    s = (Math.imul(1664525, s) + 1013904223) >>> 0;
-    code += ALPHABET_CODE[s % ALPHABET_CODE.length];
-  }
+  for (let i = 0; i < 8; i++) code += ALPHABET_CODE[buf[i] % ALPHABET_CODE.length];
   return code;
 }
 
@@ -517,6 +514,7 @@ async function remplir({ run, get, all }) {
           [c[iCode], iPar >= 0 ? c[iPar] : null, iVal >= 0 ? Number(String(c[iVal]).replace(',', '.')) : null, iUni >= 0 ? c[iUni] : null, iDat >= 0 ? c[iDat] : lot.date, id]
         );
       }
+      try { await appliquerReglesSurLot({ run, get, all }, id); } catch { /* seed */ }
     }
 
     const dateCrea = lot.date ? `${lot.date} 08:30:00` : '2026-01-10 08:30:00';

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../db');
-const { carteLeveyJennings } = require('../lib/tracabilite');
+const { carteLeveyJennings, csvAvecBom } = require('../lib/tracabilite');
 
 function parametreDuLot(lot) {
   if (lot.parametre) return String(lot.parametre).trim();
@@ -30,8 +30,7 @@ function datesDuLot(lot) {
   }
 }
 
-router.get('/', async (req, res) => {
-  try {
+async function chargerSeries(req) {
     const clauses = ['COALESCE(lots.archive, 0) = 0', 'COALESCE(lots.est_test, 0) = 0'];
     const params = [];
     if (req.query.machine_id) {
@@ -62,7 +61,11 @@ router.get('/', async (req, res) => {
       const vals = valeursDuLot(lot);
       if (!vals.length) continue;
       const dates = datesDuLot(lot);
-      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map(() => lot.date));
+      const opts = {
+        refDebut: Number(req.query.ref_debut) || 0,
+        refN: Number(req.query.ref_n) || 0
+      };
+      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map(() => lot.date), opts);
       series.push({
         lot_id: lot.id,
         nom: lot.nom,
@@ -90,7 +93,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    res.json({
+    return {
       series,
       parametres,
       points: series[0]?.points || [],
@@ -98,10 +101,28 @@ router.get('/', async (req, res) => {
       ecart_type: series[0]?.ecart_type ?? 0,
       limite_2s_bas: series[0]?.limite_2s_bas ?? null,
       limite_2s_haut: series[0]?.limite_2s_haut ?? null
-    });
-  } catch (err) {
-    res.status(500).json({ erreur: err.message });
-  }
+    };
+}
+
+router.get('/', async (req, res) => {
+  try { res.json(await chargerSeries(req)); }
+  catch (err) { res.status(500).json({ erreur: err.message }); }
+});
+
+router.get('/csv', async (req, res) => {
+  try {
+    const { series } = await chargerSeries(req);
+    const lignes = [['lot', 'machine', 'parametre', 'index', 'date', 'valeur', 'hors_norme', 'westgard']];
+    for (const s of series || []) {
+      (s.points || []).forEach((pt, i) => {
+        const wg = (s.westgard || []).filter((w) => w.index === i).map((w) => w.regle).join('+');
+        lignes.push([s.nom, s.machine_nom, s.parametre, i + 1, pt.date || '', pt.valeur, pt.hors_norme ? 1 : 0, wg]);
+      });
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="cartes-controle.csv"');
+    res.send(csvAvecBom(lignes));
+  } catch (err) { res.status(500).json({ erreur: err.message }); }
 });
 
 module.exports = router;

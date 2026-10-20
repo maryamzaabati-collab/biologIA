@@ -15,7 +15,8 @@
   <main>
     <h1>Journal d’audit</h1>
     <p class="page-intro">Qui a fait quoi, et quand. Heure de Paris. Visible des biologistes.</p>
-    <p><a class="btn-link" href="/api/journal/csv">Exporter CSV</a></p>
+    <p><a class="btn-link" href="/api/journal/csv">Exporter CSV</a> <button type="button" class="secondary" id="btn-integrite">Vérifier la chaîne de hachage</button></p>
+    <p id="integrite-ok" class="message ok" hidden></p>
     <div class="filtres">
       <input type="search" id="filtre-qui" placeholder="Utilisateur">
       <select id="filtre-action"><option value="">Toutes les actions</option></select>
@@ -152,6 +153,21 @@ document.getElementById('btn-date-clear').addEventListener('click', () => {
   document.getElementById('filtre-date').value = '';
   page = 1;
   charger();
+});
+document.getElementById('btn-integrite')?.addEventListener('click', async () => {
+  const el = document.getElementById('integrite-ok');
+  try {
+    const r = await api('/journal/integrite');
+    el.hidden = false;
+    el.className = 'message ' + (r.ok ? 'ok' : 'erreur');
+    el.textContent = r.ok
+      ? `Chaîne intègre (${r.nb} événement(s)).`
+      : `Rupture détectée sur ${r.fautes.length} ligne(s).`;
+  } catch (err) {
+    el.hidden = false;
+    el.className = 'message erreur';
+    el.textContent = err.message;
+  }
 });
 charger();
 </script>

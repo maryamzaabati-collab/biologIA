@@ -17,6 +17,8 @@ const {
 const journal = require('../lib/journal');
 const { formaterParis, isoUtc, horlogeParis } = require('../lib/dates');
 const { extrairePsnCsv } = require('../lib/patients');
+const { appliquerReglesSurLot } = require('../lib/alerte-mesures');
+const { refusLotSurMachine } = require('../lib/machine-statut');
 
 async function verifierEtSignaler(lotId, champs) {
   const problemes = problemesLot(champs);
@@ -144,6 +146,13 @@ function enrichir(lot, validations = []) {
   };
 }
 
+
+async function controlerMachine(machineId, dateLot) {
+  if (!machineId) return null;
+  const machine = await db.get('SELECT * FROM machines WHERE id = ?', [machineId]);
+  return refusLotSurMachine(machine, dateLot);
+}
+
 router.post('/analyser-csv', (req, res) => {
   const analyse = analyserCsv(req.body.csv_texte || '');
   res.json({
@@ -162,6 +171,9 @@ router.get('/', async (req, res) => {
     const params = [];
     if (req.query.archives === '1') {
       clauses.length = 0;
+    }
+    if (req.query.tests !== '1') {
+      clauses.push('COALESCE(lots.est_test, 0) = 0');
     }
     if (req.query.machine_id) {
       clauses.push('lots.machine_id = ?');
@@ -350,6 +362,8 @@ router.post('/', async (req, res) => {
   if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
 
   try {
+    const refus = await controlerMachine(data.machine_id, data.date);
+    if (refus) return res.status(409).json({ erreur: refus });
     const code = genererCodeVerification();
     const createurId = req.utilisateur ? req.utilisateur.id : null;
     const { id } = await db.run(
@@ -369,6 +383,7 @@ router.post('/', async (req, res) => {
       contenus_sensibles: data.contenus_sensibles
     });
     await enregistrerMesuresCsv(id, req.body.csv_texte, data.date);
+    await appliquerReglesSurLot(db, id);
     await journal.enregistrer(req, 'création lot', `lot ${id}`, data.nom);
     res.status(201).json({
       id,
@@ -396,6 +411,8 @@ router.put('/:id', async (req, res) => {
     const data = payloadLot(req.body, ancien);
     const erreurs = validerSaisieLot(data, { estTest: Boolean(Number(ancien.est_test)), strict: !Number(ancien.est_test) });
     if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
+    const refus = await controlerMachine(data.machine_id, data.date);
+    if (refus) return res.status(409).json({ erreur: refus });
 
     const auteur = req.utilisateur ? req.utilisateur.nom : 'système';
     const champs = [
@@ -449,6 +466,7 @@ router.put('/:id', async (req, res) => {
     if (String(req.body.csv_texte || '').trim()) {
       await enregistrerMesuresCsv(req.params.id, req.body.csv_texte, data.date);
     }
+    await appliquerReglesSurLot(db, req.params.id);
     await journal.enregistrer(req, 'modification lot', `lot ${req.params.id}`, `${data.nom} — ${motif}`);
     res.json({ message: 'Lot mis à jour.', alerte_identite: data.alerte_identite, sensibles: data.sensibles });
   } catch (err) {

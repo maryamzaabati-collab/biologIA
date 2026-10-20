@@ -301,8 +301,10 @@ function etiquettePointControle(i, dates) {
   return `point ${i + 1}`;
 }
 
-function pointsControle(moyennes) {
-  const ref = (moyennes || []).slice(0, MIN_POINTS_CONTROLE);
+function pointsControle(moyennes, opts = {}) {
+  const debut = Number(opts.refDebut) || 0;
+  const n = Number(opts.refN) > 0 ? Number(opts.refN) : MIN_POINTS_CONTROLE;
+  const ref = (moyennes || []).slice(debut, debut + n);
   const m = moyenne(ref);
   const sd = ecartType(ref);
   return {
@@ -322,30 +324,63 @@ function pointsControle(moyennes) {
 function westgard(valeurs, m, sd, dates = []) {
   const alertes = [];
   if (!sd) return alertes;
+  const n = (valeurs || []).length;
   (valeurs || []).forEach((v, i) => {
     if (Math.abs(v - m) > 3 * sd) {
       alertes.push({
         regle: '1-3s',
         index: i,
-        message: `Règle 1-3s : le ${etiquettePointControle(i, dates)} sort de ±3σ`
+        message: `Règle 1-3s : le ${etiquettePointControle(i, dates)} sort de ±3σ`,
+        aide: 'Un seul point au-delà de 3 écarts-types : arrêt immédiat en labo.'
       });
     }
   });
-  for (let i = 1; i < (valeurs || []).length; i++) {
+  for (let i = 1; i < n; i++) {
     const a = valeurs[i - 1] - m;
     const b = valeurs[i] - m;
     if (Math.abs(a) > 2 * sd && Math.abs(b) > 2 * sd && Math.sign(a) === Math.sign(b) && Math.sign(a) !== 0) {
       alertes.push({
         regle: '2-2s',
         index: i,
-        message: `Règle 2-2s : ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)} sont consécutifs hors ±2σ du même côté`
+        message: `Règle 2-2s : ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)} sont consécutifs hors ±2σ du même côté`,
+        aide: 'Deux points consécutifs du même côté au-delà de 2σ.'
+      });
+    }
+    if (Math.abs(valeurs[i] - valeurs[i - 1]) > 4 * sd) {
+      alertes.push({
+        regle: 'R-4s',
+        index: i,
+        message: `Règle R-4s : écart > 4σ entre ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)}`,
+        aide: 'Deux points consécutifs distants de plus de 4 écarts-types (dérive brutale).'
+      });
+    }
+  }
+  for (let i = 3; i < n; i++) {
+    const fen = [i - 3, i - 2, i - 1, i].map((k) => valeurs[k] - m);
+    if (fen.every((d) => Math.abs(d) > sd && Math.sign(d) === Math.sign(fen[0]) && Math.sign(fen[0]) !== 0)) {
+      alertes.push({
+        regle: '4-1s',
+        index: i,
+        message: `Règle 4-1s : quatre points consécutifs jusqu’au ${etiquettePointControle(i, dates)} hors ±1σ du même côté`,
+        aide: 'Quatre mesures d’affilée du même côté au-delà de 1σ.'
+      });
+    }
+  }
+  for (let i = 9; i < n; i++) {
+    const fen = valeurs.slice(i - 9, i + 1).map((v) => v - m);
+    if (fen.every((d) => Math.sign(d) === Math.sign(fen[0]) && Math.sign(fen[0]) !== 0)) {
+      alertes.push({
+        regle: '10x̄',
+        index: i,
+        message: `Règle 10x̄ : dix points consécutifs jusqu’au ${etiquettePointControle(i, dates)} du même côté de la moyenne`,
+        aide: 'Dix points d’affilée au-dessus ou en dessous de la moyenne (biais).'
       });
     }
   }
   return alertes;
 }
 
-function carteLeveyJennings(valeurs, dates = []) {
+function carteLeveyJennings(valeurs, dates = [], opts = {}) {
   const vals = (valeurs || []).map(Number).filter((v) => !Number.isNaN(v));
   const messageInsuffisant = 'Pas assez de données pour calculer les limites';
   if (vals.length < MIN_POINTS_CONTROLE) {
@@ -372,7 +407,7 @@ function carteLeveyJennings(valeurs, dates = []) {
       }))
     };
   }
-  const stats = pointsControle(vals);
+  const stats = pointsControle(vals, opts);
   if (!stats.ecart_type) {
     return {
       suffisant: false,
@@ -409,6 +444,8 @@ function carteLeveyJennings(valeurs, dates = []) {
     message: null,
     nb_points: vals.length,
     nb_reference: stats.nb_reference || MIN_POINTS_CONTROLE,
+    ref_debut: Number(opts.refDebut) || 0,
+    ref_n: Number(opts.refN) > 0 ? Number(opts.refN) : MIN_POINTS_CONTROLE,
     ...stats,
     hors_norme: hors,
     westgard: alertes,
@@ -528,7 +565,7 @@ function testerAnonymisation(csvTexte) {
   const colonnes = extraireColonnesCsv(csvTexte);
   const idxAge = colonnes.findIndex((c) => /tranche|age|âge/i.test(c));
   const idxSexe = colonnes.findIndex((c) => /sexe|genre/i.test(c));
-  const idxDep = colonnes.findIndex((c) => /depart|départ/i.test(c));
+  const idxDep = colonnes.findIndex((c) => /depart|départ|territoire|région|region/i.test(c));
   let kMin = null;
   let kOk = false;
   if (idxAge >= 0 && idxSexe >= 0 && idxDep >= 0 && lignes.length > 1) {

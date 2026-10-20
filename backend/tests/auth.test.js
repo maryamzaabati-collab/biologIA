@@ -10,16 +10,19 @@ process.env.DATABASE_PATH = dbFile;
 const db = require('../database');
 require('../lib/alias-db');
 const app = require('../application');
+const { creerJson } = require('./http');
 
 let server;
 let base;
-let cookie = '';
+const etat = { cookie: '' };
+let json;
 
 before(async () => {
   await db.init();
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', () => {
       base = `http://127.0.0.1:${server.address().port}`;
+      json = creerJson(() => base, etat);
       resolve();
     });
   });
@@ -31,24 +34,14 @@ after(async () => {
   try { fs.unlinkSync(dbFile); } catch { /* ignore */ }
 });
 
-async function json(chemin, options = {}) {
-  const r = await fetch(`${base}${chemin}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(cookie ? { Cookie: cookie } : {}),
-      ...(options.headers || {})
-    },
-    ...options
-  });
-  const set = r.headers.get('set-cookie');
-  if (set) cookie = set.split(';')[0];
-  const data = await r.json().catch(() => ({}));
-  return { status: r.status, data };
+function resetCookie() {
+  etat.cookie = '';
 }
 
 async function creerLotValide(nom) {
   const machines = await json('/api/machines');
-  const mid = machines.data[0].id;
+  const ok = (machines.data || []).find((m) => m.statut_service !== 'maintenance' && m.statut_service !== 'hors_service' && !m.calibration_expiree);
+  const mid = (ok || machines.data[0]).id;
   return json('/api/lots', {
     method: 'POST',
     body: JSON.stringify({
@@ -91,20 +84,20 @@ describe('authentification', () => {
   });
 
   it('permet au biologiste de valider', async () => {
-    cookie = '';
+    resetCookie();
     const login = await json('/api/auth/connexion', {
       method: 'POST',
       body: JSON.stringify({ identifiant: 'amrani', mot_de_passe: 'labo2026' })
     });
     assert.equal(login.status, 200);
 
-    cookie = '';
+    resetCookie();
     await json('/api/auth/connexion', {
       method: 'POST',
       body: JSON.stringify({ identifiant: 'samira', mot_de_passe: 'labo2026' })
     });
     const cree = await creerLotValide('LOT-2026-303');
-    cookie = '';
+    resetCookie();
     await json('/api/auth/connexion', {
       method: 'POST',
       body: JSON.stringify({ identifiant: 'amrani', mot_de_passe: 'labo2026' })
@@ -118,7 +111,7 @@ describe('authentification', () => {
   });
 
   it('interdit au technicien d archiver', async () => {
-    cookie = '';
+    resetCookie();
     await json('/api/auth/connexion', {
       method: 'POST',
       body: JSON.stringify({ identifiant: 'samira', mot_de_passe: 'labo2026' })

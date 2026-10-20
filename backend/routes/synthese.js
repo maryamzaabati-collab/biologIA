@@ -5,6 +5,7 @@ const router = express.Router();
 const db = require('../db');
 const { libelleStatut, csvAvecBom } = require('../lib/tracabilite');
 const { formaterParis, formaterJour } = require('../lib/dates');
+const { analyserTout } = require('../lib/coherence');
 
 function uniqueValidations(liste) {
   const vus = new Set();
@@ -59,7 +60,7 @@ async function chiffres() {
     machines[nom].lots += 1;
     if (lot.statut_affiche === 'valide') machines[nom].valides += 1;
   }
-  return {
+  const out = {
     totalLots: total,
     lotsValides: valides,
     lotsAnonymises: anonymises,
@@ -74,8 +75,19 @@ async function chiffres() {
     pourcentageAnonymises: total ? Math.round((anonymises / total) * 100) : 0,
     par_machine: Object.values(machines),
     lots,
-    genereLe: new Date().toISOString()
+    genereLe: new Date().toISOString(),
+    score_qualite_moyen: null,
+    nb_anomalies_coherence: 0
   };
+  try {
+    const coh = await analyserTout(db);
+    const n = (coh.lots || []).length;
+    out.score_qualite_moyen = n
+      ? Math.round(coh.lots.reduce((s, l) => s + ((l.score_qualite && l.score_qualite.global) || 0), 0) / n)
+      : null;
+    out.nb_anomalies_coherence = (coh.anomalies || []).length;
+  } catch { /* ignore */ }
+  return out;
 }
 
 router.get('/', async (req, res) => {
