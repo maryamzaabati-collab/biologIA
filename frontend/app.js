@@ -145,29 +145,34 @@ async function lireFichierTexte(input) {
 }
 
 function roleActuel() {
-  return localStorage.getItem('roleLabo') || 'technicien';
+  return (window.__utilisateur && window.__utilisateur.role)
+    || document.body.dataset.role
+    || localStorage.getItem('roleLabo')
+    || '';
 }
 
 function appliquerRole() {
   const role = roleActuel();
-  document.body.dataset.role = role;
+  if (role) document.body.dataset.role = role;
   document.querySelectorAll('[data-role-option]').forEach((btn) => {
     btn.classList.toggle('active', btn.dataset.roleOption === role);
   });
 }
 
 function themeActuel() {
-  return localStorage.getItem('themeLabo') || 'clair';
+  return localStorage.getItem('themeLabo') === 'sombre' ? 'sombre' : 'clair';
 }
 
 function appliquerTheme() {
   const theme = themeActuel();
   document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme === 'sombre' ? 'dark' : 'light';
   const btn = document.getElementById('btn-theme');
   if (btn) {
-    btn.textContent = '';
-    btn.setAttribute('aria-label', theme === 'sombre' ? 'Passer au thème clair' : 'Passer au thème sombre');
-    btn.title = theme === 'sombre' ? 'Thème clair' : 'Thème sombre';
+    const clair = theme === 'clair';
+    btn.setAttribute('aria-checked', clair ? 'true' : 'false');
+    btn.setAttribute('aria-label', clair ? 'Thème clair — glisser pour le mode sombre' : 'Thème sombre — glisser pour le mode clair');
+    btn.title = clair ? 'Passer au thème sombre' : 'Passer au thème clair';
   }
 }
 
@@ -215,6 +220,23 @@ function icone(nom) {
     pipeteur: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3h4v7l3 11H7l3-11z"/></svg>'
   };
   return `<span class="icone">${svg[nom] || ''}</span>`;
+}
+
+function htmlAnneau(texte, label, pct, variante) {
+  const n = Math.max(0, Math.min(100, Number(pct) || 0));
+  const classe = variante || (n >= 70 ? 'ok' : n >= 40 ? 'moyen' : 'faible');
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  const offset = c - (n / 100) * c;
+  return `<div class="anneau-bloc">
+    <svg class="jauge jauge-anneau ${classe}" viewBox="0 0 72 72" aria-label="${echap(label)}">
+      <circle class="jauge-fond" cx="36" cy="36" r="${r}"></circle>
+      <circle class="jauge-arc" cx="36" cy="36" r="${r}"
+        stroke-dasharray="${c.toFixed(2)}" stroke-dashoffset="${offset.toFixed(2)}"></circle>
+      <text x="36" y="40" text-anchor="middle">${echap(String(texte))}</text>
+    </svg>
+    <span class="anneau-label">${echap(label)}</span>
+  </div>`;
 }
 
 function htmlJauge(score, libelle = 'Score de confiance', detail, opts = {}) {

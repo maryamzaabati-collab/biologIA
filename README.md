@@ -50,7 +50,9 @@ Sécurité pédagogique : cookie de session HttpOnly, jeton CSRF (`X-CSRF-Token`
 
 Les lots marqués TEST sont exclus du tableau de bord, des cartes de contrôle et de la synthèse.
 
-Page scénario jury : `frontend/demo.html`.
+Page scénario jury (hors menu) : ouvrir `frontend/demo.html` ou le bouton « Voir la démonstration » sur l’accueil.
+
+Le QR des PDF pointe vers `PUBLIC_URL` si défini, sinon l’hôte public de la requête, sinon le dépôt GitHub. Sur Replit après Publish : `https://biologia.replit.app`.
 
 ## Tests
 

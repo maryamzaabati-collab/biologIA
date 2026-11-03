@@ -29,9 +29,9 @@
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
     <div id="liste-machines" class="cards"><p class="empty">Chargement…</p></div>
-    <div class="only-technicien" style="margin-top:32px;">
+    <div class="only-technicien card" style="margin-top:24px;max-width:480px">
       <h2>Ajouter une machine</h2>
-      <form id="form-machine" style="max-width:420px">
+      <form id="form-machine">
         <p id="erreur-form" class="message erreur" hidden></p>
         <label for="nom">Nom</label>
         <input type="text" id="nom" required placeholder="Nom de l'analyseur">
@@ -71,7 +71,7 @@ async function chargerMachines() {
         <div class="machine-head">
           ${icone(ico)}
           <div>
-            <h3>${echap(m.nom)}</h3>
+            <h3><a href="machine.html?id=${m.id}">${echap(m.nom)}</a></h3>
             <p class="hint" style="margin:0">${pluriel(n, 'lot')}${nTest ? ` (dont ${nTest} test)` : ''} · ${echap(m.type || 'type non précisé')}</p>
             <p class="hint">Dernière calibration : ${m.date_calibration ? formatDate(m.date_calibration) : (m.derniere_calibration ? formatDate(m.derniere_calibration) : '—')}</p>
             ${m.calibration_a_renouveler ? '<p class="machine-cal">Calibration à renouveler</p>' : ''}
@@ -79,7 +79,7 @@ async function chargerMachines() {
         </div>
         <div class="actions">
           <span class="badge ${maint ? 'douteux' : 'ok'}">${maint ? '⚠ Maintenance' : 'En service'}</span>
-          <a class="btn-link" href="controle.html?machine_id=${m.id}">Carte de contrôle</a>
+          <a class="btn-link" href="machine.html?id=${m.id}">Ouvrir</a>
         </div>
         <div class="actions only-biologiste">
           ${n ? `<p class="hint">Suppression bloquée : ${pluriel(n, 'lot')} rattaché${n > 1 ? 's' : ''}.</p>` : `<button class="secondary" data-id="${m.id}">Retirer (sans lots)</button>`}

@@ -126,7 +126,7 @@ async function charger() {
         <div class="card">
           <strong>${Number(lot.nb_signalements) ? pluriel(lot.nb_signalements, 'signalement') : 'Aucun signalement'}</strong>
           ${(lot.signalements && lot.signalements[0]) ? `<p class="hint">${echap(lot.signalements[0].raison)}</p>` : '<p class="hint">Rien à signaler sur ce lot.</p>'}
-          ${Number(lot.nb_signalements) ? '<p><button type="button" class="secondary" data-onglet-lien="alertes">Voir la carte de contrôle</button></p>' : ''}
+          ${Number(lot.nb_signalements) ? `<p><a class="btn-link" href="machine.html?id=${encodeURIComponent(lot.machine_id || '')}">Voir la carte de contrôle</a></p>` : ''}
         </div>
       </div>
       ${Number(lot.nb_signalements) ? `<div class="bande-action"><strong>⚠ Action requise</strong><span class="hint">Vérifiez le lot et les résultats associés.</span></div>` : ''}

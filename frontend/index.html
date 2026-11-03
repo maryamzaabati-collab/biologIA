@@ -22,35 +22,32 @@
   </aside>
   <main>
     <div class="page-head">
-      <div>
-        <h1>Lots</h1>
-        <p class="page-intro" hidden></p>
+      <h1>Lots</h1>
+      <div class="page-head-actions">
+        <button type="button" class="secondary actif" id="vue-cartes">Cartes</button>
+        <button type="button" class="secondary" id="vue-tableau">Tableau</button>
+        <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
       </div>
-      <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
     </div>
     <div class="lots-toolbar">
-    <div class="actions" style="margin:0 0 12px">
-      <button type="button" class="secondary actif" id="vue-cartes">Cartes</button>
-      <button type="button" class="secondary" id="vue-tableau">Tableau</button>
+    <div class="filtres" style="margin-bottom:10px">
+      <input type="search" id="filtre-q" placeholder="Rechercher un lot" autocomplete="off" name="recherche-lot">
+      <div class="pills" id="pills" style="margin:0">
+        <button type="button" class="secondary active" data-filtre="">Tous</button>
+        <button type="button" class="secondary" data-filtre="brouillon">Brouillons</button>
+        <button type="button" class="secondary" data-filtre="a_valider">À valider</button>
+        <button type="button" class="secondary" data-filtre="valide">Validés</button>
+        <button type="button" class="secondary" data-filtre="a_revalider">À revalider</button>
+        <button type="button" class="secondary" data-filtre="signale">Signalés</button>
+      </div>
       <select id="tri-lots">
         <option value="date">Plus récents</option>
         <option value="nom">Nom</option>
         <option value="statut">Statut</option>
       </select>
-    </div>
-    <div class="pills" id="pills">
-      <button type="button" class="secondary active" data-filtre="">Tous</button>
-      <button type="button" class="secondary" data-filtre="brouillon">Brouillons</button>
-      <button type="button" class="secondary" data-filtre="a_valider">À valider</button>
-      <button type="button" class="secondary" data-filtre="valide">Validés</button>
-      <button type="button" class="secondary" data-filtre="a_revalider">À revalider</button>
-      <button type="button" class="secondary" data-filtre="signale">Signalés</button>
-    </div>
-    <div class="filtres">
-      <input type="search" id="filtre-q" placeholder="Rechercher un lot" autocomplete="off" name="recherche-lot">
       <select id="filtre-machine"><option value="">Toutes les machines</option></select>
-      <input type="date" id="filtre-date" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
-      <button type="button" class="secondary" id="btn-date-clear">Effacer</button>
+      <input type="date" id="filtre-date" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off" hidden>
+      <button type="button" class="secondary" id="btn-date-clear" hidden>Effacer</button>
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
     </div>
@@ -64,7 +61,7 @@
 let filtreStatutAffiche = new URLSearchParams(location.search).get('filtre') || '';
 let pageLots = 1;
 let vueLots = 'cartes';
-const PAGE_LOTS = 9;
+const PAGE_LOTS = 6;
 
 async function remplirMachines() {
   const machines = await api('/machines');
@@ -132,7 +129,8 @@ async function chargerLots() {
         <span class="lot-carte-ref">${echap(lot.code_verification || '')}</span>
         <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
         <span class="lot-carte-date">${formatDate(lot.derniere_mesure || lot.date)}</span>
-        <span class="score-ligne"><span>Score ${lot.score_confiance ?? '—'}/100</span><span class="piste"><i style="width:${Number(lot.score_confiance)||0}%"></i></span></span>
+        <span class="score-ligne"><span>Score de confiance ${lot.score_confiance ?? '—'} / 100</span></span>
+        <span class="piste"><i style="width:${Number(lot.score_confiance)||0}%"></i></span>
       </a>
     `).join('');
     }

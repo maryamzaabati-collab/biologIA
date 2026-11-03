@@ -139,73 +139,10 @@ router.get('/csv', async (req, res) => {
   }
 });
 
-function urlPublique() {
-  if (process.env.PUBLIC_URL) return String(process.env.PUBLIC_URL).replace(/\/$/, '');
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return 'https://biologia.replit.app';
-}
-
-function couleursStatut(code) {
-  if (code === 'valide') return { fond: '#ddf7ee', texte: '#0f6b4c' };
-  if (code === 'signale') return { fond: '#fde8e9', texte: '#8d242c' };
-  return { fond: '#f8ecd3', texte: '#7a5410' };
-}
-
-function garantirEspace(doc, hauteur) {
-  const bas = doc.page.height - 52;
-  if (doc.y + hauteur > bas) doc.addPage();
-}
-
-function dessinerTableau(doc, colonnes, lignes) {
-  const x0 = 48;
-  const largeur = doc.page.width - 96;
-  const totalW = colonnes.reduce((s, c) => s + c.w, 0);
-  const largeurs = colonnes.map((c) => (c.w / totalW) * largeur);
-  const hautLigne = 18;
-
-  const enTete = () => {
-    const y0 = doc.y;
-    let x = x0;
-    doc.rect(x0, y0, largeur, hautLigne).fill('#18534F');
-    doc.fillColor('#F5F5DC').fontSize(8).font('Helvetica-Bold');
-    colonnes.forEach((c, i) => {
-      doc.text(c.label, x + 4, y0 + 5, { width: largeurs[i] - 8, lineBreak: false });
-      x += largeurs[i];
-    });
-    doc.y = y0 + hautLigne;
-    doc.font('Helvetica');
-  };
-
-  garantirEspace(doc, hautLigne * 2);
-  enTete();
-  lignes.forEach((ligne, idx) => {
-    if (doc.y + hautLigne > doc.page.height - 52) {
-      doc.addPage();
-      enTete();
-    }
-    const y = doc.y;
-    const fond = ligne.fond || (idx % 2 ? '#F7EFE0' : '#FFFFFF');
-    doc.rect(x0, y, largeur, hautLigne).fill(fond);
-    let x = x0;
-    colonnes.forEach((c, i) => {
-      doc.fillColor(ligne.couleurs && ligne.couleurs[i] ? ligne.couleurs[i] : '#16241E')
-        .fontSize(8)
-        .text(String(ligne.cellules[i] ?? ''), x + 4, y + 5, { width: largeurs[i] - 8, lineBreak: false });
-      x += largeurs[i];
-    });
-    doc.y = y + hautLigne;
-  });
-  doc.fillColor('#16241E');
-}
-
-async function bufferQr(url) {
-  try {
-    const QRCode = require('qrcode');
-    return await QRCode.toBuffer(url, { type: 'png', margin: 1, width: 132, errorCorrectionLevel: 'M' });
-  } catch {
-    return null;
-  }
-}
+const {
+  SAGE, INK, MUTED,
+  urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr
+} = require('../lib/pdf-maquettes');
 
 router.get('/pdf', async (req, res) => {
   try {
@@ -217,117 +154,80 @@ router.get('/pdf', async (req, res) => {
       ORDER BY signalements.date DESC
     `);
     const PDFDocument = require('pdfkit');
-    const site = urlPublique();
+    const site = urlPublique(req);
     const qr = await bufferQr(site);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="fiche-synthese.pdf"');
 
-    const doc = new PDFDocument({ margin: 48, size: 'A4', bufferPages: true });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
     doc.pipe(res);
 
-    const logo = path.join(__dirname, '..', '..', 'frontend', 'logo.png');
-    if (fs.existsSync(logo)) {
-      try { doc.image(logo, 48, 36, { width: 48 }); } catch { /* logo optionnel */ }
-    }
-    doc.fontSize(18).fillColor('#18534F').text('Fiche de synthèse — Contrôle qualité', 108, 40, { width: 360 });
-    doc.fontSize(10).fillColor('#4C5850').text('Registre de traçabilité biologIA — démonstrateur pédagogique', 108, 66, { width: 360 });
+    doc.roundedRect(40, 28, 22, 22, 5).fill(SAGE);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(SAGE).text('biologIA', 68, 33);
+    doc.fontSize(9).fillColor(MUTED).text('Registre de traçabilité', 320, 32, { width: 230, align: 'right' });
+    doc.fontSize(8).text('Données fictives · démonstrateur pédagogique', 320, 46, { width: 230, align: 'right' });
+    doc.strokeColor(SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
+
+    doc.fontSize(16).fillColor(INK).font('Helvetica-Bold')
+      .text('Fiche de synthèse — Contrôle qualité', 40, 80);
     const emise = req.utilisateur
-      ? `Émise par ${req.utilisateur.nom} (${req.utilisateur.role}) le ${formaterParis(s.genereLe)}`
+      ? `Émise par ${req.utilisateur.nom} (${req.utilisateur.role}) · ${formaterParis(s.genereLe)}`
       : `Générée le ${formaterParis(s.genereLe)}`;
-    doc.text(emise, 108, 80, { width: 360 });
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(emise, 40, 102);
 
-    doc.y = 118;
-    doc.fillColor('#16241E').fontSize(12);
-    doc.text(`Lots enregistrés : ${s.totalLots}   ·   validés par un biologiste : ${s.lotsValides} (${s.pourcentageValides} %)`);
-    doc.text(`Pseudonymisés : ${s.lotsAnonymises} (${s.pourcentageAnonymises} %)   ·   signalements ouverts : ${s.signalementsEnCours}`);
-    doc.text(`Brouillon ${s.lotsBrouillon}  ·  À valider ${s.lotsAValider}  ·  À revalider ${s.lotsARevalider}  ·  Signalé ${s.lotsDouteux}`);
+    dessinerAnneau(doc, 70, 160, 100, String(s.totalLots), 'lots enregistrés', SAGE);
+    dessinerAnneau(doc, 190, 160, s.pourcentageValides, `${s.pourcentageValides} %`, 'validés par un biologiste', SAGE);
+    dessinerAnneau(doc, 310, 160, s.pourcentageAnonymises, `${s.pourcentageAnonymises} %`, 'pseudonymisés', SAGE);
+    dessinerAnneau(doc, 430, 160, s.signalementsEnCours ? 70 : 8, String(s.signalementsEnCours), 'signalements ouverts', '#C85A4A');
 
-    doc.moveDown(0.9);
-    doc.fontSize(13).fillColor('#18534F').text('Répartition par machine');
-    doc.moveDown(0.25);
-    dessinerTableau(doc, [
-      { label: 'Machine', w: 3 },
-      { label: 'Lots', w: 1 },
-      { label: 'Validés', w: 1 },
-      { label: 'Taux', w: 1 }
-    ], (s.par_machine.length ? s.par_machine : [{ nom: 'Aucune', lots: 0, valides: 0 }]).map((m) => ({
+    doc.y = 210;
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('Lots', 40, 210);
+    const yLots = tableauSimple(doc, [
+      { label: 'Lot', w: 2.4 },
+      { label: 'Machine', w: 2.2 },
+      { label: 'Date', w: 1.4 },
+      { label: 'Statut', w: 1.6 },
+      { label: 'Score', w: 0.8 }
+    ], s.lots.map((lot) => ({
       cellules: [
-        m.nom,
-        String(m.lots),
-        String(m.valides),
-        m.lots ? `${Math.round((m.valides / m.lots) * 100)} %` : '—'
+        lot.nom,
+        lot.machine_nom || 'n/r',
+        formaterJour(lot.date),
+        { point: couleurPoint(lot.statut_affiche), texte: lot.statut_libelle },
+        String(lot.score_confiance)
       ]
-    })));
+    })), 228);
 
-    doc.moveDown(0.9);
-    doc.fontSize(13).fillColor('#18534F').text('Lots');
-    doc.moveDown(0.25);
-    if (!s.lots.length) {
-      doc.fontSize(10).fillColor('#4C5850').text('Aucun lot enregistré (hors lots TEST).');
-    } else {
-      dessinerTableau(doc, [
-        { label: 'Réf.', w: 1.1 },
-        { label: 'Lot', w: 2.6 },
-        { label: 'Machine', w: 2 },
-        { label: 'Date', w: 1.3 },
-        { label: 'Statut', w: 1.5 },
-        { label: 'Score', w: 0.9 }
-      ], s.lots.map((lot) => {
-        const c = couleursStatut(lot.statut_affiche);
-        return {
-          fond: c.fond,
-          couleurs: ['#16241E', '#16241E', '#16241E', '#16241E', c.texte, '#16241E'],
-          cellules: [
-            `L-${String(lot.id).padStart(3, '0')}`,
-            lot.nom,
-            lot.machine_nom || 'n/r',
-            formaterJour(lot.date),
-            lot.statut_libelle,
-            String(lot.score_confiance)
-          ]
-        };
-      }));
-    }
-
-    doc.moveDown(0.9);
-    doc.fontSize(13).fillColor('#18534F').text('Signalements ouverts');
-    doc.moveDown(0.25);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('Signalements ouverts', 40, yLots + 10);
+    let yFin = yLots + 28;
     if (!signalements.length) {
-      doc.fontSize(10).fillColor('#4C5850').text('Aucun signalement ouvert.');
+      doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Aucun signalement ouvert.', 40, yFin);
+      yFin += 16;
     } else {
-      dessinerTableau(doc, [
+      yFin = tableauSimple(doc, [
         { label: 'Lot', w: 2 },
         { label: 'Motif', w: 5 }
       ], signalements.map((sig) => ({
-        fond: '#fde8e9',
         cellules: [sig.lot_nom, sig.raison]
-      })));
+      })), yFin);
     }
 
-    garantirEspace(doc, 150);
-    doc.moveDown(1);
-    const ySign = doc.y;
-    doc.fontSize(12).fillColor('#18534F').text('Zone de signature du biologiste', 48, ySign);
-    doc.strokeColor('#18534F').lineWidth(0.8);
-    doc.rect(48, ySign + 22, 280, 56).stroke();
-    doc.fontSize(8).fillColor('#4C5850').text('Nom, date et paraphe', 56, ySign + 70);
+    const ySign = Math.min(yFin + 16, 700);
+    doc.strokeColor(SAGE).lineWidth(0.8).rect(40, ySign, 280, 56).stroke();
+    doc.fontSize(8).fillColor(MUTED).text('Signature du biologiste · nom, date, paraphe', 48, ySign + 8);
 
     if (qr) {
-      try { doc.image(qr, 400, ySign + 8, { width: 92 }); } catch { /* ignore */ }
-      doc.fontSize(8).fillColor('#4C5850').text('QR vers le site', 400, ySign + 104, { width: 92, align: 'center' });
-    } else {
-      doc.rect(400, ySign + 22, 92, 56).stroke('#18534F');
-      doc.fontSize(7).fillColor('#4C5850').text(site, 404, ySign + 40, { width: 84 });
+      try { doc.image(qr, 470, ySign, { width: 72 }); } catch { /* ignore */ }
     }
 
     const plage = doc.bufferedPageRange();
     for (let i = 0; i < plage.count; i++) {
       doc.switchToPage(plage.start + i);
-      doc.fontSize(8).fillColor('#4C5850').text(
-        `biologIA — ${emise} — ${site} — page ${i + 1} / ${plage.count}`,
-        48,
-        doc.page.height - 32,
-        { width: doc.page.width - 96, align: 'center' }
+      doc.fontSize(8).fillColor(MUTED).text(
+        `biologIA · Page ${i + 1} / ${plage.count}`,
+        40,
+        792,
+        { width: doc.page.width - 80, align: 'center', lineBreak: false }
       );
     }
     doc.end();

@@ -24,14 +24,58 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
+    const { libelleStatut, detailScoreConfiance } = require('../lib/tracabilite');
     const m = await db.get('SELECT * FROM machines WHERE id = ?', [req.params.id]);
     if (!m) return res.status(404).json({ erreur: "Cette machine n'existe pas." });
-    const lots = await db.all(
-      'SELECT id, nom, date, code_verification FROM lots WHERE machine_id = ? ORDER BY date DESC',
+    const lotsBruts = await db.all(
+      `SELECT lots.*, 
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements
+       FROM lots WHERE machine_id = ? AND COALESCE(archive, 0) = 0
+       ORDER BY date DESC, id DESC`,
+      [req.params.id]
+    );
+    const lots = [];
+    for (const lot of lotsBruts) {
+      const vals = await db.all('SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC', [lot.id]);
+      const vu = libelleStatut(lot, vals, Number(lot.nb_signalements) || 0);
+      const sc = detailScoreConfiance(lot, vals, Number(lot.nb_signalements) || 0);
+      lots.push({
+        id: lot.id,
+        nom: lot.nom,
+        date: lot.date,
+        code_verification: lot.code_verification,
+        est_test: lot.est_test,
+        statut_affiche: vu.code,
+        statut_libelle: vu.libelle,
+        score_confiance: sc.score,
+        nb_signalements: Number(lot.nb_signalements) || 0
+      });
+    }
+    const horsTest = lots.filter((l) => !Number(l.est_test));
+    const signalements = await db.all(
+      `SELECT signalements.id, signalements.raison, signalements.date, lots.id AS lot_id, lots.nom AS lot_nom
+       FROM signalements JOIN lots ON lots.id = signalements.lot_id
+       WHERE lots.machine_id = ? AND signalements.resolu = 0 AND COALESCE(lots.archive, 0) = 0 AND COALESCE(lots.est_test, 0) = 0
+       ORDER BY signalements.date DESC`,
       [req.params.id]
     );
     const histo = await db.all('SELECT * FROM calibrations WHERE machine_id = ? ORDER BY date DESC', [req.params.id]);
-    res.json({ ...enrichirMachine(m), lots, calibrations: histo });
+    const valides = horsTest.filter((l) => l.statut_affiche === 'valide').length;
+    const scoreMoyen = horsTest.length
+      ? Math.round(horsTest.reduce((s, l) => s + (Number(l.score_confiance) || 0), 0) / horsTest.length)
+      : 0;
+    res.json({
+      ...enrichirMachine(m),
+      lots,
+      calibrations: histo,
+      signalements,
+      stats: {
+        lots: horsTest.length,
+        valides,
+        score_moyen: scoreMoyen,
+        signalements: signalements.length
+      }
+    });
   } catch (err) {
     res.status(500).json({ erreur: err.message });
   }

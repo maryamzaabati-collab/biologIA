@@ -23,29 +23,36 @@
       <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
       <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
       <button type="button" class="secondary" data-onglet="tester">Tester l’identification</button>
-      <button type="button" class="secondary only-biologiste" data-onglet="anonymiser">Générer le jeu anonymisé</button>
-      <button type="button" class="secondary" data-onglet="tester-anon">Tester l’anonymisation (k ≥ 5)</button>
+      <button type="button" class="secondary" data-onglet="anonymiser">Anonymisation</button>
+      <button type="button" class="secondary" data-onglet="identifiants">Identifiants</button>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
 
-    <section class="card panneau" id="panneau-identifier">
-      <h2>Identifier</h2>
-      <form id="form-numero">
-        <label for="numero">Numéro patient</label>
-        <input type="text" id="numero" placeholder="NP-2026-000123" autocomplete="off">
-        <p id="erreur-numero" class="message erreur champ-erreur" hidden></p>
-        <button type="submit">Chercher le numéro</button>
-      </form>
-      <form id="form-nom" style="margin-top:16px">
-        <label>Ou nom + date de naissance (normalisés, sans accents)</label>
-        <div class="grid-2">
-          <input type="text" id="nom" placeholder="Nom">
-          <input type="date" id="date_naissance" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+    <section class="panneau" id="panneau-identifier">
+      <div class="dash-2">
+        <div class="card">
+          <h2>Identifier un patient</h2>
+          <form id="form-numero">
+            <label for="numero">Numéro patient</label>
+            <input type="text" id="numero" placeholder="NP-2026-000123" autocomplete="off">
+            <p id="erreur-numero" class="message erreur champ-erreur" hidden></p>
+            <button type="submit">Rechercher</button>
+          </form>
+          <p class="hint" style="margin:16px 0 8px">ou</p>
+          <form id="form-nom">
+            <label for="nom">Nom</label>
+            <input type="text" id="nom" placeholder="Nom" autocomplete="off">
+            <label for="date_naissance">Date de naissance</label>
+            <input type="date" id="date_naissance" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+            <p id="erreur-nom" class="message erreur champ-erreur" hidden></p>
+            <button type="submit" class="secondary">Retrouver le PSN</button>
+          </form>
         </div>
-        <p id="erreur-nom" class="message erreur champ-erreur" hidden></p>
-        <button type="submit">Retrouver le PSN</button>
-      </form>
-      <div id="resultat-recherche"></div>
+        <div>
+          <div class="card" id="resultat-recherche"><p class="hint">Saisissez un numéro ou un nom pour afficher le PSN.</p></div>
+          <div class="card" style="margin-top:14px" id="dernier-test-anon"></div>
+        </div>
+      </div>
     </section>
 
     <section class="card panneau only-biologiste" id="panneau-creer" hidden>
@@ -94,58 +101,104 @@
       <div id="rapport-tests"></div>
     </section>
 
-    <section class="card panneau only-biologiste" id="panneau-anonymiser" hidden>
-      <h2>Générer le jeu anonymisé</h2>
+    <section class="card panneau" id="panneau-anonymiser" hidden>
+      <h2>Anonymisation</h2>
       <p class="hint">Table irréversible : tranche d’âge, sexe, territoire, paramètre, valeur. Les groupes k &lt; 5 sont généralisés puis exclus. Aucun PSN.</p>
       <p id="statut-anon" class="hint">Aucun jeu généré. Cliquez sur Générer.</p>
-      <button type="button" id="btn-generer-anon">Générer / régénérer</button>
-      <button type="button" class="secondary" id="btn-export-anon">Exporter CSV anonymisé</button>
-      <div id="resultat-anon"></div>
-    </section>
-
-    <section class="card panneau" id="panneau-tester-anon" hidden>
-      <h2>Tester l’anonymisation (k ≥ 5)</h2>
-      <p class="hint">Contrôles : k-anonymat, absence de colonnes identifiantes, absence de PSN, ré-identification.</p>
       <div class="actions">
-        <button type="button" id="btn-test-propre">Tester le jeu généré</button>
+        <button type="button" class="only-biologiste" id="btn-generer-anon">Générer / régénérer</button>
+        <button type="button" class="secondary" id="btn-export-anon">Exporter CSV anonymisé</button>
+        <button type="button" class="secondary" id="btn-test-propre">Tester le jeu généré</button>
         <button type="button" class="secondary" id="btn-test-piege">CSV piège (doit échouer)</button>
       </div>
+      <div id="resultat-anon"></div>
       <label for="csv-anon">Ou coller un CSV</label>
       <textarea id="csv-anon" rows="6" placeholder="tranche_age;sexe;territoire;parametre;valeur;unite;mois"></textarea>
       <button type="button" class="secondary" id="btn-test-csv">Analyser ce CSV</button>
       <div id="rapport-anon"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-identifiants" hidden>
+      <h2>Identifiants</h2>
+      <div class="filtres">
+        <input type="search" id="filtre-psn" placeholder="Rechercher un PSN ou un numéro" autocomplete="off">
+        <a class="btn-link" id="lien-export" href="/api/patients/export.csv">Exporter CSV</a>
+      </div>
+      <div id="liste-identifiants"><p class="empty">Chargement…</p></div>
+      <div id="pagination-id" class="pagination"></div>
+      <div id="identite-box"></div>
     </section>
   </main>
 </div>
 <script src="app.js"></script>
 <script>
 function montrerOnglet(id) {
+  if (id === 'tester-anon') id = 'anonymiser';
   document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
     b.classList.toggle('actif', b.dataset.onglet === id);
   });
   document.querySelectorAll('.panneau').forEach((p) => {
     p.hidden = p.id !== 'panneau-' + id;
   });
+  if (id === 'identifiants') chargerIdentifiants();
 }
 document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
   b.addEventListener('click', () => montrerOnglet(b.dataset.onglet));
 });
+const paramsUrl = new URLSearchParams(location.search);
+const ongletUrl = paramsUrl.get('onglet');
+if (ongletUrl) montrerOnglet(ongletUrl);
+const qPsn = paramsUrl.get('q');
+if (qPsn && document.getElementById('filtre-psn')) {
+  document.getElementById('filtre-psn').value = qPsn;
+  montrerOnglet('identifiants');
+}
+
+let pageId = 1;
+async function chargerIdentifiants() {
+  const q = document.getElementById('filtre-psn')?.value.trim() || '';
+  const exportQ = q ? `?q=${encodeURIComponent(q)}` : '';
+  const lien = document.getElementById('lien-export');
+  if (lien) lien.href = '/api/patients/export.csv' + exportQ;
+  try {
+    const data = await api(`/patients?page=${pageId}&taille=20&q=${encodeURIComponent(q)}`);
+    const box = document.getElementById('liste-identifiants');
+    const bio = roleActuel() === 'biologiste';
+    if (!data.identifiants.length) {
+      box.innerHTML = '<p class="empty">Aucun identifiant pour cette recherche.</p>';
+      return;
+    }
+    box.innerHTML = `<table class="table-audit"><thead><tr><th>PSN</th>${bio ? '<th>Numéro</th>' : ''}<th>Lots</th><th>Mesures</th></tr></thead><tbody>
+      ${data.identifiants.map((l) => `<tr>
+        <td class="mono">${echap(l.psn)}</td>
+        ${bio ? `<td class="mono">${echap(l.numero_patient || '')}</td>` : ''}
+        <td>${l.nb_lots || 0}</td>
+        <td>${l.nb_mesures || 0}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+}
+document.getElementById('filtre-psn')?.addEventListener('input', () => { pageId = 1; chargerIdentifiants(); });
 document.getElementById('btn-nouveau-patient')?.addEventListener('click', () => montrerOnglet('creer'));
 
 function blocResultat(r) {
   if (!r.trouve) {
-    return `<p class="message erreur">${echap(r.message || 'Inconnu')}</p>`;
+    return `<h2>Résultat</h2><p class="message erreur">${echap(r.message || 'Inconnu')}</p>`;
   }
   const bio = roleActuel() === 'biologiste';
   const afficher = bio
     ? `<form id="form-motif" style="margin-top:12px">
-         <label for="motif">Motif (obligatoire pour afficher l’identité)</label>
+         <button type="submit" class="secondary">Afficher l’identité (motif requis)</button>
+         <label for="motif">Motif</label>
          <input type="text" id="motif" required placeholder="Ex. contrôle pédagogique">
-         <button type="submit">Afficher l’identité</button>
        </form>
        <div id="identite-revelee"></div>`
     : '<p class="hint">Identité masquée — le technicien ne voit que le PSN.</p>';
-  return `<p class="message ok">${echap(r.message)}</p>${afficher}`;
+  return `<div class="page-head" style="margin:0"><h2>Résultat</h2>
+      <button type="button" class="secondary" data-copier="${echap(r.psn || '')}">Copier</button></div>
+      <p class="mono" style="font-size:1.05rem;font-weight:650">${echap(r.psn || '')}</p>
+      <p class="hint">Identité masquée</p>${afficher}`;
 }
 
 async function identifier(corps) {
@@ -237,6 +290,9 @@ async function chargerStatutAnon() {
   }
 }
 chargerStatutAnon();
+api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'propre' }) })
+  .then(afficherRapportAnon)
+  .catch(() => {});
 
 document.getElementById('btn-generer-anon').addEventListener('click', async () => {
   try {
@@ -261,9 +317,17 @@ function afficherRapportAnon(r) {
   const cls = statut === 'conforme' ? 'ok' : 'erreur';
   const okN = (r.controles || []).filter((c) => c.ok).length;
   const tot = (r.controles || []).length;
-  document.getElementById('rapport-anon').innerHTML = `
-    <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>
-    <ul>${(r.controles || []).map((c) => `<li>${iconeControle(c)} <strong>${echap(c.libelle)}</strong> — ${echap(c.detail || '')}</li>`).join('')}</ul>`;
+  const html = `
+    <div class="page-head" style="margin:0 0 8px"><h2>Dernier test d’anonymisation</h2>
+      <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${okN} sur ${tot || 0}</span></div>
+    <ul class="lexique" style="list-style:none;padding:0;margin:0">${(r.controles || []).map((c) =>
+      `<li style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)">
+        <span>${echap(c.libelle)}</span><strong>${c.ok ? 'ok' : iconeControle(c)}</strong></li>`).join('')}</ul>
+    <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>`;
+  const rapport = document.getElementById('rapport-anon');
+  if (rapport) rapport.innerHTML = html;
+  const resume = document.getElementById('dernier-test-anon');
+  if (resume) resume.innerHTML = html;
 }
 document.getElementById('btn-export-anon')?.addEventListener('click', async () => {
   try {

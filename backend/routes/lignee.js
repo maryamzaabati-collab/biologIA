@@ -42,22 +42,24 @@ router.get('/', async (req, res) => {
         etapes: [
           {
             type: 'patient',
-            libelle: 'Patients du lot',
-            valeur: mesures.length ? `${mesures.length} patient(s)` : (Number(lot.anonymise) ? 'Codes PSN du CSV' : 'non confirmé'),
+            libelle: 'Patients',
+            valeur: mesures.length ? `${mesures.length} patients` : '—',
+            auteur: Number(lot.anonymise) ? 'pseudonymisés' : 'à confirmer',
             date: lot.date,
-            href: 'identifiants.html',
+            href: 'patients.html?onglet=identifiants',
             details: mesures.map((m) => m.code_patient)
           },
           {
             type: 'mesures',
-            libelle: 'Mesures de référence',
-            valeur: lot.nom,
+            libelle: 'Mesures',
+            valeur: mesures.length ? `${mesures.length} valeurs` : '—',
             date: lot.date
           },
           {
             type: 'lot',
             libelle: 'Lot',
             valeur: lot.code_verification || lot.nom,
+            auteur: lot.nom,
             date: lot.date_creation,
             href: `lot.html?id=${lot.id}`
           },
@@ -65,17 +67,18 @@ router.get('/', async (req, res) => {
             type: 'machine',
             libelle: 'Machine',
             valeur: lot.machine_nom || 'n/r',
-            href: 'machines.html'
+            href: lot.machine_id ? `machine.html?id=${lot.machine_id}` : 'machines.html'
           },
           {
             type: 'regle',
             libelle: 'Règle',
-            valeur: regles[0] ? regles[0].parametre : 'aucune'
+            valeur: regles[0] ? regles[0].parametre : 'Aucune',
+            auteur: regles[0] && regles[0].statut === 'validee' ? 'seuils validés' : (regles[0] ? 'seuils' : '—')
           },
           {
             type: 'alerte',
             libelle: 'Alerte',
-            valeur: signalements.length ? `${signalements.length} ouverte(s)` : 'aucune',
+            valeur: signalements.length ? `${signalements.length} ouverte(s)` : 'Aucune',
             date: signalements[0] && signalements[0].date
           },
           {

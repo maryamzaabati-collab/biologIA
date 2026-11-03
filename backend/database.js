@@ -316,6 +316,12 @@ async function init() {
   } catch (err) {
     console.error('Chargement des données de démonstration :', err);
   }
+
+  await run(`UPDATE utilisateurs SET email = NULL, statut = 'refuse'
+    WHERE lower(COALESCE(email, '')) IN ('maryam@biol', 'mary@biologie')`);
+  await run(`DELETE FROM sessions WHERE utilisateur_id IN (
+    SELECT id FROM utilisateurs WHERE lower(identifiant) IN ('mary', 'maryam') AND statut = 'refuse')`);
+  await run(`DELETE FROM utilisateurs WHERE lower(identifiant) IN ('mary', 'maryam') AND statut = 'refuse'`);
 }
 
 module.exports = { run, get, all, init, dbPath, fermer };

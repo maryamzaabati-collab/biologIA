@@ -12,6 +12,11 @@ const {
   genererCodeVerification,
   composerConditions,
   validerSaisieLot,
+  extraireValeursCsv,
+  libelleConditionsAffichees,
+  libelleSeuils,
+  conditionsStructurees,
+  MIN_POINTS_CONTROLE,
   MOIS_PEREMPTION
 } = require('../lib/tracabilite');
 const journal = require('../lib/journal');
@@ -245,59 +250,123 @@ router.get('/:id/historique', async (req, res) => {
 router.get('/:id/certificat', async (req, res) => {
   try {
     const lot = await db.get(`
-      SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type
+      SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type,
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements
       FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
       WHERE lots.id = ?
     `, [req.params.id]);
     if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
 
-    const validations = await db.all(
+    const validations = uniqueValidations(await db.all(
       'SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC',
       [req.params.id]
-    );
+    ));
     const regles = await db.all('SELECT * FROM regles_alerte WHERE lot_id = ?', [req.params.id]);
-    const vu = enrichir(lot, uniqueValidations(validations));
+    const vu = enrichir(lot, validations);
     const { formaterJour } = require('../lib/dates');
+    const pdf = require('../lib/pdf-maquettes');
+
+    const nPoints = extraireValeursCsv(lot.csv_texte || '').length
+      || (() => { try { return JSON.parse(lot.valeurs_controle || '[]').length; } catch { return 0; } })();
+    const condOk = conditionsStructurees(lot.conditions);
+    const condLib = libelleConditionsAffichees(lot.conditions);
+    const regle = regles[0];
+    const val = validations[0];
+    const lignesControle = [
+      {
+        libelle: 'Machine et date renseignées',
+        resultat: lot.machine_id && lot.date ? 'Oui' : 'Non',
+        ref: 'Obligatoire',
+        code: lot.machine_id && lot.date ? 'valide' : 'signale',
+        interp: lot.machine_id && lot.date ? 'Conforme' : 'À compléter'
+      },
+      {
+        libelle: 'Conditions de mesure',
+        resultat: condOk ? condLib : (condLib === 'Non renseignées' ? 'Incomplètes' : condLib),
+        ref: 'Obligatoire',
+        code: condOk ? 'valide' : 'signale',
+        interp: condOk ? 'Conforme' : 'À compléter'
+      },
+      {
+        libelle: 'Pseudonymisation',
+        resultat: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'Confirmée' : (Number(lot.alerte_identite) ? 'Colonnes identifiantes' : 'Non confirmée'),
+        ref: 'Obligatoire',
+        code: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'valide' : 'signale',
+        interp: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'Conforme' : 'À corriger'
+      },
+      {
+        libelle: 'Série de contrôle',
+        resultat: `${nPoints} points`,
+        ref: `≥ ${MIN_POINTS_CONTROLE} points`,
+        code: nPoints >= MIN_POINTS_CONTROLE ? 'valide' : 'signale',
+        interp: nPoints >= MIN_POINTS_CONTROLE ? 'Conforme' : 'Insuffisant'
+      },
+      {
+        libelle: 'Règle d’alerte',
+        resultat: regle ? `${regle.parametre} ${libelleSeuils(regle)}` : 'Aucune',
+        ref: 'Validée par un biologiste',
+        code: regle ? 'valide' : 'a_valider',
+        interp: regle ? 'Conforme' : 'En attente'
+      },
+      {
+        libelle: 'Validation biologiste',
+        resultat: val ? val.nom_biologiste : 'Aucune',
+        ref: 'Requise',
+        code: val ? 'valide' : 'a_valider',
+        interp: val ? 'Conforme' : 'En attente'
+      }
+    ];
 
     const PDFDocument = require('pdfkit');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="certificat-${lot.code_verification || lot.id}.pdf"`);
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
     doc.pipe(res);
-    doc.fontSize(16).text('Certificat de traçabilité', { align: 'center' });
-    doc.moveDown(0.3);
-    doc.fontSize(10).fillColor('#4C5850').text(
-      'Registre des données de référence — esprit ISO 15189 / ISO 17025',
-      { align: 'center' }
-    );
-    doc.moveDown(1.2);
-    doc.fillColor('#16241E').fontSize(12);
-    doc.text(`Lot : ${lot.nom}`);
-    doc.text(`Code de traçabilité : ${lot.code_verification || 'n/r'}`);
-    doc.text(`Machine : ${lot.machine_nom || 'non renseignée'} (${lot.machine_type || 'type n/r'})`);
-    doc.text(`Date de mesure : ${formaterJour(lot.date)}`);
-    doc.text(`Conditions : ${lot.conditions || 'non renseignées'}`);
-    doc.text(`Pseudonymisation confirmée : ${lot.anonymise ? 'oui' : 'non'}`);
-    doc.text(`Statut : ${vu.statut_libelle}`);
-    doc.text(`Score de confiance : ${vu.score_confiance} / 100`);
-    doc.moveDown(0.8);
-    doc.fontSize(12).text('Règles d\'alerte calibrées sur ce lot');
-    doc.fontSize(10);
-    if (!regles.length) doc.text('Aucune règle associée.');
-    regles.forEach((r) => {
-      doc.text(`- ${r.parametre} : ${r.seuil_bas ?? '—'} à ${r.seuil_haut ?? '—'} ${r.unite || ''}`);
-    });
-    doc.moveDown(0.8);
-    doc.fontSize(12).text('Validations biologiste');
-    doc.fontSize(10);
-    if (!validations.length) doc.text('Aucune validation enregistrée.');
-    validations.forEach((v) => {
-      doc.text(`- ${v.nom_biologiste} — ${formaterParis(v.date_validation)}`);
-    });
-    doc.moveDown(1.5);
-    doc.fontSize(8).fillColor('#4C5850').text(
-      'Document généré par le registre de traçabilité. Données de référence fictives — aucun bilan patient.'
+    doc.roundedRect(40, 28, 22, 22, 5).fill(pdf.SAGE);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.SAGE).text('biologIA', 68, 33);
+    doc.fontSize(9).fillColor(pdf.MUTED).text('Registre de traçabilité', 320, 32, { width: 230, align: 'right' });
+    doc.fontSize(8).text('Données fictives · démonstrateur pédagogique', 320, 46, { width: 230, align: 'right' });
+    doc.strokeColor(pdf.SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
+
+    doc.font('Helvetica-Bold').fontSize(16).fillColor(pdf.INK).text('Certificat de traçabilité', 40, 80);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED)
+      .text(`Esprit ISO 15189 / ISO 17025 · émis le ${formaterJour(new Date().toISOString().slice(0, 10))}`, 40, 102);
+
+    doc.roundedRect(40, 122, 515, 88, 8).strokeColor('#DDD6C8').lineWidth(0.8).stroke();
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(pdf.INK).text(lot.nom, 52, 134);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED).text(lot.code_verification || '', 52, 152);
+    doc.fillColor(pdf.INK).fontSize(8)
+      .text(`Machine ${lot.machine_nom || 'non renseignée'}`, 250, 134)
+      .text(`Date de mesure ${formaterJour(lot.date)}`, 250, 148);
+    doc.circle(250, 166, 3).fill(pdf.couleurPoint(vu.statut_affiche));
+    doc.fillColor(pdf.INK).fontSize(8).text(`Statut  ${vu.statut_libelle}`, 258, 162);
+    pdf.dessinerAnneau(doc, 500, 166, vu.score_confiance, String(vu.score_confiance), 'score / 100', pdf.SAGE);
+
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('Contrôles et résultats', 40, 228);
+    pdf.tableauSimple(doc, [
+      { label: 'Contrôle', w: 2.2 },
+      { label: 'Résultat', w: 2.4 },
+      { label: 'Référence', w: 1.8 },
+      { label: 'Interprétation', w: 1.6 }
+    ], lignesControle.map((l) => ({
+      cellules: [
+        l.libelle,
+        l.resultat,
+        l.ref,
+        { point: pdf.couleurPoint(l.code), texte: l.interp }
+      ]
+    })), 246, { hauteur: 26, entete: 20 });
+
+    doc.strokeColor(pdf.SAGE).lineWidth(0.8).rect(40, 700, 280, 56).stroke();
+    doc.fontSize(8).fillColor(pdf.MUTED).text('Validation du biologiste · nom, date, paraphe', 48, 708);
+    const qr = await pdf.bufferQr(pdf.urlPublique(req) + `/lot.html?id=${lot.id}`);
+    if (qr) {
+      try { doc.image(qr, 470, 688, { width: 72 }); } catch { /* ignore */ }
+    }
+    doc.fontSize(8).fillColor(pdf.MUTED).text(
+      'Aucun bilan patient · biologIA · Page 1 / 1',
+      40, 792, { width: 515, align: 'center', lineBreak: false }
     );
     doc.end();
   } catch (err) {

@@ -83,15 +83,25 @@
 
   function lienNav(href, label, icon, page) {
     const active = page === href
-      || (page === 'lot.html' && href === 'index.html')
-      || (page === 'certificat.html' && href === 'index.html')
-      || (page === 'nouveau-lot.html' && href === 'index.html');
+      || (href === 'index.html' && (page === 'lot.html' || page === 'nouveau-lot.html'))
+      || (href === 'machines.html' && (page === 'machine.html' || page === 'controle.html'))
+      || (href === 'patients.html' && page === 'identifiants.html')
+      || (href === 'documents.html' && (page === 'synthese.html' || page === 'certificat.html' || page === 'lignee.html'))
+      || (href === 'tableau.html' && page === 'tableau.html');
     return `<a href="${href}" class="${active ? 'active' : ''}">${ICONES[icon] || ''}<span>${label}</span></a>`;
   }
 
   function remplirNav(role) {
     const brand = document.querySelector('.sidebar .brand');
-    if (brand) brand.innerHTML = '<span class="logo-mark"></span> biologIA';
+    if (brand) {
+      brand.innerHTML = `<span class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#F7F4EC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 2.8h6"/>
+          <path d="M10.2 2.8v4.6L6.1 18.4A3.6 3.6 0 0 0 9.4 23h5.2a3.6 3.6 0 0 0 3.3-4.6L13.8 7.4V2.8"/>
+          <path d="M8 14.2h8"/>
+        </svg>
+      </span> biologIA`;
+    }
     const nav = document.querySelector('.sidebar nav');
     if (!nav) return;
     const page = (location.pathname.split('/').pop() || 'accueil.html').replace(/^$/, 'accueil.html');
@@ -102,18 +112,16 @@
       : '';
     nav.innerHTML = `
       <p class="nav-section">Suivi</p>
-      ${lienNav('accueil.html', 'Tableau de bord', 'accueil', page)}
+      ${lienNav('accueil.html', 'Accueil', 'accueil', page)}
+      ${lienNav('tableau.html', 'Tableau de bord', 'synthese', page)}
       ${lienNav('index.html', 'Lots', 'lots', page)}
       ${lienNav('machines.html', 'Machines', 'machines', page)}
       ${lienNav('signalements.html', 'Signalements', 'signalements', page)}
-      ${lienNav('controle.html', 'Cartes de contrôle', 'controle', page)}
-      <p class="nav-section">Traçabilité</p>
-      ${lienNav('lignee.html', 'Lignée', 'lignee', page)}
-      ${role === 'client' ? '' : `${lienNav('patients.html', 'Patients', 'patients', page)}
-      ${lienNav('identifiants.html', 'Identifiants', 'patients', page)}`}
-      ${lienNav('synthese.html', 'Synthèse', 'synthese', page)}
+      <p class="nav-section">Données</p>
+      ${role === 'client' ? '' : lienNav('patients.html', 'Patients', 'patients', page)}
+      ${lienNav('documents.html', 'Documents', 'synthese', page)}
+      <p class="nav-section">Conformité</p>
       ${lienNav('conformite.html', 'Conformité', 'conformite', page)}
-      ${lienNav('demo.html', 'Démo', 'synthese', page)}
       ${admin}
     `;
   }
@@ -135,10 +143,18 @@
     bar.className = 'topbar';
     bar.innerHTML = `
       <div class="recherche-globale">
-        <input type="search" id="recherche-globale" name="recherche-labo" placeholder="Lots, machines, signalements, PSN (⌘K)" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
+        <input type="search" id="recherche-globale" name="recherche-labo" placeholder="Lots, machines, PSN" autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true">
         <div id="recherche-resultats" class="recherche-resultats" hidden></div>
       </div>
-      <button type="button" id="btn-theme" class="theme-btn" aria-label="Changer de thème"></button>
+      <button type="button" id="btn-theme" class="theme-switch" role="switch" aria-checked="true">
+        <span class="theme-ico theme-ico-lune" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 14.5A8.5 8.5 0 1 1 9.5 3 7 7 0 0 0 21 14.5z"/></svg>
+        </span>
+        <span class="theme-switch-knob" aria-hidden="true"></span>
+        <span class="theme-ico theme-ico-soleil" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6 6l1.4 1.4M16.6 16.6 18 18M6 18l1.4-1.4M16.6 7.4 18 6"/></svg>
+        </span>
+      </button>
       <button type="button" id="btn-avatar" class="avatar-top" aria-label="Compte" hidden></button>
       <div id="menu-compte" class="menu-compte" hidden></div>
     `;
@@ -159,13 +175,11 @@
           const r = await api(`/recherche?q=${encodeURIComponent(q)}`);
           const lignes = [];
           (r.lots || []).forEach((l) => lignes.push(`<a href="lot.html?id=${l.id}">Lot · ${echap(l.nom)}</a>`));
-          (r.machines || []).forEach((m) => lignes.push(`<a href="machines.html">Machine · ${echap(m.nom)}</a>`));
+          (r.machines || []).forEach((m) => lignes.push(`<a href="machine.html?id=${m.id}">Machine · ${echap(m.nom)}</a>`));
           (r.signalements || []).forEach((s) => lignes.push(`<a href="lot.html?id=${s.lot_id}&edit=1">Signalement · ${echap(s.lot_nom)}</a>`));
-          (r.patients || []).forEach((p) => lignes.push(`<a href="identifiants.html?q=${encodeURIComponent(p.psn)}">Patient · ${echap(p.psn)}</a>`));
-          const groupes = [];
-          if (r.lots.length) groupes.push(`<p class="hint">Lots</p>`);
+          (r.patients || []).forEach((p) => lignes.push(`<a href="patients.html?onglet=identifiants&q=${encodeURIComponent(p.psn)}">Patient · ${echap(p.psn)}</a>`));
           box.innerHTML = lignes.length
-            ? `<p class="hint">${pluriel((r.lots||[]).length, 'lot')} · ${pluriel((r.machines||[]).length, 'machine')} · ${pluriel((r.signalements||[]).length, 'signalement')} · ${(r.patients||[]).length} PSN</p>${lignes.join('')}`
+            ? `<p class="hint">${pluriel((r.lots || []).length, 'lot')} · ${pluriel((r.machines || []).length, 'machine')} · ${pluriel((r.signalements || []).length, 'signalement')} · ${(r.patients || []).length} PSN</p>${lignes.join('')}`
             : '<p class="empty">Aucun résultat.</p>';
           box.hidden = false;
         } catch (err) {
@@ -174,15 +188,20 @@
         }
       }, 200);
     });
-    document.getElementById('btn-theme').addEventListener('click', () => {
-      localStorage.setItem('themeLabo', themeActuel() === 'sombre' ? 'clair' : 'sombre');
-      appliquerTheme();
-    });
+    const themeBtn = document.getElementById('btn-theme');
+    if (themeBtn) {
+      const basculer = () => {
+        localStorage.setItem('themeLabo', themeActuel() === 'sombre' ? 'clair' : 'sombre');
+        appliquerTheme();
+      };
+      themeBtn.addEventListener('click', basculer);
+    }
     appliquerTheme();
     document.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        document.getElementById('recherche-globale')?.focus();
+        const champ = document.getElementById('recherche-globale');
+        if (champ && champ.offsetParent) champ.focus();
       }
     });
   }
@@ -222,7 +241,10 @@
         av.textContent = initiales(moi.nom);
         menu.innerHTML = `<p class="hint" style="margin:0 8px 8px">${echap(moi.nom)} · ${echap(moi.role)}</p>
           <button type="button" class="secondary" id="btn-deconnexion">Déconnexion</button>`;
-        av.onclick = () => { menu.hidden = !menu.hidden; };
+        av.onclick = (e) => { e.stopPropagation(); menu.hidden = !menu.hidden; };
+        document.addEventListener('click', (e) => {
+          if (!menu.hidden && !menu.contains(e.target) && e.target !== av) menu.hidden = true;
+        });
         document.getElementById('btn-deconnexion')?.addEventListener('click', async () => {
           try { await api('/auth/deconnexion', { method: 'POST' }); } catch { /* ignore */ }
           window.location.href = 'connexion.html';

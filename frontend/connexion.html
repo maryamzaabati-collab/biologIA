@@ -10,7 +10,13 @@
 <div class="landing">
   <section class="landing-gauche">
     <div class="landing-marque">
-      <img class="logo-connexion" src="logo.png" alt="biologIA">
+      <span class="logo-mark logo-connexion-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#F7F4EC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 2.8h6"/>
+          <path d="M10.2 2.8v4.6L6.1 18.4A3.6 3.6 0 0 0 9.4 23h5.2a3.6 3.6 0 0 0 3.3-4.6L13.8 7.4V2.8"/>
+          <path d="M8 14.2h8"/>
+        </svg>
+      </span>
       <p class="landing-nom">biologIA</p>
     </div>
     <div class="landing-texte">
@@ -103,7 +109,7 @@ document.getElementById('form-connexion').addEventListener('submit', async (e) =
         mot_de_passe: document.getElementById('mot_de_passe').value
       })
     });
-    window.location.href = 'accueil.html';
+    window.location.href = 'tableau.html';
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }

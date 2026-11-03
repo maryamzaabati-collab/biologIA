@@ -13,8 +13,12 @@
     <nav></nav>
   </aside>
   <main>
-    <h1>Validation des comptes</h1>
-    <p class="page-intro">Un biologiste accorde ou refuse l’accès, et confirme le rôle : client (consultation), technicien (lots) ou biologiste (validation). Aucune identité patient n’est collectée ici.</p>
+    <div class="page-head">
+      <div>
+        <h1>Comptes</h1>
+        <p class="page-intro">Accorder, refuser ou confirmer un rôle. Aucune identité patient ici.</p>
+      </div>
+    </div>
     <p id="erreur-page" class="message erreur" hidden></p>
     <p id="ok-page" class="message ok" hidden></p>
     <div id="liste"></div>
@@ -79,7 +83,7 @@ async function charger() {
             <option value="biologiste" ${c.role === 'biologiste' ? 'selected' : ''}>Biologiste</option>
           </select>
           <button type="button" class="secondary" data-rolebtn="${c.id}">Changer le rôle</button>
-          ${c.statut === 'valide' ? `<button type="button" class="btn-ghost" data-suspend="${c.id}">Suspendre</button>` : ''}`}
+          ${c.statut === 'valide' ? `<button type="button" class="danger" data-suspend="${c.id}">Suspendre</button>` : ''}`}
         </div>
       </div>
     `).join('');

@@ -498,6 +498,12 @@ function conditionsStructurees(texte) {
   return /temp/i.test(t) && /r[eé]actif/i.test(t) && /calibr/i.test(t);
 }
 
+function libelleConditionsAffichees(texte) {
+  const t = String(texte || '').trim();
+  if (!t || /^\d+$/.test(t)) return 'Non renseignées';
+  return t;
+}
+
 function validerSaisieLot(data, { estTest = false, strict = true } = {}) {
   const erreurs = [];
   if (!data.nom) erreurs.push('Le nom du lot est obligatoire.');
@@ -659,6 +665,7 @@ module.exports = {
   dateDansLeFutur,
   composerConditions,
   conditionsStructurees,
+  libelleConditionsAffichees,
   validerSaisieLot,
   codePseudo,
   trancheAge,
