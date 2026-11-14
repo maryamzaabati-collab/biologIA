@@ -9,47 +9,67 @@
 <body class="page-connexion">
 <div class="landing">
   <section class="landing-gauche">
+    <svg class="landing-helice" viewBox="0 0 200 440" aria-hidden="true" focusable="false">
+      <g id="helice-brins"></g>
+    </svg>
+    <svg class="landing-hexa" viewBox="0 0 120 110" aria-hidden="true" focusable="false">
+      <path d="M32 8h32l16 28-16 28H32L16 36z"/>
+      <path d="M80 36h24l12 20-12 20H80L68 56z"/>
+      <path d="M40 64h28l14 24-14 24H40L26 88z"/>
+      <circle cx="32" cy="8" r="4.5" class="pleine"/>
+      <circle cx="104" cy="36" r="4.5" class="pleine miel"/>
+      <circle cx="82" cy="112" r="4.5" class="pleine"/>
+    </svg>
     <div class="landing-marque">
       <span class="logo-mark logo-connexion-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#F7F4EC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 2.8h6"/>
-          <path d="M10.2 2.8v4.6L6.1 18.4A3.6 3.6 0 0 0 9.4 23h5.2a3.6 3.6 0 0 0 3.3-4.6L13.8 7.4V2.8"/>
-          <path d="M8 14.2h8"/>
+        <svg viewBox="0 0 28 28" fill="none">
+          <rect width="28" height="28" rx="8" fill="#F7F4EC"/>
+          <path d="M10 6c0 5 8 5 8 8s-8 3-8 8M18 6c0 5-8 5-8 8s8 3 8 8" stroke="#2F5742" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M11 10h6M11 18h6" stroke="#2F5742" stroke-width="1.4" stroke-linecap="round"/>
+          <circle cx="22" cy="6" r="2.2" fill="#FCC88A"/>
         </svg>
       </span>
-      <p class="landing-nom">biologIA</p>
+      <p class="landing-nom">biolog<span class="landing-ia">IA</span></p>
     </div>
     <div class="landing-texte">
       <h1>Chaque lot garde sa mémoire</h1>
-      <p>Origine, qualité et validation, au même endroit.</p>
-      <ul class="landing-points">
-        <li>Machine, date et conditions renseignées</li>
-        <li>Pseudonymisation contrôlée (RGPD)</li>
-        <li>Validation nominative par un biologiste</li>
-      </ul>
+      <p>Registre de traçabilité des données de référence d’un laboratoire d’analyses : de la machine à la validation.</p>
     </div>
+    <ul class="landing-mots" aria-label="Les trois piliers">
+      <li>Origine</li>
+      <li>Qualité</li>
+      <li>Validation</li>
+    </ul>
   </section>
   <section class="landing-droite">
+    <div id="langue-slot" class="langue-slot-connexion"></div>
     <h1>Connexion</h1>
-    <p class="page-intro">Espace laboratoire. Un biologiste valide chaque nouveau compte.</p>
-    <div class="onglets">
-      <button type="button" class="secondary active" id="onglet-connexion">Connexion</button>
-      <button type="button" class="secondary" id="onglet-inscription">Créer un compte</button>
+    <p class="page-intro">Accédez au registre de votre laboratoire.</p>
+    <div class="onglets-page onglets-connexion" role="tablist">
+      <button type="button" class="active" id="onglet-connexion" role="tab" aria-selected="true">Se connecter</button>
+      <button type="button" id="onglet-inscription" role="tab" aria-selected="false">Créer un compte</button>
     </div>
     <p id="message-page" class="message ok" hidden></p>
     <p id="erreur-page" class="message erreur" hidden></p>
 
     <form id="form-connexion">
       <label for="identifiant">Identifiant ou e-mail</label>
-      <input type="text" id="identifiant" required autocomplete="username">
+      <input type="text" id="identifiant" required autocomplete="username" placeholder="ex. samira.k">
       <label for="mot_de_passe">Mot de passe</label>
       <div class="champ-mdp">
         <input type="password" id="mot_de_passe" required autocomplete="current-password">
         <button type="button" class="oeil" id="voir-mdp" aria-label="Afficher le mot de passe">Afficher</button>
       </div>
+      <div class="ligne-aide">
+        <span class="hint">Session de 8 h, déconnexion automatique.</span>
+        <button type="button" class="lien-discret" id="btn-oublie">Mot de passe oublié ?</button>
+      </div>
       <button type="submit" style="width:100%">Se connecter</button>
-      <p class="hint"><button type="button" class="lien-discret" id="btn-oublie">Mot de passe oublié</button></p>
     </form>
+    <aside class="encart-demo" aria-label="Avertissement">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16v.5"/></svg>
+      <p><strong>Démonstrateur pédagogique.</strong> Données fictives, aucun bilan patient réel. Un biologiste valide chaque nouveau compte.</p>
+    </aside>
     <form id="form-oublie" hidden>
       <label for="oublie-id">Identifiant ou e-mail</label>
       <input type="text" id="oublie-id" required>
@@ -78,6 +98,19 @@
 </div>
 <script src="app.js"></script>
 <script>
+(function dessinerHelice() {
+  const g = document.getElementById('helice-brins');
+  if (!g) return;
+  let s = '';
+  for (let i = 0; i < 15; i++) {
+    const y = 14 + i * 29;
+    const dx = Math.sin(i * 0.9) * 46;
+    const x1 = (100 - dx).toFixed(1), x2 = (100 + dx).toFixed(1);
+    s += `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}"/>`;
+    s += `<circle cx="${x1}" cy="${y}" r="5.5" class="base-a"/><circle cx="${x2}" cy="${y}" r="5.5" class="base-b"/>`;
+  }
+  g.innerHTML = s;
+})();
 document.getElementById('voir-mdp').addEventListener('click', () => {
   const champ = document.getElementById('mot_de_passe');
   const btn = document.getElementById('voir-mdp');
@@ -90,12 +123,16 @@ document.getElementById('onglet-connexion').addEventListener('click', () => {
   document.getElementById('form-inscription').hidden = true;
   document.getElementById('onglet-connexion').classList.add('active');
   document.getElementById('onglet-inscription').classList.remove('active');
+  document.getElementById('onglet-connexion').setAttribute('aria-selected', 'true');
+  document.getElementById('onglet-inscription').setAttribute('aria-selected', 'false');
 });
 document.getElementById('onglet-inscription').addEventListener('click', () => {
   document.getElementById('form-connexion').hidden = true;
   document.getElementById('form-inscription').hidden = false;
   document.getElementById('onglet-inscription').classList.add('active');
   document.getElementById('onglet-connexion').classList.remove('active');
+  document.getElementById('onglet-inscription').setAttribute('aria-selected', 'true');
+  document.getElementById('onglet-connexion').setAttribute('aria-selected', 'false');
 });
 
 document.getElementById('form-connexion').addEventListener('submit', async (e) => {
@@ -109,7 +146,7 @@ document.getElementById('form-connexion').addEventListener('submit', async (e) =
         mot_de_passe: document.getElementById('mot_de_passe').value
       })
     });
-    window.location.href = 'tableau.html';
+    window.location.href = 'accueil.html';
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }
