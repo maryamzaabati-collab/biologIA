@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patients — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-patients">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Patients</h1>
+      </div>
+      <button type="button" class="only-biologiste" data-onglet="creer" id="btn-nouveau-patient">+ Nouveau patient</button>
+    </div>
+    <div class="onglets-page">
+      <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
+      <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
+      <button type="button" class="secondary" data-onglet="tester">Tester l’identification</button>
+      <button type="button" class="secondary" data-onglet="anonymiser">Anonymisation</button>
+      <button type="button" class="secondary" data-onglet="identifiants">Identifiants</button>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+
+    <section class="panneau" id="panneau-identifier">
+      <div class="dash-2">
+        <div class="card">
+          <h2>Identifier un patient</h2>
+          <form id="form-numero">
+            <label for="numero">Numéro patient</label>
+            <input type="text" id="numero" placeholder="NP-2026-000123" autocomplete="off">
+            <p id="erreur-numero" class="message erreur champ-erreur" hidden></p>
+            <button type="submit">Rechercher</button>
+          </form>
+          <p class="hint" style="margin:16px 0 8px">ou</p>
+          <form id="form-nom">
+            <label for="nom">Nom</label>
+            <input type="text" id="nom" placeholder="Nom" autocomplete="off">
+            <label for="date_naissance">Date de naissance</label>
+            <input type="date" id="date_naissance" placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+            <p id="erreur-nom" class="message erreur champ-erreur" hidden></p>
+            <button type="submit" class="secondary">Retrouver le PSN</button>
+          </form>
+        </div>
+        <div>
+          <div class="card" id="resultat-recherche"><p class="hint">Saisissez un numéro ou un nom pour afficher le PSN.</p></div>
+          <div class="card" style="margin-top:14px" id="dernier-test-anon"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card panneau only-biologiste" id="panneau-creer" hidden>
+      <h2>Créer une identité fictive</h2>
+      <form id="form-creer">
+        <div class="grid-2">
+          <div>
+            <label for="c-nom">Nom</label>
+            <input type="text" id="c-nom" required>
+          </div>
+          <div>
+            <label for="c-prenom">Prénom</label>
+            <input type="text" id="c-prenom" required>
+          </div>
+          <div>
+            <label for="c-date">Date de naissance</label>
+            <input type="date" id="c-date" required placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+          </div>
+          <div>
+            <label for="c-sexe">Sexe</label>
+            <select id="c-sexe" required>
+              <option value="">Choisir</option>
+              <option value="F">F</option>
+              <option value="M">M</option>
+            </select>
+          </div>
+          <div>
+            <label for="c-ville">Ville</label>
+            <input type="text" id="c-ville" required>
+          </div>
+          <div>
+            <label for="c-cp">Code postal (5 chiffres)</label>
+            <input type="text" id="c-cp" required pattern="\d{5}" maxlength="5">
+          </div>
+        </div>
+        <p class="hint">Le numéro NP-AAAA-… et le PSN sont générés automatiquement.</p>
+        <button type="submit">Enregistrer</button>
+      </form>
+      <div id="resultat-creer"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-tester" hidden>
+      <h2>Tester l’identification</h2>
+      <p class="hint">Rapport OK/KO exécuté sur le serveur (numéro, chiffre de contrôle, inconnu, accents, doublon, droits technicien).</p>
+      <button type="button" id="btn-tests">Lancer la suite de tests</button>
+      <div id="rapport-tests"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-anonymiser" hidden>
+      <h2>Anonymisation</h2>
+      <p class="hint">Table irréversible : tranche d’âge, sexe, territoire, paramètre, valeur. Les groupes k &lt; 5 sont généralisés puis exclus. Aucun PSN.</p>
+      <p id="statut-anon" class="hint">Aucun jeu généré. Cliquez sur Générer.</p>
+      <div class="actions">
+        <button type="button" class="only-biologiste" id="btn-generer-anon">Générer / régénérer</button>
+        <button type="button" class="secondary" id="btn-export-anon">Exporter CSV anonymisé</button>
+        <button type="button" class="secondary" id="btn-test-propre">Tester le jeu généré</button>
+        <button type="button" class="secondary" id="btn-test-piege">CSV piège (doit échouer)</button>
+      </div>
+      <div id="resultat-anon"></div>
+      <label for="csv-anon">Ou coller un CSV</label>
+      <textarea id="csv-anon" rows="6" placeholder="tranche_age;sexe;territoire;parametre;valeur;unite;mois"></textarea>
+      <button type="button" class="secondary" id="btn-test-csv">Analyser ce CSV</button>
+      <div id="rapport-anon"></div>
+    </section>
+
+    <section class="card panneau" id="panneau-identifiants" hidden>
+      <h2>Identifiants</h2>
+      <div class="filtres">
+        <input type="search" id="filtre-psn" placeholder="Rechercher un PSN ou un numéro" autocomplete="off">
+        <a class="btn-link" id="lien-export" href="/api/patients/export.csv">Exporter CSV</a>
+      </div>
+      <div id="liste-identifiants"><p class="empty">Chargement…</p></div>
+      <div id="pagination-id" class="pagination"></div>
+      <div id="identite-box"></div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+function montrerOnglet(id) {
+  if (id === 'tester-anon') id = 'anonymiser';
+  document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
+    b.classList.toggle('actif', b.dataset.onglet === id);
+  });
+  document.querySelectorAll('.panneau').forEach((p) => {
+    p.hidden = p.id !== 'panneau-' + id;
+  });
+  if (id === 'identifiants') chargerIdentifiants();
+}
+document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
+  b.addEventListener('click', () => montrerOnglet(b.dataset.onglet));
+});
+const paramsUrl = new URLSearchParams(location.search);
+const ongletUrl = paramsUrl.get('onglet');
+if (ongletUrl) montrerOnglet(ongletUrl);
+const qPsn = paramsUrl.get('q');
+if (qPsn && document.getElementById('filtre-psn')) {
+  document.getElementById('filtre-psn').value = qPsn;
+  montrerOnglet('identifiants');
+}
+
+let pageId = 1;
+async function chargerIdentifiants() {
+  const q = document.getElementById('filtre-psn')?.value.trim() || '';
+  const exportQ = q ? `?q=${encodeURIComponent(q)}` : '';
+  const lien = document.getElementById('lien-export');
+  if (lien) lien.href = '/api/patients/export.csv' + exportQ;
+  try {
+    const data = await api(`/patients?page=${pageId}&taille=20&q=${encodeURIComponent(q)}`);
+    const box = document.getElementById('liste-identifiants');
+    const bio = roleActuel() === 'biologiste';
+    if (!data.identifiants.length) {
+      box.innerHTML = '<p class="empty">Aucun identifiant pour cette recherche.</p>';
+      return;
+    }
+    box.innerHTML = `<table class="table-audit"><thead><tr><th>PSN</th>${bio ? '<th>Numéro</th>' : ''}<th>Lots</th><th>Mesures</th></tr></thead><tbody>
+      ${data.identifiants.map((l) => `<tr>
+        <td class="mono">${echap(l.psn)}</td>
+        ${bio ? `<td class="mono">${echap(l.numero_patient || '')}</td>` : ''}
+        <td>${l.nb_lots || 0}</td>
+        <td>${l.nb_mesures || 0}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+}
+document.getElementById('filtre-psn')?.addEventListener('input', () => { pageId = 1; chargerIdentifiants(); });
+document.getElementById('btn-nouveau-patient')?.addEventListener('click', () => montrerOnglet('creer'));
+
+function blocResultat(r) {
+  if (!r.trouve) {
+    return `<h2>Résultat</h2><p class="message erreur">${echap(r.message || 'Inconnu')}</p>`;
+  }
+  const bio = roleActuel() === 'biologiste';
+  const afficher = bio
+    ? `<form id="form-motif" style="margin-top:12px">
+         <button type="submit" class="secondary">Afficher l’identité (motif requis)</button>
+         <label for="motif">Motif</label>
+         <input type="text" id="motif" required placeholder="Ex. contrôle pédagogique">
+       </form>
+       <div id="identite-revelee"></div>`
+    : '<p class="hint">Identité masquée — le technicien ne voit que le PSN.</p>';
+  return `<div class="page-head" style="margin:0"><h2>Résultat</h2>
+      <button type="button" class="secondary" data-copier="${echap(r.psn || '')}">Copier</button></div>
+      <p class="mono" style="font-size:1.05rem;font-weight:650">${echap(r.psn || '')}</p>
+      <p class="hint">Identité masquée</p>${afficher}`;
+}
+
+async function identifier(corps) {
+  afficherMessage('erreur-page', '');
+  const r = await api('/patients/identifier', { method: 'POST', body: JSON.stringify(corps) });
+  document.getElementById('resultat-recherche').innerHTML = blocResultat(r);
+  const formMotif = document.getElementById('form-motif');
+  if (formMotif) {
+    formMotif.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const idn = await api('/patients/afficher-identite', {
+          method: 'POST',
+          body: JSON.stringify({ psn: r.psn, motif: document.getElementById('motif').value })
+        });
+        const i = idn.identite;
+        document.getElementById('identite-revelee').innerHTML =
+          `<p class="message ok">${echap(i.nom)} ${echap(i.prenom)} — ${echap(i.numero_patient)} — ${echap(i.date_naissance)}</p>
+           <p class="hint">Action écrite dans le journal d’audit.</p>`;
+        notifier('Identité affichée et journalisée', 'ok');
+      } catch (err) {
+        afficherMessage('erreur-page', err.message);
+      }
+    });
+  }
+}
+
+document.getElementById('form-numero').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-numero', '');
+  afficherMessage('erreur-nom', '');
+  afficherMessage('erreur-page', '');
+  try {
+    await identifier({ numero_patient: document.getElementById('numero').value });
+  } catch (err) {
+    afficherMessage('erreur-numero', err.message);
+    document.getElementById('numero').focus();
+  }
+});
+
+document.getElementById('form-nom').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-numero', '');
+  afficherMessage('erreur-nom', '');
+  afficherMessage('erreur-page', '');
+  try {
+    await identifier({
+      nom: document.getElementById('nom').value,
+      date_naissance: document.getElementById('date_naissance').value
+    });
+  } catch (err) {
+    afficherMessage('erreur-nom', err.message);
+    document.getElementById('nom').focus();
+  }
+});
+
+document.getElementById('form-creer').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-page', '');
+  try {
+    const r = await api('/patients', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('c-nom').value,
+        prenom: document.getElementById('c-prenom').value,
+        date_naissance: document.getElementById('c-date').value,
+        sexe: document.getElementById('c-sexe').value,
+        ville: document.getElementById('c-ville').value,
+        code_postal: document.getElementById('c-cp').value
+      })
+    });
+    document.getElementById('resultat-creer').innerHTML =
+      `<p class="message ok">Créé — ${echap(r.numero_patient)} → ${echap(r.psn)}</p>`;
+    notifier('Patient fictif créé', 'ok');
+  } catch (err) {
+    document.getElementById('resultat-creer').innerHTML =
+      `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
+
+async function chargerStatutAnon() {
+  try {
+    const s = await api('/anonymisation/statut');
+    document.getElementById('statut-anon').textContent = s.genere
+      ? `Dernier jeu : ${s.nb_lignes} lignes, k min = ${s.meta.k_min} (${s.meta.genere_le || ''})`
+      : 'Aucun jeu généré. Cliquez sur Générer.';
+  } catch {
+    document.getElementById('statut-anon').textContent = 'Aucun jeu généré. Cliquez sur Générer.';
+  }
+}
+chargerStatutAnon();
+api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'propre' }) })
+  .then(afficherRapportAnon)
+  .catch(() => {});
+
+document.getElementById('btn-generer-anon').addEventListener('click', async () => {
+  try {
+    const r = await api('/anonymisation/generer', { method: 'POST', body: '{}' });
+    document.getElementById('resultat-anon').innerHTML =
+      `<p class="message ok">${r.nb_lignes} lignes · ${r.generalisees} généralisées · ${r.supprimees} exclues · k min = ${r.k_min}</p>`;
+    notifier('Jeu anonymisé généré', 'ok');
+    chargerStatutAnon();
+  } catch (err) {
+    document.getElementById('resultat-anon').innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
+
+function iconeControle(c) {
+  if (c.ok) return '✓';
+  if (/non testable|non applicable/i.test(c.detail || '')) return '⚠';
+  return '✗';
+}
+function afficherRapportAnon(r) {
+  const statut = r.statut || (r.ok ? 'conforme' : 'non_conforme');
+  const titre = statut === 'conforme' ? 'Conforme' : (statut === 'non_testable' ? 'Non testable' : 'Non conforme');
+  const cls = statut === 'conforme' ? 'ok' : 'erreur';
+  const okN = (r.controles || []).filter((c) => c.ok).length;
+  const tot = (r.controles || []).length;
+  const html = `
+    <div class="page-head" style="margin:0 0 8px"><h2>Dernier test d’anonymisation</h2>
+      <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${okN} sur ${tot || 0}</span></div>
+    <ul class="lexique" style="list-style:none;padding:0;margin:0">${(r.controles || []).map((c) =>
+      `<li style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)">
+        <span>${echap(c.libelle)}</span><strong>${c.ok ? 'ok' : iconeControle(c)}</strong></li>`).join('')}</ul>
+    <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>`;
+  const rapport = document.getElementById('rapport-anon');
+  if (rapport) rapport.innerHTML = html;
+  const resume = document.getElementById('dernier-test-anon');
+  if (resume) resume.innerHTML = html;
+}
+document.getElementById('btn-export-anon')?.addEventListener('click', async () => {
+  try {
+    const r = await fetch('/api/anonymisation/export-anonyme', { credentials: 'include' });
+    if (!r.ok) {
+      const data = await r.json().catch(() => ({}));
+      throw new Error(data.erreur || 'Export impossible.');
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'jeu-anonymise.csv';
+    a.click();
+  } catch (err) {
+    document.getElementById('resultat-anon').innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
+  }
+});
+
+document.getElementById('btn-test-propre').addEventListener('click', async () => {
+  try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'propre' }) })); }
+  catch (err) { afficherMessage('erreur-page', err.message); }
+});
+document.getElementById('btn-test-piege').addEventListener('click', async () => {
+  try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'piege' }) })); }
+  catch (err) { afficherMessage('erreur-page', err.message); }
+});
+document.getElementById('btn-test-csv').addEventListener('click', async () => {
+  try {
+    afficherRapportAnon(await api('/anonymisation/tester', {
+      method: 'POST',
+      body: JSON.stringify({ source: 'csv', csv_texte: document.getElementById('csv-anon').value })
+    }));
+  } catch (err) { afficherMessage('erreur-page', err.message); }
+});
+
+document.getElementById('btn-tests').addEventListener('click', async () => {
+  afficherMessage('erreur-page', '');
+  try {
+    const r = await api('/patients/tests', { method: 'POST', body: '{}' });
+    document.getElementById('rapport-tests').innerHTML = `
+      <p class="message ${r.ok ? 'ok' : 'erreur'}">${r.ok ? 'Rapport OK' : 'Rapport KO'}</p>
+      <ul>${(r.tests || []).map((t) => `<li>${t.ok ? '✓' : '✗'} <strong>${echap(t.libelle)}</strong> — ${echap(t.detail || '')}</li>`).join('')}</ul>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nouveau lot — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-nouveau-lot">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html" class="active">Lots</a>
+    </nav>
+  </aside>
+  <main>
+    <p style="margin:0 0 8px"><a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:0.88rem">← Lots</a></p>
+    <div class="page-head">
+      <div>
+        <h1>Nouveau lot</h1>
+        <p class="page-intro">Machine, date, nom normalisé et conditions structurées sont obligatoires.</p>
+      </div>
+    </div>
+    <p id="erreur-form" class="message erreur" hidden></p>
+    <form id="form-lot" class="only-technicien card">
+      <div class="grid-2">
+        <div>
+          <label for="nom">Nom du lot</label>
+          <input type="text" id="nom" required pattern="LOT-\d{4}-\d{3}" placeholder="LOT-2026-025">
+          <p class="hint">Format imposé : LOT-AAAA-NNN.</p>
+        </div>
+        <div>
+          <label for="machine">Machine</label>
+          <select id="machine" required><option value="">— Sélectionner —</option></select>
+        </div>
+        <div>
+          <label for="date">Date de mesure</label>
+          <input type="date" id="date" required placeholder="jj/mm/aaaa" title="jj/mm/aaaa" autocomplete="off">
+        </div>
+        <div>
+          <label for="temperature">Température</label>
+          <input type="text" id="temperature" required placeholder="21°C">
+        </div>
+        <div>
+          <label for="lot_reactifs">Lot de réactifs</label>
+          <input type="text" id="lot_reactifs" required placeholder="R-441">
+        </div>
+        <div>
+          <label for="calibration">Calibration</label>
+          <input type="text" id="calibration" required placeholder="matin, contrôle interne passé">
+        </div>
+      </div>
+      <label for="csv">Fichier CSV du lot (contrôle RGPD)</label>
+      <input type="file" id="csv" accept=".csv,text/csv,text/plain">
+      <p class="hint">Les en-têtes <strong>et le contenu</strong> sont scannés (NIR, e-mail, téléphone). Exemples : <a href="exemples/lot-propre.csv">lot-propre.csv</a> / <a href="exemples/lot-piege.csv">lot-piege.csv</a>.</p>
+      <div id="apercu-csv" class="hint"></div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="anonymise">
+        <label for="anonymise">Les identités patients sont remplacées par un code (pseudonymisation)</label>
+      </div>
+      <div class="actions" style="justify-content:flex-end">
+        <a class="btn-link" href="index.html">Annuler</a>
+        <button type="submit">Enregistrer le lot</button>
+      </div>
+    </form>
+    <p class="only-biologiste hint">Passez en compte technicien pour créer un lot.</p>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+document.querySelector('label[for="nom"]').innerHTML =
+  'Nom du lot ' + aide('Identifiant interne du lot de référence, pas un patient. Format LOT-2026-025.');
+const champDate = document.getElementById('date');
+champDate.max = new Date().toISOString().slice(0, 10);
+
+(async () => {
+  try {
+    const machines = await api('/machines');
+    const select = document.getElementById('machine');
+    machines.forEach((m) => {
+      const option = document.createElement('option');
+      option.value = m.id;
+      option.textContent = m.nom;
+      select.appendChild(option);
+    });
+  } catch (err) {
+    afficherMessage('erreur-form', err.message);
+  }
+})();
+
+document.getElementById('csv').addEventListener('change', async () => {
+  const texte = await lireFichierTexte(document.getElementById('csv'));
+  const box = document.getElementById('apercu-csv');
+  if (!texte.trim()) { box.innerHTML = ''; return; }
+  try {
+    const a = await api('/lots/analyser-csv', { method: 'POST', body: JSON.stringify({ csv_texte: texte }) });
+    const extra = (a.contenus_sensibles || []).join(', ');
+    if (!a.colonnes || !a.colonnes.length) {
+      box.className = 'message erreur';
+      box.textContent = 'CSV illisible : vérifiez le séparateur (point-virgule) et la ligne d’en-tête (code_patient;parametre;valeur;unite;date).';
+    } else if (a.sensibles.length || extra) {
+      box.className = 'message erreur';
+      box.textContent = 'Identifiants détectés : ' + [...a.sensibles, extra].filter(Boolean).join(', ') + '. Retirez ces colonnes : le lot sera signalé.';
+    } else if (!a.nb_valeurs) {
+      box.className = 'message erreur';
+      box.textContent = 'Aucune valeur numérique trouvée. La colonne « valeur » est obligatoire.';
+    } else {
+      box.className = 'message ok';
+      box.textContent = 'Colonnes : ' + a.colonnes.join(', ') + '. ' + pluriel(a.nb_valeurs, 'valeur') + ' importée' + (a.nb_valeurs > 1 ? 's' : '') + '.';
+    }
+  } catch (err) {
+    box.className = 'message erreur';
+    box.textContent = err.message;
+  }
+});
+
+document.getElementById('form-lot').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  afficherMessage('erreur-form', '');
+  const date = document.getElementById('date').value;
+  if (date && date > new Date().toISOString().slice(0, 10)) {
+    return afficherMessage('erreur-form', 'La date de mesure ne peut pas être dans le futur.');
+  }
+  try {
+    const csvTexte = await lireFichierTexte(document.getElementById('csv'));
+    const cree = await api('/lots', {
+      method: 'POST',
+      body: JSON.stringify({
+        nom: document.getElementById('nom').value,
+        machine_id: document.getElementById('machine').value || null,
+        date: date || null,
+        temperature: document.getElementById('temperature').value,
+        lot_reactifs: document.getElementById('lot_reactifs').value,
+        calibration: document.getElementById('calibration').value,
+        anonymise: document.getElementById('anonymise').checked,
+        csv_texte: csvTexte
+      })
+    });
+    notifier('Lot enregistré.', 'ok');
+    window.location.href = 'lot.html?id=' + cree.id;
+  } catch (err) {
+    afficherMessage('erreur-form', err.message);
+  }
+});
+</script>
+</body>
+</html>

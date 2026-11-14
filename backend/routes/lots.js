@@ -1,0 +1,631 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
+const {
+  analyserCsv,
+  problemesLot,
+  valeurHistorique,
+  historiqueDifferent,
+  colonnesSensibles,
+  detailScoreConfiance,
+  libelleStatut,
+  genererCodeVerification,
+  composerConditions,
+  validerSaisieLot,
+  extraireValeursCsv,
+  libelleConditionsAffichees,
+  libelleSeuils,
+  conditionsStructurees,
+  MIN_POINTS_CONTROLE,
+  MOIS_PEREMPTION
+} = require('../lib/tracabilite');
+const journal = require('../lib/journal');
+const { formaterParis, isoUtc, horlogeParis } = require('../lib/dates');
+const { extrairePsnCsv } = require('../lib/patients');
+const { appliquerReglesSurLot } = require('../lib/alerte-mesures');
+const { refusLotSurMachine } = require('../lib/machine-statut');
+
+async function verifierEtSignaler(lotId, champs) {
+  const problemes = problemesLot(champs);
+  const statut = problemes.length === 0 ? 'ok' : 'douteux';
+  await db.run('UPDATE lots SET statut = ? WHERE id = ?', [statut, lotId]);
+  await db.run('DELETE FROM signalements WHERE lot_id = ? AND resolu = 0', [lotId]);
+  for (const raison of problemes) {
+    await db.run('INSERT INTO signalements (lot_id, raison) VALUES (?, ?)', [lotId, raison]);
+  }
+  return { statut, problemes };
+}
+
+function payloadLot(body, ancien) {
+  const analyse = analyserCsv(body.csv_texte || '');
+  let colonnesFinales = analyse.colonnes;
+  if (!colonnesFinales.length && Array.isArray(body.colonnes)) colonnesFinales = body.colonnes;
+  if (!colonnesFinales.length && ancien?.colonnes_csv) {
+    try { colonnesFinales = JSON.parse(ancien.colonnes_csv) || []; } catch { colonnesFinales = []; }
+  }
+  const sensiblesFinales = colonnesSensibles(colonnesFinales);
+  const contenus = analyse.contenus_sensibles || [];
+
+  let valeurs = analyse.valeurs;
+  let dates = analyse.dates;
+  let moyenneControle = analyse.moyenne;
+  if (!valeurs.length && ancien?.valeurs_controle) {
+    try { valeurs = JSON.parse(ancien.valeurs_controle) || []; } catch { valeurs = []; }
+    moyenneControle = ancien.moyenne_controle;
+    try { dates = ancien.dates_controle ? JSON.parse(ancien.dates_controle) : []; } catch { dates = []; }
+  }
+
+  const conditions = composerConditions(body) || (body.conditions ? String(body.conditions).trim() : null);
+
+  return {
+    nom: String(body.nom || '').trim(),
+    machine_id: body.machine_id ? Number(body.machine_id) : null,
+    date: body.date || null,
+    conditions,
+    anonymise: body.anonymise ? 1 : 0,
+    colonnes_csv: colonnesFinales.length ? JSON.stringify(colonnesFinales) : null,
+    alerte_identite: (sensiblesFinales.length || contenus.length) ? 1 : 0,
+    sensibles: sensiblesFinales,
+    contenus_sensibles: contenus,
+    valeurs_controle: valeurs.length ? JSON.stringify(valeurs) : null,
+    dates_controle: dates && dates.length ? JSON.stringify(dates) : null,
+    moyenne_controle: moyenneControle,
+    est_test: Number(body.est_test || ancien?.est_test || 0)
+  };
+}
+
+async function enregistrerMesuresCsv(lotId, csvTexte, dateLot) {
+  const texte = String(csvTexte || '');
+  if (!texte.trim()) return [];
+  const lignes = texte.split(/\r?\n/).filter((l) => l.trim());
+  if (lignes.length < 2 || !/code_patient/i.test(lignes[0])) return [];
+  const cols = lignes[0].split(/[;,]/);
+  const iCode = cols.findIndex((c) => /code_patient/i.test(c));
+  const iPar = cols.findIndex((c) => /parametre/i.test(c));
+  const iVal = cols.findIndex((c) => /valeur/i.test(c));
+  const iUni = cols.findIndex((c) => /unite/i.test(c));
+  const iDat = cols.findIndex((c) => /^date/i.test(c));
+  await db.run('DELETE FROM mesures_reference WHERE lot_id = ?', [lotId]);
+  const inconnus = new Set();
+  for (let k = 1; k < lignes.length; k++) {
+    const c = lignes[k].split(/[;,]/);
+    if (iCode < 0 || !c[iCode]) continue;
+    const psn = String(c[iCode]).trim().toUpperCase();
+    await db.run(
+      `INSERT INTO mesures_reference (code_patient, parametre, valeur, unite, date, lot_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        psn,
+        iPar >= 0 ? c[iPar] : null,
+        iVal >= 0 ? Number(String(c[iVal]).replace(',', '.')) : null,
+        iUni >= 0 ? c[iUni] : null,
+        iDat >= 0 ? c[iDat] : dateLot,
+        lotId
+      ]
+    );
+  }
+  for (const psn of extrairePsnCsv(texte)) {
+    const connu = await db.get(
+      `SELECT id FROM patients_pseudo WHERE upper(COALESCE(psn, code)) = ?`,
+      [String(psn).toUpperCase()]
+    );
+    if (!connu) inconnus.add(psn);
+  }
+  for (const psn of inconnus) {
+    await db.run(
+      'INSERT INTO signalements (lot_id, raison) VALUES (?, ?)',
+      [lotId, `PSN inconnu : ${psn}`]
+    );
+  }
+  if (inconnus.size) {
+    await db.run("UPDATE lots SET statut = 'douteux' WHERE id = ?", [lotId]);
+  }
+  return [...inconnus];
+}
+
+function uniqueValidations(liste) {
+  const vus = new Set();
+  return (liste || []).filter((v) => {
+    if (vus.has(v.nom_biologiste)) return false;
+    vus.add(v.nom_biologiste);
+    return true;
+  });
+}
+
+function enrichir(lot, validations = []) {
+  const n = Number(lot.nb_signalements) || 0;
+  let sensibles = [];
+  if (lot.colonnes_csv) {
+    try { sensibles = colonnesSensibles(JSON.parse(lot.colonnes_csv) || []); } catch { sensibles = []; }
+  }
+  const lotVu = { ...lot, sensibles };
+  const detail = detailScoreConfiance(lotVu, validations, n);
+  const statutVu = libelleStatut(lotVu, validations, n);
+  return {
+    ...lot,
+    score_confiance: detail.score,
+    score_detail: detail.lignes,
+    statut_affiche: statutVu.code,
+    statut_libelle: statutVu.libelle,
+    mois_peremption: MOIS_PEREMPTION
+  };
+}
+
+
+async function controlerMachine(machineId, dateLot) {
+  if (!machineId) return null;
+  const machine = await db.get('SELECT * FROM machines WHERE id = ?', [machineId]);
+  return refusLotSurMachine(machine, dateLot);
+}
+
+router.post('/analyser-csv', (req, res) => {
+  const analyse = analyserCsv(req.body.csv_texte || '');
+  res.json({
+    colonnes: analyse.colonnes,
+    sensibles: analyse.sensibles,
+    contenus_sensibles: analyse.contenus_sensibles,
+    nb_valeurs: analyse.valeurs.length,
+    moyenne: analyse.moyenne,
+    parametre: analyse.parametre
+  });
+});
+
+router.get('/', async (req, res) => {
+  try {
+    const clauses = ['COALESCE(lots.archive, 0) = 0'];
+    const params = [];
+    if (req.query.archives === '1') {
+      clauses.length = 0;
+    }
+    if (req.query.tests !== '1') {
+      clauses.push('COALESCE(lots.est_test, 0) = 0');
+    }
+    if (req.query.machine_id) {
+      clauses.push('lots.machine_id = ?');
+      params.push(req.query.machine_id);
+    }
+    if (req.query.statut) {
+      clauses.push('lots.statut = ?');
+      params.push(req.query.statut);
+    }
+    if (req.query.date) {
+      clauses.push('lots.date = ?');
+      params.push(req.query.date);
+    }
+    if (req.query.q) {
+      clauses.push('(lots.nom LIKE ? OR lots.code_verification LIKE ?)');
+      params.push(`%${req.query.q}%`, `%${req.query.q}%`);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const lots = await db.all(`
+      SELECT lots.*, machines.nom AS machine_nom,
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
+        (SELECT COUNT(DISTINCT upper(trim(replace(code_patient, char(13), '')))) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER) AND trim(COALESCE(code_patient, '')) != '') AS nb_patients,
+        (SELECT MAX(COALESCE(NULLIF(trim(date), ''), lots.date)) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER)) AS derniere_mesure
+      FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
+      ${where}
+      ORDER BY COALESCE(lots.date, lots.date_creation) DESC, lots.id DESC
+    `, params);
+
+    const enrichis = [];
+    for (const lot of lots) {
+      const validations = await db.all(
+        'SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC',
+        [lot.id]
+      );
+      enrichis.push(enrichir(lot, uniqueValidations(validations)));
+    }
+    const filtre = req.query.statut_affiche;
+    const sortie = filtre ? enrichis.filter((l) => l.statut_affiche === filtre) : enrichis;
+    res.json(sortie);
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.get('/par-code/:code', async (req, res) => {
+  try {
+    const lot = await db.get('SELECT id FROM lots WHERE code_verification = ?', [req.params.code]);
+    if (!lot) return res.status(404).json({ erreur: "Aucun lot pour ce code de vérification." });
+    res.json({ id: lot.id });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.get('/:id/historique', async (req, res) => {
+  try {
+    const lot = await db.get('SELECT id FROM lots WHERE id = ?', [req.params.id]);
+    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    const lignes = await db.all(
+      'SELECT * FROM historique_lots WHERE lot_id = ? ORDER BY date DESC, id DESC',
+      [req.params.id]
+    );
+    res.json(lignes);
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.get('/:id/certificat', async (req, res) => {
+  try {
+    const lot = await db.get(`
+      SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type,
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements
+      FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
+      WHERE lots.id = ?
+    `, [req.params.id]);
+    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+
+    const validations = uniqueValidations(await db.all(
+      'SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC',
+      [req.params.id]
+    ));
+    const regles = await db.all('SELECT * FROM regles_alerte WHERE lot_id = ?', [req.params.id]);
+    const vu = enrichir(lot, validations);
+    const { formaterJour } = require('../lib/dates');
+    const pdf = require('../lib/pdf-maquettes');
+
+    const nPoints = extraireValeursCsv(lot.csv_texte || '').length
+      || (() => { try { return JSON.parse(lot.valeurs_controle || '[]').length; } catch { return 0; } })();
+    const condOk = conditionsStructurees(lot.conditions);
+    const condLib = libelleConditionsAffichees(lot.conditions);
+    const regle = regles[0];
+    const val = validations[0];
+    const lignesControle = [
+      {
+        libelle: 'Machine et date renseignées',
+        resultat: lot.machine_id && lot.date ? 'Oui' : 'Non',
+        ref: 'Obligatoire',
+        code: lot.machine_id && lot.date ? 'valide' : 'signale',
+        interp: lot.machine_id && lot.date ? 'Conforme' : 'À compléter'
+      },
+      {
+        libelle: 'Conditions de mesure',
+        resultat: condOk ? condLib : (condLib === 'Non renseignées' ? 'Incomplètes' : condLib),
+        ref: 'Obligatoire',
+        code: condOk ? 'valide' : 'signale',
+        interp: condOk ? 'Conforme' : 'À compléter'
+      },
+      {
+        libelle: 'Pseudonymisation',
+        resultat: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'Confirmée' : (Number(lot.alerte_identite) ? 'Colonnes identifiantes' : 'Non confirmée'),
+        ref: 'Obligatoire',
+        code: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'valide' : 'signale',
+        interp: Number(lot.anonymise) && !Number(lot.alerte_identite) ? 'Conforme' : 'À corriger'
+      },
+      {
+        libelle: 'Série de contrôle',
+        resultat: `${nPoints} points`,
+        ref: `≥ ${MIN_POINTS_CONTROLE} points`,
+        code: nPoints >= MIN_POINTS_CONTROLE ? 'valide' : 'signale',
+        interp: nPoints >= MIN_POINTS_CONTROLE ? 'Conforme' : 'Insuffisant'
+      },
+      {
+        libelle: 'Règle d’alerte',
+        resultat: regle ? `${regle.parametre} ${libelleSeuils(regle)}` : 'Aucune',
+        ref: 'Validée par un biologiste',
+        code: regle ? 'valide' : 'a_valider',
+        interp: regle ? 'Conforme' : 'En attente'
+      },
+      {
+        libelle: 'Validation biologiste',
+        resultat: val ? val.nom_biologiste : 'Aucune',
+        ref: 'Requise',
+        code: val ? 'valide' : 'a_valider',
+        interp: val ? 'Conforme' : 'En attente'
+      }
+    ];
+
+    const PDFDocument = require('pdfkit');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="certificat-${lot.code_verification || lot.id}.pdf"`);
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    doc.pipe(res);
+    doc.roundedRect(40, 28, 22, 22, 5).fill(pdf.SAGE);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.SAGE).text('biologIA', 68, 33);
+    doc.fontSize(9).fillColor(pdf.MUTED).text('Registre de traçabilité', 320, 32, { width: 230, align: 'right' });
+    doc.fontSize(8).text('Données fictives · démonstrateur pédagogique', 320, 46, { width: 230, align: 'right' });
+    doc.strokeColor(pdf.SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
+
+    doc.font('Helvetica-Bold').fontSize(16).fillColor(pdf.INK).text('Certificat de traçabilité', 40, 80);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED)
+      .text(`Esprit ISO 15189 / ISO 17025 · émis le ${formaterJour(new Date().toISOString().slice(0, 10))}`, 40, 102);
+
+    doc.roundedRect(40, 122, 515, 88, 8).strokeColor('#DDD6C8').lineWidth(0.8).stroke();
+    doc.font('Helvetica-Bold').fontSize(13).fillColor(pdf.INK).text(lot.nom, 52, 134);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED).text(lot.code_verification || '', 52, 152);
+    doc.fillColor(pdf.INK).fontSize(8)
+      .text(`Machine ${lot.machine_nom || 'non renseignée'}`, 250, 134)
+      .text(`Date de mesure ${formaterJour(lot.date)}`, 250, 148);
+    doc.circle(250, 166, 3).fill(pdf.couleurPoint(vu.statut_affiche));
+    doc.fillColor(pdf.INK).fontSize(8).text(`Statut  ${vu.statut_libelle}`, 258, 162);
+    pdf.dessinerAnneau(doc, 500, 166, vu.score_confiance, String(vu.score_confiance), 'score / 100', pdf.SAGE);
+
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('Contrôles et résultats', 40, 228);
+    pdf.tableauSimple(doc, [
+      { label: 'Contrôle', w: 2.2 },
+      { label: 'Résultat', w: 2.4 },
+      { label: 'Référence', w: 1.8 },
+      { label: 'Interprétation', w: 1.6 }
+    ], lignesControle.map((l) => ({
+      cellules: [
+        l.libelle,
+        l.resultat,
+        l.ref,
+        { point: pdf.couleurPoint(l.code), texte: l.interp }
+      ]
+    })), 246, { hauteur: 26, entete: 20 });
+
+    doc.strokeColor(pdf.SAGE).lineWidth(0.8).rect(40, 700, 280, 56).stroke();
+    doc.fontSize(8).fillColor(pdf.MUTED).text('Validation du biologiste · nom, date, paraphe', 48, 708);
+    const qr = await pdf.bufferQr(pdf.urlPublique(req) + `/lot.html?id=${lot.id}`);
+    if (qr) {
+      try { doc.image(qr, 470, 688, { width: 72 }); } catch { /* ignore */ }
+    }
+    doc.fontSize(8).fillColor(pdf.MUTED).text(
+      'Aucun bilan patient · biologIA · Page 1 / 1',
+      40, 792, { width: 515, align: 'center', lineBreak: false }
+    );
+    doc.end();
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.get('/:id', async (req, res) => {
+  try {
+    const lot = await db.get(`
+      SELECT lots.*, machines.nom AS machine_nom, machines.type AS machine_type,
+        (SELECT COUNT(*) FROM signalements WHERE lot_id = lots.id AND resolu = 0) AS nb_signalements,
+        (SELECT COUNT(DISTINCT upper(trim(replace(code_patient, char(13), '')))) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER) AND trim(COALESCE(code_patient, '')) != '') AS nb_patients,
+        (SELECT MAX(COALESCE(NULLIF(trim(date), ''), lots.date)) FROM mesures_reference WHERE CAST(lot_id AS INTEGER) = CAST(lots.id AS INTEGER)) AS derniere_mesure
+      FROM lots LEFT JOIN machines ON lots.machine_id = machines.id
+      WHERE lots.id = ?
+    `, [req.params.id]);
+    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+
+    const validations = await db.all(
+      'SELECT * FROM validations WHERE lot_id = ? ORDER BY date_validation DESC',
+      [req.params.id]
+    );
+    const historique = await db.all(
+      'SELECT * FROM historique_lots WHERE lot_id = ? ORDER BY id DESC',
+      [req.params.id]
+    );
+    const signalements = await db.all(
+      'SELECT * FROM signalements WHERE lot_id = ? AND resolu = 0 ORDER BY date DESC',
+      [req.params.id]
+    );
+    const reglesAlerte = await db.all(
+      'SELECT * FROM regles_alerte WHERE lot_id = ? ORDER BY parametre',
+      [req.params.id]
+    );
+    const codes = await db.all(
+      'SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ?',
+      [req.params.id]
+    );
+    res.json({
+      ...enrichir(lot, uniqueValidations(validations)),
+      validations: uniqueValidations(validations).map((v) => ({
+        ...v,
+        date_validation: isoUtc(v.date_validation),
+        date_validation_paris: formaterParis(v.date_validation)
+      })),
+      historique: historique.map((h) => ({
+        ...h,
+        date: isoUtc(h.date),
+        date_paris: formaterParis(h.date)
+      })),
+      signalements,
+      reglesAlerte,
+      codes_patients: codes.map((c) => c.code_patient)
+    });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.post('/', async (req, res) => {
+  const data = payloadLot(req.body);
+  const erreurs = validerSaisieLot(data, { estTest: Boolean(data.est_test), strict: true });
+  if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
+
+  try {
+    const refus = await controlerMachine(data.machine_id, data.date);
+    if (refus) return res.status(409).json({ erreur: refus });
+    const code = genererCodeVerification();
+    const createurId = req.utilisateur ? req.utilisateur.id : null;
+    const { id } = await db.run(
+      `INSERT INTO lots (nom, machine_id, date, conditions, anonymise, colonnes_csv, alerte_identite,
+        code_verification, moyenne_controle, valeurs_controle, dates_controle, est_test, createur_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [data.nom, data.machine_id, data.date, data.conditions, data.anonymise, data.colonnes_csv,
+        data.alerte_identite, code, data.moyenne_controle, data.valeurs_controle, data.dates_controle,
+        data.est_test || 0, createurId]
+    );
+    await verifierEtSignaler(id, {
+      machine_id: data.machine_id,
+      date: data.date,
+      conditions: data.conditions,
+      anonymise: data.anonymise,
+      sensibles: data.sensibles,
+      contenus_sensibles: data.contenus_sensibles
+    });
+    await enregistrerMesuresCsv(id, req.body.csv_texte, data.date);
+    await appliquerReglesSurLot(db, id);
+    await journal.enregistrer(req, 'création lot', `lot ${id}`, data.nom);
+    res.status(201).json({
+      id,
+      nom: data.nom,
+      code_verification: code,
+      alerte_identite: data.alerte_identite,
+      sensibles: data.sensibles
+    });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  try {
+    const ancien = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
+    if (!ancien) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (Number(ancien.archive)) {
+      return res.status(409).json({ erreur: 'Un lot archivé ne peut plus être modifié.' });
+    }
+    const motif = String(req.body.motif || '').trim();
+    if (!motif) {
+      return res.status(400).json({ erreur: 'Un motif de modification est obligatoire.' });
+    }
+    const data = payloadLot(req.body, ancien);
+    const erreurs = validerSaisieLot(data, { estTest: Boolean(Number(ancien.est_test)), strict: !Number(ancien.est_test) });
+    if (erreurs.length) return res.status(400).json({ erreur: erreurs[0] });
+    const refus = await controlerMachine(data.machine_id, data.date);
+    if (refus) return res.status(409).json({ erreur: refus });
+
+    const auteur = req.utilisateur ? req.utilisateur.nom : 'système';
+    const champs = [
+      ['nom', ancien.nom, data.nom],
+      ['machine_id', ancien.machine_id, data.machine_id],
+      ['date', ancien.date, data.date],
+      ['conditions', ancien.conditions, data.conditions],
+      ['anonymise', ancien.anonymise, data.anonymise]
+    ];
+    if (String(req.body.csv_texte || '').trim()) {
+      champs.push(['colonnes_csv', ancien.colonnes_csv, data.colonnes_csv]);
+    }
+    let change = false;
+    for (const [champ, avant, apres] of champs) {
+      if (historiqueDifferent(champ, avant, apres)) {
+        change = true;
+        await db.run(
+          `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [req.params.id, champ, valeurHistorique(avant), valeurHistorique(apres), horlogeParis(), auteur, motif]
+        );
+      }
+    }
+
+    const validations = await db.all('SELECT * FROM validations WHERE lot_id = ?', [req.params.id]);
+    const revalider = change && validations.length > 0 ? 1 : Number(ancien.modifie_apres_validation || 0);
+
+    await db.run(
+      `UPDATE lots SET nom = ?, machine_id = ?, date = ?, conditions = ?, anonymise = ?,
+        colonnes_csv = ?, alerte_identite = ?, moyenne_controle = ?, valeurs_controle = ?,
+        dates_controle = ?, modifie_apres_validation = ? WHERE id = ?`,
+      [data.nom, data.machine_id, data.date, data.conditions, data.anonymise,
+        data.colonnes_csv, data.alerte_identite, data.moyenne_controle, data.valeurs_controle,
+        data.dates_controle, revalider, req.params.id]
+    );
+    if (revalider) {
+      await db.run(
+        `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+         VALUES (?, 'statut', 'Validé', 'À revalider', ?, ?, ?)`,
+        [req.params.id, horlogeParis(), auteur, motif]
+      );
+    }
+    await verifierEtSignaler(req.params.id, {
+      machine_id: data.machine_id,
+      date: data.date,
+      conditions: data.conditions,
+      anonymise: data.anonymise,
+      sensibles: data.sensibles,
+      contenus_sensibles: data.contenus_sensibles
+    });
+    if (String(req.body.csv_texte || '').trim()) {
+      await enregistrerMesuresCsv(req.params.id, req.body.csv_texte, data.date);
+    }
+    await appliquerReglesSurLot(db, req.params.id);
+    await journal.enregistrer(req, 'modification lot', `lot ${req.params.id}`, `${data.nom} — ${motif}`);
+    res.json({ message: 'Lot mis à jour.', alerte_identite: data.alerte_identite, sensibles: data.sensibles });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.post('/:id/archiver', async (req, res) => {
+  try {
+    const lot = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
+    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (Number(lot.archive)) return res.json({ message: 'Lot déjà archivé.' });
+    const auteur = req.utilisateur ? req.utilisateur.nom : 'système';
+    await db.run('UPDATE lots SET archive = 1 WHERE id = ?', [req.params.id]);
+    await db.run(
+      `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+       VALUES (?, 'archive', 'actif', 'archivé', ?, ?, ?)`,
+      [req.params.id, horlogeParis(), auteur, 'Archivage qualité — conservation de la mémoire']
+    );
+    await journal.enregistrer(req, 'archivage lot', `lot ${req.params.id}`, lot.nom);
+    res.json({ message: 'Lot archivé. Il reste consultable dans l’historique.' });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  return res.status(405).json({
+    erreur: 'La suppression est interdite dans un registre de traçabilité. Archivez le lot.'
+  });
+});
+
+router.post('/:id/validations', async (req, res) => {
+  const { utilisateur_id, nom_biologiste } = req.body;
+  try {
+    const lot = await db.get('SELECT * FROM lots WHERE id = ?', [req.params.id]);
+    if (!lot) return res.status(404).json({ erreur: "Ce lot n'existe pas." });
+    if (Number(lot.archive)) {
+      return res.status(409).json({ erreur: 'Un lot archivé ne peut plus être validé.' });
+    }
+
+    let biologiste = null;
+    if (utilisateur_id) {
+      biologiste = await db.get(
+        'SELECT * FROM utilisateurs WHERE id = ? AND role = ?',
+        [utilisateur_id, 'biologiste']
+      );
+    } else if (nom_biologiste) {
+      biologiste = await db.get(
+        'SELECT * FROM utilisateurs WHERE nom = ? AND role = ?',
+        [nom_biologiste, 'biologiste']
+      );
+    }
+    if (!biologiste) {
+      return res.status(400).json({ erreur: 'Choisissez un biologiste enregistré dans la liste.' });
+    }
+    if (lot.createur_id && Number(lot.createur_id) === Number(biologiste.id)) {
+      return res.status(403).json({
+        erreur: 'Règle des quatre yeux : un biologiste ne valide pas un lot qu’il a lui-même créé.'
+      });
+    }
+
+    const recente = await db.get(
+      `SELECT id FROM validations
+       WHERE lot_id = ? AND nom_biologiste = ?
+         AND date_validation >= datetime('now', '-2 minutes')
+       ORDER BY id DESC LIMIT 1`,
+      [req.params.id, biologiste.nom]
+    );
+    if (recente) {
+      return res.status(200).json({ id: recente.id, nom_biologiste: biologiste.nom, deja: true });
+    }
+
+    const { id } = await db.run(
+      "INSERT INTO validations (lot_id, nom_biologiste, date_validation) VALUES (?, ?, ?)",
+      [req.params.id, biologiste.nom, horlogeParis()]
+    );
+    await db.run('UPDATE lots SET modifie_apres_validation = 0 WHERE id = ?', [req.params.id]);
+    await db.run(
+      `INSERT INTO historique_lots (lot_id, champ, ancienne_valeur, nouvelle_valeur, date, utilisateur, motif)
+       VALUES (?, 'validation', '', ?, ?, ?, 'signature biologiste')`,
+      [req.params.id, biologiste.nom, horlogeParis(), biologiste.nom]
+    );
+    await journal.enregistrer(req, 'validation lot', `lot ${req.params.id}`, biologiste.nom);
+    res.status(201).json({ id, nom_biologiste: biologiste.nom });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+module.exports = router;

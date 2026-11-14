@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comptes — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-comptes">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Comptes</h1>
+        <p class="page-intro">Accorder, refuser ou confirmer un rôle. Aucune identité patient ici.</p>
+      </div>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <p id="ok-page" class="message ok" hidden></p>
+    <div id="liste"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+function libelleRole(r) {
+  if (r === 'client') return 'Client';
+  if (r === 'technicien') return 'Technicien';
+  if (r === 'biologiste') return 'Biologiste';
+  return r || '—';
+}
+function libelleStatutCompte(s) {
+  if (s === 'valide') return 'Actif';
+  if (s === 'en_attente') return 'En attente';
+  if (s === 'refuse') return 'Suspendu';
+  return s || '—';
+}
+function initiales(nom) {
+  return String(nom || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
+}
+function classeRole(r) {
+  if (r === 'biologiste') return 'ok';
+  if (r === 'technicien') return 'a-valider';
+  return 'brouillon';
+}
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const box = document.getElementById('liste');
+  try {
+    const comptes = await api('/comptes');
+    if (!comptes.length) {
+      box.innerHTML = '<p class="empty">Aucun compte en base.</p>';
+      return;
+    }
+    box.innerHTML = comptes.map((c) => `
+      <div class="signalement-row">
+        <div class="machine-head">
+          <span class="avatar" style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:0.8rem">${echap(initiales(c.nom))}</span>
+          <div>
+            <strong>${echap(c.nom)}</strong>${c.identifiant && c.identifiant !== c.nom ? ` <span class="mono">(${echap(c.identifiant)})</span>` : ''}
+            <div class="hint">${c.email ? echap(c.email) : 'E-mail non renseigné'}</div>
+            <div class="hint">Rôle demandé : ${echap(libelleRole(c.role_demande || c.role))}</div>
+          </div>
+        </div>
+        <div class="actions compte-actions">
+          <span class="badge ${classeRole(c.role)} role-badge">${echap(libelleRole(c.role))}</span>
+          <span class="badge ${c.statut === 'valide' ? 'ok' : (c.statut === 'en_attente' ? 'attente' : 'douteux')}">${echap(libelleStatutCompte(c.statut))}</span>
+          ${c.statut === 'en_attente' ? `
+          <select data-role="${c.id}">
+            <option value="client" ${c.role_demande === 'client' ? 'selected' : ''}>Client</option>
+            <option value="technicien" ${c.role_demande === 'technicien' ? 'selected' : ''}>Technicien</option>
+            <option value="biologiste" ${c.role_demande === 'biologiste' ? 'selected' : ''}>Biologiste</option>
+          </select>
+          <button type="button" data-ok="${c.id}">Accorder</button>
+          <button type="button" class="danger" data-no="${c.id}">Refuser</button>` : `
+          <select data-changer="${c.id}">
+            <option value="client" ${c.role === 'client' ? 'selected' : ''}>Client</option>
+            <option value="technicien" ${c.role === 'technicien' ? 'selected' : ''}>Technicien</option>
+            <option value="biologiste" ${c.role === 'biologiste' ? 'selected' : ''}>Biologiste</option>
+          </select>
+          <button type="button" class="secondary" data-rolebtn="${c.id}">Changer le rôle</button>
+          ${c.statut === 'valide' ? `<button type="button" class="danger" data-suspend="${c.id}">Suspendre</button>` : ''}`}
+        </div>
+      </div>
+    `).join('');
+    box.querySelectorAll('[data-ok]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const role = box.querySelector(`[data-role="${btn.dataset.ok}"]`).value;
+        try {
+          await api(`/comptes/${btn.dataset.ok}`, { method: 'PUT', body: JSON.stringify({ action: 'valider', role }) });
+          afficherMessage('ok-page', 'Compte accordé.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-no]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await api(`/comptes/${btn.dataset.no}`, { method: 'PUT', body: JSON.stringify({ action: 'refuser' }) });
+          afficherMessage('ok-page', 'Compte refusé.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-rolebtn]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const role = box.querySelector(`[data-changer="${btn.dataset.rolebtn}"]`).value;
+        try {
+          await api(`/comptes/${btn.dataset.rolebtn}`, { method: 'PUT', body: JSON.stringify({ action: 'role', role }) });
+          afficherMessage('ok-page', 'Rôle mis à jour.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+    box.querySelectorAll('[data-suspend]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('Suspendre ce compte ? Il ne pourra plus se connecter.')) return;
+        try {
+          await api(`/comptes/${btn.dataset.suspend}`, { method: 'PUT', body: JSON.stringify({ action: 'suspendre' }) });
+          afficherMessage('ok-page', 'Compte suspendu.', 'ok');
+          charger();
+        } catch (err) { afficherMessage('erreur-page', err.message); }
+      });
+    });
+  } catch (err) {
+    box.innerHTML = '';
+    afficherMessage('erreur-page', err.message);
+  }
+}
+charger();
+</script>
+</body>
+</html>

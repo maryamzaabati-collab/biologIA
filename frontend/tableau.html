@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de bord — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-tableau">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <h1 id="bonjour">Tableau de bord</h1>
+      <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="stats" class="stats-row"></div>
+    <div class="dash-2">
+      <div class="card">
+        <h2>À faire aujourd’hui</h2>
+        <div id="urgence" class="urgence"><p class="empty">Chargement…</p></div>
+      </div>
+      <div class="card" id="qualite"></div>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const [s, lots, moi] = await Promise.all([
+      api('/synthese'),
+      api('/lots'),
+      api('/auth/moi').catch(() => null)
+    ]);
+    document.getElementById('bonjour').textContent = 'Bonjour ' + (moi?.nom || 'là');
+    document.getElementById('stats').innerHTML = `
+      <a class="stat" href="index.html"><div class="label"><span class="stat-dot" style="background:var(--ok)"></span>Lots</div><div class="valeur">${s.totalLots ?? 0}</div></a>
+      <a class="stat stat-wait" href="index.html?filtre=a_valider"><div class="label"><span class="stat-dot" style="background:var(--wait)"></span>À valider</div><div class="valeur">${s.lotsAValider ?? 0}</div></a>
+      <a class="stat stat-reval" href="index.html?filtre=a_revalider"><div class="label"><span class="stat-dot" style="background:var(--reval)"></span>À revalider</div><div class="valeur">${s.lotsARevalider || 0}</div></a>
+      <a class="stat stat-alert" href="index.html?filtre=signale"><div class="label"><span class="stat-dot" style="background:var(--flag)"></span>Signalé</div><div class="valeur">${s.lotsDouteux || 0}</div></a>
+    `;
+    const recents = [...lots]
+      .filter((l) => !Number(l.est_test) && ['signale', 'a_valider', 'a_revalider'].includes(l.statut_affiche))
+      .slice(0, 6);
+    const box = document.getElementById('urgence');
+    box.innerHTML = recents.length
+      ? recents.map((l) => `
+        <a href="lot.html?id=${l.id}">
+          <span><strong>${echap(l.nom)}</strong> <span class="meta">${echap(l.machine_nom || '')}</span></span>
+          <span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span>
+        </a>`).join('')
+      : '<p class="empty">Rien à traiter pour le moment.</p>';
+    const pct = s.totalLots ? Math.round(100 * (s.lotsValides || 0) / s.totalLots) : 0;
+    document.getElementById('qualite').innerHTML = `
+      <h2>Lots validés</h2>
+      ${htmlAnneau(pct + ' %', `${s.lotsValides || 0} lots sur ${s.totalLots} · hors lot TEST`, pct)}
+      <p class="hint">${pluriel(s.signalementsEnCours, 'signalement')} ouvert${Number(s.signalementsEnCours) > 1 ? 's' : ''}.</p>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
+</body>
+</html>

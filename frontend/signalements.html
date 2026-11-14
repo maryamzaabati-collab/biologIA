@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signalements — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-signalements">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Signalements</h1>
+        <p class="page-intro">Anomalies automatiques. Clôture après correction ou justification.</p>
+      </div>
+    </div>
+    <div class="pills" id="pills">
+      <button type="button" class="secondary active" data-filtre="0">Ouverts</button>
+      <button type="button" class="secondary" data-filtre="1">Résolus</button>
+    </div>
+    <p id="erreur-liste" class="message erreur" hidden></p>
+    <div id="liste-signalements"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+let resolus = '0';
+
+async function chargerSignalements() {
+  const conteneur = document.getElementById('liste-signalements');
+  afficherMessage('erreur-liste', '');
+  try {
+    const signalements = await api('/signalements?resolu=' + resolus);
+    if (signalements.length === 0) {
+      conteneur.innerHTML = resolus === '1'
+        ? '<p class="empty">Aucun signalement résolu pour le moment.</p>'
+        : '<p class="empty">Aucun signalement ouvert, bravo.</p>';
+      return;
+    }
+    const groupes = [];
+    const vus = new Map();
+    signalements.forEach((s) => {
+      if (!vus.has(s.lot_id)) {
+        vus.set(s.lot_id, { lot_id: s.lot_id, lot_nom: s.lot_nom, raisons: [], ids: [] });
+        groupes.push(vus.get(s.lot_id));
+      }
+      vus.get(s.lot_id).raisons.push(s.raison);
+      vus.get(s.lot_id).ids.push(s.id);
+    });
+    conteneur.innerHTML = groupes.map((g) => `
+      <div class="signalement-row">
+        <div>
+          <a class="lien-lot" href="lot.html?id=${g.lot_id}&edit=1">${echap(g.lot_nom)}</a>
+          <ul class="raison">${g.raisons.map((r) => `<li>${echap(r)}</li>`).join('')}</ul>
+        </div>
+        <div class="actions">
+          <span class="badge ${resolus === '1' ? 'ok' : 'douteux'}">${pluriel(g.raisons.length, resolus === '1' ? 'résolu' : 'ouvert')}</span>
+          <a class="btn-link primary" href="lot.html?id=${g.lot_id}&edit=1">Corriger</a>
+          ${resolus === '0' ? '<button class="btn-ghost only-biologiste" data-id="' + g.ids[0] + '">Clôturer (biologiste)</button>' : ''}
+        </div>
+      </div>
+    `).join('');
+    conteneur.querySelectorAll('button[data-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const bio = roleActuel() === 'biologiste';
+        let justification = '';
+        if (bio) {
+          justification = prompt('Si le lot n’est pas encore corrigé, justifiez la clôture (rôle biologiste) :') || '';
+        } else if (!confirm('Marquer ce signalement comme résolu ? Le lot doit déjà avoir été corrigé.')) {
+          return;
+        }
+        afficherMessage('erreur-liste', '');
+        try {
+          await api(`/signalements/${btn.dataset.id}/resoudre`, {
+            method: 'PUT',
+            body: JSON.stringify({ justification })
+          });
+          notifier('Signalement résolu.', 'ok');
+          chargerSignalements();
+        } catch (err) {
+          afficherMessage('erreur-liste', err.message);
+        }
+      });
+    });
+  } catch (err) {
+    conteneur.innerHTML = '';
+    afficherMessage('erreur-liste', err.message);
+  }
+}
+
+document.getElementById('pills').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-filtre]');
+  if (!btn) return;
+  resolus = btn.dataset.filtre;
+  document.querySelectorAll('#pills [data-filtre]').forEach((b) => b.classList.toggle('active', b === btn));
+  chargerSignalements();
+});
+
+chargerSignalements();
+</script>
+</body>
+</html>

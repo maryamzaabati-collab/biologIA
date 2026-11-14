@@ -1,0 +1,12 @@
+{
+  "terminal.integrated.env.osx": {
+    "PATH": "${env:HOME}/.labo-tracabilite/nodejs/bin:${env:PATH}"
+  },
+  "terminal.integrated.env.linux": {
+    "PATH": "${env:HOME}/.labo-tracabilite/nodejs/bin:${env:PATH}"
+  },
+  "terminal.integrated.env.windows": {
+    "PATH": "${env:USERPROFILE}\\.labo-tracabilite\\nodejs;${env:PATH}"
+  },
+  "terminal.integrated.cwd": "${workspaceFolder}/backend"
+}

@@ -1,0 +1,16 @@
+run = "sh -c '(git fetch origin main && git reset --hard origin/main) || true; cd backend && npm install --omit=optional && node start.js'"
+entrypoint = "backend/start.js"
+modules = ["nodejs-22"]
+hidden = [".config", "node_modules", "backend/node_modules"]
+
+[nix]
+channel = "stable-24_11"
+
+[deployment]
+deploymentTarget = "cloudrun"
+build = ["sh", "-c", "npm install --prefix backend --omit=optional"]
+run = ["sh", "-c", "node backend/start.js"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80

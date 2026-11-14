@@ -1,0 +1,25 @@
+{
+  "name": "labo-tracabilite",
+  "version": "1.0.0",
+  "description": "Registre de tracabilite des donnees de reference pour un reseau de laboratoires d'analyses medicales - Projet 4 Biologie/Laboratoires",
+  "main": "server.js",
+  "scripts": {
+    "start": "node start.js",
+    "seed": "node reset-demo.js",
+    "test": "node --test tests/tracabilite.test.js tests/lots.test.js tests/auth.test.js tests/patients.test.js tests/anonymisation.test.js tests/blocs.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pdfkit": "^0.15.0",
+    "qrcode": "^1.5.4"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "overrides": {
+    "proxy-addr": "2.0.8"
+  }
+}

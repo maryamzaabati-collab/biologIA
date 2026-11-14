@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cartes de contrôle — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-controle">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Cartes de contrôle</h1>
+        <p class="page-intro">Levey-Jennings, un analyte à la fois. Les points rouges ne sont pas des patients.</p>
+      </div>
+    </div>
+    <p><a class="btn-link" id="export-csv" href="/api/controle/csv">Exporter CSV</a></p>
+
+    <div class="filtres">
+      <select id="filtre-machine">
+        <option value="">Toutes les machines</option>
+      </select>
+      <select id="filtre-parametre">
+        <option value="">Tous les paramètres</option>
+      </select>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="carte"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const machine = document.getElementById('filtre-machine').value;
+  const parametre = document.getElementById('filtre-parametre').value;
+  const q = new URLSearchParams();
+  if (machine) q.set('machine_id', machine);
+  if (parametre) q.set('parametre', parametre);
+  const suffix = q.toString() ? `?${q}` : '';
+  try {
+    const serie = await api('/controle' + suffix);
+    const select = document.getElementById('filtre-parametre');
+    const actuel = select.value;
+    const options = ['<option value="">Tous les paramètres</option>']
+      .concat((serie.parametres || []).map((p) => `<option value="${echap(p)}" ${p === actuel ? 'selected' : ''}>${echap(p)}</option>`));
+    select.innerHTML = options.join('');
+    document.getElementById('carte').innerHTML = htmlCarteControle(serie);
+    const lien = document.getElementById('export-csv');
+    if (lien) lien.href = '/api/controle/csv' + suffix;
+  } catch (err) {
+    document.getElementById('carte').innerHTML = '';
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+(async () => {
+  try {
+    const machines = await api('/machines');
+    const select = document.getElementById('filtre-machine');
+    machines.forEach((m) => {
+      const o = document.createElement('option');
+      o.value = m.id;
+      o.textContent = m.nom;
+      select.appendChild(o);
+    });
+    const mid = new URLSearchParams(location.search).get('machine_id');
+    if (mid) select.value = mid;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+  document.getElementById('filtre-machine').addEventListener('change', charger);
+  document.getElementById('filtre-parametre').addEventListener('change', charger);
+  charger();
+})();
+</script>
+</body>
+</html>

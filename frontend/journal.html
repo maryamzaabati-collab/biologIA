@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-journal">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Journal d’audit</h1>
+        <p class="page-intro">Qui a fait quoi, et quand. Heure de Paris.</p>
+      </div>
+    </div>
+    <p><a class="btn-link" href="/api/journal/csv">Exporter CSV</a> <button type="button" class="secondary" id="btn-integrite">Vérifier la chaîne de hachage</button></p>
+    <p id="integrite-ok" class="message ok" hidden></p>
+    <div class="filtres">
+      <input type="search" id="filtre-qui" placeholder="Utilisateur">
+      <select id="filtre-action"><option value="">Toutes les actions</option></select>
+      <input type="date" id="filtre-date" placeholder="jj/mm/aaaa">
+      <button type="button" class="secondary" id="btn-date-clear">Effacer</button>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="liste"><p class="empty">Chargement…</p></div>
+    <div id="pagination" class="pagination"></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+const PAGE = 15;
+let page = 1;
+let cache = { lignes: [], actions: [] };
+let tri = { col: 'date', dir: -1 };
+
+function valeurTri(ligne, col) {
+  if (col === 'date') return ligne.date || ligne.date_paris || '';
+  if (col === 'qui') return String(ligne.nom_affiche || '').toLowerCase();
+  if (col === 'action') return String(ligne.action || '').toLowerCase();
+  return String(ligne.cible_lisible || ligne.cible || '').toLowerCase();
+}
+
+function lignesTriees() {
+  const lignes = [...(cache.lignes || [])];
+  const { col, dir } = tri;
+  lignes.sort((a, b) => {
+    const va = valeurTri(a, col);
+    const vb = valeurTri(b, col);
+    if (va < vb) return -1 * dir;
+    if (va > vb) return 1 * dir;
+    return 0;
+  });
+  return lignes;
+}
+
+function enteteTri(col, libelle) {
+  const actif = tri.col === col;
+  const fleche = !actif ? '↕' : (tri.dir === 1 ? '↑' : '↓');
+  return `<th><button type="button" class="tri-th ${actif ? 'actif' : ''}" data-tri="${col}">${libelle} <span>${fleche}</span></button></th>`;
+}
+
+function classeAction(action) {
+  const a = String(action || '').toLowerCase();
+  if (a.includes('échou') || a.includes('echec') || a.includes('échec')) return 'echec';
+  if (a.includes('inscription')) return 'inscription';
+  if (a.includes('accord')) return 'accord';
+  if (a.includes('connexion')) return 'connexion';
+  if (a.includes('valid')) return 'validation';
+  if (a.includes('refus') || a.includes('suspen')) return 'refus';
+  return 'attente';
+}
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  const q = new URLSearchParams();
+  const qui = document.getElementById('filtre-qui').value.trim();
+  const action = document.getElementById('filtre-action').value;
+  const date = document.getElementById('filtre-date').value;
+  if (qui) q.set('utilisateur', qui);
+  if (action) q.set('action', action);
+  if (date) q.set('date', date);
+  q.set('taille', '50');
+  q.set('page', String(page));
+  try {
+    const data = await api('/journal' + (q.toString() ? '?' + q : ''));
+    cache = Array.isArray(data) ? { lignes: data, actions: [] } : data;
+    const sel = document.getElementById('filtre-action');
+    if (cache.actions && sel.options.length <= 1) {
+      cache.actions.forEach((a) => {
+        const o = document.createElement('option');
+        o.value = a;
+        o.textContent = a;
+        sel.appendChild(o);
+      });
+    }
+    afficherPage();
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+}
+
+function afficherPage() {
+  const lignes = lignesTriees();
+  const box = document.getElementById('liste');
+  if (!lignes.length) {
+    box.innerHTML = '<p class="empty">Aucune action enregistrée pour l’instant.</p>';
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+  const pages = Math.max(1, Math.ceil(lignes.length / PAGE));
+  if (page > pages) page = pages;
+  const slice = lignes.slice((page - 1) * PAGE, page * PAGE);
+  box.innerHTML = `<table class="table-audit"><thead><tr>${enteteTri('date', 'Date')}${enteteTri('qui', 'Qui')}${enteteTri('action', 'Action')}${enteteTri('cible', 'Cible')}</tr></thead><tbody>${
+    slice.map((l) => {
+      const cible = l.lot_id
+        ? `<a href="lot.html?id=${l.lot_id}">${echap(l.cible_lisible || l.cible)}</a>`
+        : echap(l.cible_lisible || l.cible || '—');
+      const details = String(l.details || '').trim();
+      const cibleTxt = String(l.cible_lisible || l.cible || '');
+      const extra = details && !cibleTxt.includes(details) && details !== cibleTxt ? ' · ' + echap(details) : '';
+      return `<tr>
+        <td>${echap(l.date_paris || formatDateHeure(l.date))}</td>
+        <td>${echap(l.nom_affiche)}</td>
+        <td><span class="badge-action ${classeAction(l.action)}">${echap(l.action)}</span></td>
+        <td>${cible}${extra}</td>
+      </tr>`;
+    }).join('')
+  }</tbody></table>`;
+  document.getElementById('pagination').innerHTML = pages > 1
+    ? `<button type="button" class="secondary" data-p="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Précédent</button>
+       <span>Page ${page} / ${pages}</span>
+       <button type="button" class="secondary" data-p="${page + 1}" ${page >= pages ? 'disabled' : ''}>Suivant</button>`
+    : '';
+}
+
+document.getElementById('liste').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-tri]');
+  if (!btn) return;
+  const col = btn.dataset.tri;
+  tri.dir = tri.col === col ? -tri.dir : (col === 'date' ? -1 : 1);
+  tri.col = col;
+  page = 1;
+  afficherPage();
+});
+
+document.getElementById('pagination').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-p]');
+  if (!btn || btn.disabled) return;
+  page = Number(btn.dataset.p);
+  afficherPage();
+});
+['filtre-qui', 'filtre-action', 'filtre-date'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => { page = 1; charger(); });
+  document.getElementById(id).addEventListener('change', () => { page = 1; charger(); });
+});
+document.getElementById('btn-date-clear').addEventListener('click', () => {
+  document.getElementById('filtre-date').value = '';
+  page = 1;
+  charger();
+});
+document.getElementById('btn-integrite')?.addEventListener('click', async () => {
+  const el = document.getElementById('integrite-ok');
+  try {
+    const r = await api('/journal/integrite');
+    el.hidden = false;
+    el.className = 'message ' + (r.ok ? 'ok' : 'erreur');
+    el.textContent = r.ok
+      ? `Chaîne intègre (${pluriel(r.nb, 'événement')}).`
+      : `Rupture détectée sur ${pluriel(r.fautes.length, 'ligne')}.`;
+  } catch (err) {
+    el.hidden = false;
+    el.className = 'message erreur';
+    el.textContent = err.message;
+  }
+});
+charger();
+</script>
+</body>
+</html>

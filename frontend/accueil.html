@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accueil — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-accueil">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <h1>Bienvenue dans biologIA</h1>
+    <p class="page-intro" style="max-width:62ch">Pour chaque lot de mesures d’un laboratoire, on sait <strong>d’où il vient</strong>, <strong>quelle machine l’a produit</strong>, <strong>s’il est fiable</strong> et <strong>qui l’a validé</strong>.</p>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div class="cards" style="margin:18px 0">
+      <div class="card">
+        <div class="etape-num">1</div>
+        <h3>Saisir</h3>
+        <p class="hint">Un technicien enregistre un lot : machine, date, conditions de mesure et fichier de mesures.</p>
+      </div>
+      <div class="card">
+        <div class="etape-num">2</div>
+        <h3>Contrôler</h3>
+        <p class="hint">Le site vérifie tout seul : données complètes, aucun nom de patient, valeurs dans les seuils.</p>
+      </div>
+      <div class="card">
+        <div class="etape-num">3</div>
+        <h3>Valider</h3>
+        <p class="hint">Un biologiste valide ou signale le lot. Tout est tracé, daté et imprimable.</p>
+      </div>
+    </div>
+    <div class="dash-2">
+      <div class="card">
+        <h2>Où en est le laboratoire ?</h2>
+        <div id="anneaux" class="anneaux-ligne"><p class="empty">Chargement…</p></div>
+      </div>
+      <div class="card">
+        <h2>Les mots à connaître</h2>
+        <dl class="lexique">
+          <dt>Lot</dt><dd>une série de mesures d’une machine</dd>
+          <dt>PSN</dt><dd>code qui replace le nom du patient</dd>
+          <dt>Carte de contrôle</dt><dd>courbe qui montre si une machine dérive</dd>
+          <dt>Signalement</dt><dd>anomalie repérée automatiquement</dd>
+        </dl>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn-link primary" href="demo.html">Voir la démonstration (5 min)</a>
+      <a class="btn-link" href="tableau.html">Ouvrir le tableau de bord</a>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const [s, machines] = await Promise.all([
+      api('/synthese'),
+      api('/machines').catch(() => [])
+    ]);
+    const calOk = (machines || []).filter((m) => !m.calibration_a_renouveler).length;
+    document.getElementById('anneaux').innerHTML =
+      htmlAnneau((s.pourcentageValides || 0) + ' %', 'lots validés', s.pourcentageValides)
+      + htmlAnneau((s.pourcentageAnonymises || 0) + ' %', 'pseudonymisés', s.pourcentageAnonymises)
+      + htmlAnneau(`${calOk} / ${(machines || []).length || 0}`, 'calibrations à jour', machines.length ? (100 * calOk / machines.length) : 0);
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
+</body>
+</html>

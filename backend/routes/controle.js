@@ -1,0 +1,142 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../db');
+const { carteLeveyJennings, csvAvecBom } = require('../lib/tracabilite');
+
+function parametreDuLot(lot) {
+  if (lot.parametre) return String(lot.parametre).trim();
+  const nom = String(lot.nom || '');
+  const coupure = nom.split(/\s[—–-]\s/);
+  return (coupure[0] || nom || 'Paramètre').trim();
+}
+
+function valeursDuLot(lot) {
+  if (!lot.valeurs_controle) return [];
+  try {
+    const parsed = JSON.parse(lot.valeurs_controle);
+    return Array.isArray(parsed) ? parsed.map(Number).filter((n) => !Number.isNaN(n)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function datesDuLot(lot) {
+  if (!lot.dates_controle) return [];
+  try {
+    const parsed = JSON.parse(lot.dates_controle);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function chargerSeries(req) {
+    const clauses = ['COALESCE(lots.archive, 0) = 0', 'COALESCE(lots.est_test, 0) = 0'];
+    const params = [];
+    if (req.query.machine_id) {
+      clauses.push('lots.machine_id = ?');
+      params.push(req.query.machine_id);
+    }
+    if (req.query.lot_id) {
+      clauses.push('lots.id = ?');
+      params.push(req.query.lot_id);
+    }
+    const lots = await db.all(`
+      SELECT lots.id, lots.nom, lots.date, lots.moyenne_controle, lots.machine_id,
+        lots.valeurs_controle, lots.dates_controle,
+        machines.nom AS machine_nom,
+        (SELECT r.parametre FROM regles_alerte r WHERE r.lot_id = lots.id ORDER BY r.id ASC LIMIT 1) AS parametre
+      FROM lots LEFT JOIN machines ON machines.id = lots.machine_id
+      WHERE ${clauses.join(' AND ')}
+      ORDER BY lots.machine_id ASC, lots.date ASC, lots.id ASC
+    `, params);
+
+    const enrichis = lots.map((l) => ({ ...l, parametre: parametreDuLot(l) }));
+    const parametres = [...new Set(enrichis.map((l) => l.parametre))].sort();
+    const filtreParam = req.query.parametre ? String(req.query.parametre) : '';
+    const filtrés = filtreParam ? enrichis.filter((l) => l.parametre === filtreParam) : enrichis;
+
+    const series = [];
+    for (const lot of filtrés) {
+      const vals = valeursDuLot(lot);
+      if (!vals.length) continue;
+      let dates = datesDuLot(lot);
+      if (dates.length < vals.length) {
+        const mes = await db.all(
+          'SELECT date FROM mesures_reference WHERE lot_id = ? ORDER BY date ASC, id ASC',
+          [lot.id]
+        );
+        if (mes.length) dates = mes.map((m) => m.date);
+      }
+      const opts = {
+        refDebut: Number(req.query.ref_debut) || 0,
+        refN: Number(req.query.ref_n) > 0 ? Number(req.query.ref_n) : 20
+      };
+      const stats = carteLeveyJennings(vals, dates.length ? dates : vals.map((_, i) => {
+        if (lot.date && /^\d{4}-\d{2}-\d{2}$/.test(lot.date)) {
+          const d = new Date(`${lot.date}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() + i);
+          return d.toISOString().slice(0, 10);
+        }
+        return lot.date;
+      }), opts);
+      series.push({
+        lot_id: lot.id,
+        nom: lot.nom,
+        machine_nom: lot.machine_nom || 'Machine non renseignée',
+        parametre: lot.parametre,
+        suffisant: stats.suffisant,
+        message: stats.message,
+        nb_reference: stats.nb_reference,
+        nb_points: stats.nb_points,
+        points: stats.points.map((p, i) => ({
+          ...p,
+          id: lot.id,
+          nom: lot.nom,
+          index: i + 1
+        })),
+        moyenne: stats.moyenne,
+        ecart_type: stats.ecart_type,
+        limite_1s_bas: stats.limite_1s_bas,
+        limite_1s_haut: stats.limite_1s_haut,
+        limite_2s_bas: stats.limite_2s_bas,
+        limite_2s_haut: stats.limite_2s_haut,
+        limite_3s_bas: stats.limite_3s_bas,
+        limite_3s_haut: stats.limite_3s_haut,
+        westgard: stats.westgard
+      });
+    }
+
+    return {
+      series,
+      parametres,
+      points: series[0]?.points || [],
+      moyenne: series[0]?.moyenne ?? null,
+      ecart_type: series[0]?.ecart_type ?? 0,
+      limite_2s_bas: series[0]?.limite_2s_bas ?? null,
+      limite_2s_haut: series[0]?.limite_2s_haut ?? null
+    };
+}
+
+router.get('/', async (req, res) => {
+  try { res.json(await chargerSeries(req)); }
+  catch (err) { res.status(500).json({ erreur: err.message }); }
+});
+
+router.get('/csv', async (req, res) => {
+  try {
+    const { series } = await chargerSeries(req);
+    const lignes = [['lot', 'machine', 'parametre', 'index', 'date', 'valeur', 'hors_norme', 'westgard']];
+    for (const s of series || []) {
+      (s.points || []).forEach((pt, i) => {
+        const wg = (s.westgard || []).filter((w) => w.index === i).map((w) => w.regle).join('+');
+        lignes.push([s.nom, s.machine_nom, s.parametre, i + 1, pt.date || '', pt.valeur, pt.hors_norme ? 1 : 0, wg]);
+      });
+    }
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="cartes-controle.csv"');
+    res.send(csvAvecBom(lignes));
+  } catch (err) { res.status(500).json({ erreur: err.message }); }
+});
+
+module.exports = router;

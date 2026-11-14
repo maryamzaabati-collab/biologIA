@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conformité — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-conformite">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Conformité</h1>
+        <p class="page-intro">Pastilles issues de contrôles réels. Démonstrateur, pas une certification.</p>
+      </div>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="liste"><p class="empty">Chargement…</p></div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const c = await api('/conformite');
+    const badge = (s) => s === 'mis_en_place' ? 'ok' : (s === 'partiel' ? 'attente' : 'douteux');
+    const lib = (s) => s === 'mis_en_place' ? 'Mis en place' : (s === 'partiel' ? 'Partiel' : 'À faire');
+    document.getElementById('liste').innerHTML = `
+      <div class="card">${c.items.map((it) => `
+        <div class="conformite-ligne">
+          <div>
+            <strong>${echap(it.titre)}</strong>
+            <p>${echap(it.detail)}</p>
+          </div>
+          <span class="badge ${badge(it.statut)}">${lib(it.statut)}</span>
+        </div>`).join('')}
+      </div>
+      <div class="card" style="margin-top:20px">
+        <strong>Note de transparence (AI Act)</strong>
+        <p class="hint">${echap(c.note_ai)}</p>
+      </div>`;
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
+</body>
+</html>

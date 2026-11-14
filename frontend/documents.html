@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Documents — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-documents">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav></nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <div>
+        <h1>Documents</h1>
+        <p class="page-intro">Fiche de synthèse, certificats de traçabilité et parcours des lots.</p>
+      </div>
+      <div class="page-head-actions">
+        <a class="btn-link primary" href="/api/synthese/pdf">Fiche PDF</a>
+        <a class="btn-link" href="/api/synthese/csv">CSV</a>
+      </div>
+    </div>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="stats"></div>
+    <div class="card" style="margin-top:16px">
+      <h2>Parcours (lignée)</h2>
+      <p class="hint">Les 7 étapes d’un lot, de la mesure à la validation.</p>
+      <p><a class="btn-link" href="lignee.html">Ouvrir la lignée</a></p>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h2>Certificats de traçabilité</h2>
+      <div id="certs"><p class="empty">Chargement…</p></div>
+    </div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+(async () => {
+  try {
+    const s = await api('/synthese');
+    document.getElementById('stats').innerHTML = `
+      <div class="card anneaux-ligne">
+        ${htmlAnneau(String(s.totalLots), 'lots enregistrés', 100)}
+        ${htmlAnneau((s.pourcentageValides || 0) + ' %', 'validés', s.pourcentageValides)}
+        ${htmlAnneau((s.pourcentageAnonymises || 0) + ' %', 'pseudonymisés', s.pourcentageAnonymises)}
+        ${htmlAnneau(String(s.signalementsEnCours || 0), 'signalements', s.signalementsEnCours ? 70 : 8, s.signalementsEnCours ? 'faible' : 'ok')}
+      </div>`;
+    const lots = s.lots || [];
+    document.getElementById('certs').innerHTML = lots.length
+      ? `<table class="table-audit"><thead><tr><th>Lot</th><th>Statut</th><th>Score</th><th></th></tr></thead><tbody>
+        ${lots.map((l) => `<tr>
+          <td><a href="lot.html?id=${l.id}">${echap(l.nom)}</a></td>
+          <td><span class="badge ${classeBadge(l.statut_affiche)}">${echap(l.statut_libelle)}</span></td>
+          <td>${l.score_confiance}</td>
+          <td><a class="btn-link" href="certificat.html?id=${l.id}">Certificat</a>
+              <a class="btn-link" href="/api/lots/${l.id}/certificat">PDF</a></td>
+        </tr>`).join('')}
+      </tbody></table>`
+      : '<p class="empty">Aucun lot.</p>';
+  } catch (err) {
+    afficherMessage('erreur-page', err.message);
+  }
+})();
+</script>
+</body>
+</html>

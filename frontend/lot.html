@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Détail du lot — biologIA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="page-lot">
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <nav>
+      <a href="accueil.html">Tableau de bord</a>
+      <a href="index.html">Lots</a>
+      <a href="machines.html">Machines</a>
+      <a href="signalements.html">Signalements</a>
+      <a href="controle.html">Cartes de contrôle</a>
+      <a href="synthese.html">Synthèse</a>
+      <a href="conformite.html">Conformité</a>
+    </nav>
+  </aside>
+  <main>
+    <p id="erreur-page" class="message erreur" hidden></p>
+    <div id="detail">Chargement…</div>
+  </main>
+</div>
+<script src="app.js"></script>
+<script>
+const idLot = new URLSearchParams(window.location.search).get('id');
+const ouvrirEdition = new URLSearchParams(window.location.search).get('edit') === '1';
+let machines = [];
+let biologistes = [];
+
+function colonnesDuLot(lot) {
+  if (!lot.colonnes_csv) return [];
+  try {
+    const parsed = JSON.parse(lot.colonnes_csv);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function libelleChamp(champ) {
+  const map = {
+    nom: 'Nom',
+    machine_id: 'Machine',
+    date: 'Date',
+    conditions: 'Conditions',
+    anonymise: 'Pseudonymisation',
+    colonnes_csv: 'Colonnes CSV',
+    création: 'Création',
+    validation: 'Validation',
+    revalidation: 'Revalidation',
+    archivage: 'Archivage',
+    règle: 'Règle d’alerte'
+  };
+  return map[champ] || champ;
+}
+
+async function charger() {
+  afficherMessage('erreur-page', '');
+  if (!idLot) {
+    document.getElementById('detail').innerHTML = '';
+    afficherMessage('erreur-page', "Aucun identifiant de lot n'a été fourni.");
+    return;
+  }
+  try {
+    const [lot, listeMachines, listeBio, moi] = await Promise.all([
+      api(`/lots/${idLot}`),
+      api('/machines'),
+      api('/utilisateurs?role=biologiste'),
+      api('/auth/moi').catch(() => window.__utilisateur)
+    ]);
+    window.__utilisateur = moi || window.__utilisateur;
+    machines = listeMachines;
+    biologistes = listeBio;
+    document.title = `${lot.nom} — biologIA`;
+    const colonnes = colonnesDuLot(lot);
+    const optionsMachines = machines.map((m) =>
+      `<option value="${m.id}" ${String(m.id) === String(lot.machine_id) ? 'selected' : ''}>${echap(m.nom)}</option>`
+    ).join('');
+    const optionsBio = biologistes.map((b) =>
+      `<option value="${b.id}">${echap(b.nom)}</option>`
+    ).join('');
+
+    const cond = libelleConditions(lot);
+    const parts = cond === 'Non renseignées' ? [] : cond.split(',').map((x) => x.trim());
+    const temp = (parts.find((p) => /temp/i.test(p)) || '').replace(/^Température\s*/i, '') || '—';
+    const react = (parts.find((p) => /réactif|reactif/i.test(p)) || '').replace(/^Lot de réactifs\s*/i, '') || '—';
+    const cal = (parts.find((p) => /calib/i.test(p)) || '').replace(/^Calibration\s*/i, '') || '—';
+    document.getElementById('detail').innerHTML = `
+      <div class="entete-lot">
+        <div>
+          <p style="margin:0 0 8px"><a href="index.html" style="color:var(--ink-soft);text-decoration:none;font-size:0.88rem">← Lots</a></p>
+          <h1>${echap(lot.nom)}
+            ${lot.code_verification ? `<button type="button" class="secondary" data-copier="${echap(lot.code_verification)}">Copier</button>` : ''}
+            <span class="badge ${classeBadge(lot.statut_affiche)}">${echap(lot.statut_libelle)}</span>
+            ${Number(lot.est_test) ? '<span class="badge brouillon">Lot TEST</span>' : ''}
+          </h1>
+        </div>
+        ${htmlJauge(lot.score_confiance, 'Score', lot.score_detail, { mini: true })}
+      </div>
+
+      <div class="onglets-page" id="onglets-lot">
+        <button type="button" class="secondary actif" data-onglet="resume">Résumé</button>
+        <button type="button" class="secondary" data-onglet="mesures">Mesures</button>
+        <button type="button" class="secondary" data-onglet="alertes">Alertes</button>
+        <button type="button" class="secondary" data-onglet="coherence">Cohérence</button>
+        <button type="button" class="secondary" data-onglet="historique">Historique</button>
+        <button type="button" class="secondary" data-onglet="certificat">Certificat</button>
+      </div>
+      <section class="panneau-lot" data-panneau="resume">
+      ${htmlChaineTracabilite(lot)}
+
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card">
+          <strong>Conditions de mesure</strong>
+          <dl class="cond-grid">
+            <div><dt>Température</dt><dd>${echap(temp)}</dd></div>
+            <div><dt>Lot de réactifs</dt><dd>${echap(react)}</dd></div>
+            <div><dt>Calibration</dt><dd>${echap(cal)}</dd></div>
+          </dl>
+        </div>
+        <div class="card">
+          <strong>${Number(lot.nb_signalements) ? pluriel(lot.nb_signalements, 'signalement') : 'Aucun signalement'}</strong>
+          ${(lot.signalements && lot.signalements[0]) ? `<p class="hint">${echap(lot.signalements[0].raison)}</p>` : '<p class="hint">Rien à signaler sur ce lot.</p>'}
+          ${Number(lot.nb_signalements) ? `<p><a class="btn-link" href="machine.html?id=${encodeURIComponent(lot.machine_id || '')}">Voir la carte de contrôle</a></p>` : ''}
+        </div>
+      </div>
+      ${Number(lot.nb_signalements) ? `<div class="bande-action"><strong>⚠ Action requise</strong><span class="hint">Vérifiez le lot et les résultats associés.</span></div>` : ''}
+
+      </section>
+      <section class="panneau-lot" data-panneau="mesures" hidden>
+      <h2>Origine</h2>
+      <dl class="fiche-dl">
+        <div><dt>Machine</dt><dd>${echap(lot.machine_nom || 'non renseignée')}</dd></div>
+        <div><dt>Date de mesure</dt><dd>${formatDate(lot.date)}</dd></div>
+        <div><dt>Conditions</dt><dd>${echap(libelleConditions(lot))}</dd></div>
+        <div><dt>Pseudonymisation</dt><dd>${lot.anonymise ? 'oui' : 'non confirmé'}</dd></div>
+        <div><dt>Colonnes CSV</dt><dd>${colonnes.length ? echap(colonnes.join(', ')) : 'aucun fichier analysé'}</dd></div>
+        <div><dt>Péremption des validations</dt><dd>${lot.mois_peremption} mois (ISO 15189)</dd></div>
+      </dl>
+      ${lot.alerte_identite ? '<p class="message erreur">Alerte RGPD : des colonnes identifiantes ont été détectées dans le CSV. Retirez-les puis réimportez un fichier pseudonymisé.</p>' : ''}
+      </section>
+      <section class="panneau-lot" data-panneau="alertes" hidden>
+      ${(lot.signalements && lot.signalements.length) ? `<div class="card" style="margin-bottom:16px"><strong>Signalements ouverts</strong><ul>${lot.signalements.map((s) => `<li>${echap(s.raison)}</li>`).join('')}</ul><p class="hint">Corrigez le lot : le statut « Signalé » disparaît quand ces points sont levés.</p></div>` : '<p class="empty">Aucun signalement ouvert.</p>'}
+
+      <div class="actions only-technicien">
+        <button type="button" class="secondary" id="btn-modifier">Modifier</button>
+        <a class="btn-link" href="certificat.html?id=${lot.id}">Certificat imprimable</a>
+        <a class="btn-link" href="/api/lots/${lot.id}/certificat">PDF</a>
+      </div>
+      <div class="actions only-biologiste">
+        <a class="btn-link" href="certificat.html?id=${lot.id}">Certificat imprimable</a>
+        <a class="btn-link" href="/api/lots/${lot.id}/certificat">PDF</a>
+      </div>
+      <p id="erreur-actions" class="message erreur" hidden></p>
+
+      <form id="form-edition" ${ouvrirEdition ? '' : 'hidden'}>
+        <h2>Corriger le lot</h2>
+        <p id="erreur-edition" class="message erreur" hidden></p>
+        <label for="edit-nom">Nom du lot ${aide('Format imposé : LOT-2026-025. Exception : le lot TEST de démonstration.')}</label>
+        <input type="text" id="edit-nom" required ${Number(lot.est_test) ? '' : 'pattern="LOT-\\d{4}-\\d{3}"'} value="${echap(lot.nom)}">
+        <label for="edit-machine">Machine utilisée ${aide('Appareil qui a produit les mesures de référence.')}</label>
+        <select id="edit-machine" required>
+          <option value="">— Sélectionner —</option>
+          ${optionsMachines}
+        </select>
+        <label for="edit-date">Date de mesure</label>
+        <input type="date" id="edit-date" required value="${lot.date || ''}">
+        <label for="edit-temperature">Température</label>
+        <input type="text" id="edit-temperature" placeholder="21°C" required>
+        <label for="edit-reactifs">Lot de réactifs</label>
+        <input type="text" id="edit-reactifs" placeholder="R-441" required>
+        <label for="edit-calibration">Calibration</label>
+        <input type="text" id="edit-calibration" placeholder="matin, contrôle interne passé" required>
+        <label for="edit-motif">Motif de la modification ${aide('Obligatoire : le registre conserve qui, quand, quoi et pourquoi.')}</label>
+        <input type="text" id="edit-motif" required placeholder="Correction des conditions après CQ">
+        <label for="edit-csv">Nouveau CSV (optionnel)</label>
+        <input type="file" id="edit-csv" accept=".csv,text/csv,text/plain">
+        <div class="checkbox-row">
+          <input type="checkbox" id="edit-anonymise" ${lot.anonymise ? 'checked' : ''}>
+          <label for="edit-anonymise">Identités patients remplacées par un code (pseudonymisation)</label>
+        </div>
+        <button type="submit">Enregistrer les modifications</button>
+      </form>
+
+      <h2 style="margin-top:32px;">Règles d'alerte associées</h2>
+      <p class="hint">Seuils calibrés sur ce lot. Le test ci-dessous utilise une valeur d'exemple fictive, jamais un vrai patient.</p>
+      <div id="regles-alerte"></div>
+      <form id="form-regle" class="only-technicien">
+        <h2>Ajouter une règle</h2>
+        <p id="erreur-regle" class="message erreur" hidden></p>
+        <label for="regle-parametre">Paramètre</label>
+        <input type="text" id="regle-parametre" placeholder="Ex : Glycémie à jeun" required>
+        <label for="regle-bas">Seuil bas</label>
+        <input type="text" id="regle-bas" placeholder="optionnel">
+        <label for="regle-haut">Seuil haut</label>
+        <input type="text" id="regle-haut" placeholder="optionnel">
+        <label for="regle-unite">Unité</label>
+        <input type="text" id="regle-unite" placeholder="g/L" required>
+        <button type="submit">Enregistrer la règle</button>
+      </form>
+
+      <h2 style="margin-top:32px;">Validations d'un biologiste</h2>
+      <div id="validations"></div>
+      <form id="form-validation" class="only-biologiste" style="max-width:340px;">
+        <p id="erreur-validation" class="message erreur" hidden></p>
+        <p id="ok-validation" class="message ok" hidden></p>
+        <p class="hint">La signature utilise le biologiste connecté (${echap((moi && moi.nom) || '')}).</p>
+        <button type="submit">${lot.validations.length ? 'Revalider' : 'Valider ce lot'}</button>
+      </form>
+      <p class="only-technicien hint">Passez en rôle biologiste pour valider ce lot.</p>
+
+      </section>
+      <section class="panneau-lot" data-panneau="coherence" hidden>
+        <h2>Cohérence des données</h2>
+        <div id="bloc-coherence"><p class="empty">Chargement…</p></div>
+      </section>
+      <section class="panneau-lot" data-panneau="historique" hidden>
+      <h2 style="margin-top:32px;">Historique des modifications</h2>
+      <p class="hint">Registre en ajout seul : une ligne d’historique ne se modifie ni ne se supprime.</p>
+      <div id="historique" class="frise"></div>
+
+      <div class="zone-archive only-biologiste" id="zone-archive" ${Number(lot.archive) ? 'hidden' : ''}>
+        <h2>Archiver ce lot</h2>
+        <p class="hint">Dans un outil de traçabilité on n’efface pas : on archive. Le lot reste dans l’historique.</p>
+        <button type="button" class="danger" id="btn-archiver">Archiver ce lot</button>
+        <p id="erreur-archive" class="message erreur" hidden></p>
+      </div>
+      </section>
+      <section class="panneau-lot" data-panneau="certificat" hidden>
+        <p class="hint">Ouvrir le certificat imprimable ou le PDF de traçabilité.</p>
+        <div class="actions">
+          <a class="btn-link primary" href="certificat.html?id=${lot.id}">Certificat imprimable</a>
+          <a class="btn-link" href="/api/lots/${lot.id}/certificat">PDF</a>
+        </div>
+      </section>
+    `;
+    function ouvrirOnglet(id) {
+      document.querySelectorAll('#onglets-lot [data-onglet]').forEach((b) => b.classList.toggle('actif', b.dataset.onglet === id));
+      document.querySelectorAll('.panneau-lot').forEach((p) => {
+        p.hidden = p.dataset.panneau !== id;
+      });
+    }
+    document.getElementById('onglets-lot')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-onglet]');
+      if (!btn) return;
+      ouvrirOnglet(btn.dataset.onglet);
+    });
+    document.getElementById('detail')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-onglet-lien]');
+      if (!btn) return;
+      e.preventDefault();
+      ouvrirOnglet(btn.dataset.ongletLien);
+    });
+    api(`/coherence/lot/${lot.id}`).then((c) => {
+      const el = document.getElementById('bloc-coherence');
+      if (!el) return;
+      const s = c.score_qualite || {};
+      const liste = c.anomalies || [];
+      if (c.vide || (s.global == null && !liste.length)) {
+        el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';
+        return;
+      }
+      const anoms = liste.map((a) => `<tr><td>${echap(a.severite || '')}</td><td>${echap(a.code)}</td><td>${echap(a.detail)}</td></tr>`).join('');
+      el.innerHTML = `<p>Complétude ${s.completude ?? '—'} · Cohérence ${s.coherence ?? '—'} · Conformité ${s.conformite ?? '—'} · Global ${s.global ?? '—'}</p>
+        ${anoms ? `<table class="table-audit"><thead><tr><th>Sévérité</th><th>Code</th><th>Message</th></tr></thead><tbody>${anoms}</tbody></table>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
+    }).catch(() => {
+      const el = document.getElementById('bloc-coherence');
+      if (el) el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';
+    });
+
+    const conteneurRegles = document.getElementById('regles-alerte');
+    if (!lot.reglesAlerte || lot.reglesAlerte.length === 0) {
+      conteneurRegles.innerHTML = '<p class="empty">Aucune règle d\'alerte associée à ce lot.</p>';
+    } else {
+      conteneurRegles.innerHTML = lot.reglesAlerte.map((r) => `
+        <div class="validation-item">
+          ${icone('regle')}<span class="qui">${echap(r.parametre)}</span> :
+          ${echap(libelleSeuils(r))}
+          <span class="badge ${r.statut === 'validee' ? 'ok' : 'attente'}">${r.statut === 'validee' ? 'Règle validée' : 'À valider'}</span>
+          ${r.validee_par ? `<span class="quand">${echap(r.validee_par)}</span>` : ''}
+          <form class="simulateur" data-regle="${r.id}">
+            <label>Tester une valeur d'exemple</label>
+            <input type="text" name="valeur" placeholder="ex. 1.05">
+            <button type="submit">Tester</button>
+            <p class="resultat-test" hidden></p>
+          </form>
+          ${r.statut !== 'validee' ? `<button type="button" class="secondary only-biologiste" data-valider-regle="${r.id}">Valider cette règle</button>` : ''}
+        </div>
+      `).join('');
+      conteneurRegles.querySelectorAll('.simulateur').forEach((form) => {
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const out = form.querySelector('.resultat-test');
+          try {
+            const t = await api(`/regles_alerte/${form.dataset.regle}/tester`, {
+              method: 'POST',
+              body: JSON.stringify({ valeur: form.valeur.value })
+            });
+            out.hidden = false;
+            out.className = 'resultat-test message ' + (t.resultat === 'alerte' || t.resultat === 'invalide' ? 'erreur' : 'ok');
+            out.textContent = t.message + (t.lot_nom ? ' Lot de calibration : ' + t.lot_nom + '.' : '');
+          } catch (err) {
+            out.hidden = false;
+            out.className = 'resultat-test message erreur';
+            out.textContent = err.message;
+          }
+        });
+      });
+      conteneurRegles.querySelectorAll('[data-valider-regle]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          try {
+            await api(`/regles_alerte/${btn.dataset.validerRegle}/valider`, { method: 'POST', body: '{}' });
+            charger();
+          } catch (err) {
+            afficherMessage('erreur-page', err.message);
+          }
+        });
+      });
+    }
+
+    const conteneurValidations = document.getElementById('validations');
+    if (lot.validations.length === 0) {
+      conteneurValidations.innerHTML = '<p class="empty">Ce lot n\'a pas encore été validé.</p>';
+    } else {
+      conteneurValidations.innerHTML = lot.validations.map((v) => `
+        <div class="validation-item">
+          ${icone('biologiste')}<span class="qui">${echap(v.nom_biologiste)}</span> —
+          <span class="quand">${echap(v.date_validation_paris || formatDateHeure(v.date_validation))}</span>
+        </div>
+      `).join('');
+    }
+
+    const conteneurHist = document.getElementById('historique');
+    if (!lot.historique.length) {
+      conteneurHist.innerHTML = '<p class="empty">Aucune modification enregistrée pour l\'instant.</p>';
+    } else {
+      conteneurHist.innerHTML = lot.historique.map((h) => `
+        <div class="validation-item">
+          <span class="qui">${echap(libelleChamp(h.champ))}</span> :
+          ${echap(h.ancienne_valeur)} → ${echap(h.nouvelle_valeur)}
+          <span class="quand"> (${echap(h.date_paris || formatDateHeure(h.date))}${h.utilisateur ? ' · ' + echap(h.utilisateur) : ''}${h.motif ? ' · ' + echap(h.motif) : ''})</span>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('btn-modifier')?.addEventListener('click', () => {
+      document.getElementById('form-edition').hidden = false;
+      document.getElementById('form-edition').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('btn-archiver')?.addEventListener('click', async () => {
+      if (roleActuel() !== 'biologiste') {
+        afficherMessage('erreur-archive', 'Seul un biologiste peut archiver.');
+        return;
+      }
+      if (!confirm('Archiver ce lot ? Il restera visible dans l’historique, sans être effacé.')) return;
+      afficherMessage('erreur-archive', '');
+      try {
+        await api(`/lots/${idLot}/archiver`, { method: 'POST', body: '{}' });
+        notifier('Lot archivé.', 'ok');
+        window.location.href = 'index.html';
+      } catch (err) {
+        afficherMessage('erreur-archive', err.message);
+      }
+    });
+
+    const aujourd = new Date().toISOString().slice(0, 10);
+    const champDate = document.getElementById('edit-date');
+    if (champDate) champDate.max = aujourd;
+
+    document.getElementById('form-edition').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      afficherMessage('erreur-edition', '');
+      try {
+        const csvTexte = await lireFichierTexte(document.getElementById('edit-csv'));
+        await api(`/lots/${idLot}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            nom: document.getElementById('edit-nom').value,
+            machine_id: document.getElementById('edit-machine').value || null,
+            date: document.getElementById('edit-date').value || null,
+            temperature: document.getElementById('edit-temperature').value,
+            lot_reactifs: document.getElementById('edit-reactifs').value,
+            calibration: document.getElementById('edit-calibration').value,
+            motif: document.getElementById('edit-motif').value,
+            anonymise: document.getElementById('edit-anonymise').checked,
+            csv_texte: csvTexte
+          })
+        });
+        notifier('Lot mis à jour.', 'ok');
+        charger();
+      } catch (err) {
+        afficherMessage('erreur-edition', err.message);
+      }
+    });
+
+    document.getElementById('form-regle').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      afficherMessage('erreur-regle', '');
+      try {
+        await api('/regles_alerte', {
+          method: 'POST',
+          body: JSON.stringify({
+            lot_id: Number(idLot),
+            parametre: document.getElementById('regle-parametre').value,
+            seuil_bas: document.getElementById('regle-bas').value || null,
+            seuil_haut: document.getElementById('regle-haut').value || null,
+            unite: document.getElementById('regle-unite').value
+          })
+        });
+        charger();
+      } catch (err) {
+        afficherMessage('erreur-regle', err.message);
+      }
+    });
+
+    document.getElementById('form-validation').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const bouton = e.target.querySelector('button[type="submit"]');
+      if (bouton) bouton.disabled = true;
+      afficherMessage('erreur-validation', '');
+      try {
+        await api(`/lots/${idLot}/validations`, {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        afficherMessage('ok-validation', 'Lot validé.', 'ok');
+        charger();
+      } catch (err) {
+        if (bouton) bouton.disabled = false;
+        afficherMessage('erreur-validation', err.message);
+      }
+    });
+
+    appliquerRole();
+  } catch (err) {
+    document.getElementById('detail').innerHTML = '';
+    const message = /n'existe pas/i.test(err.message) ? "Ce lot n'existe pas." : err.message;
+    afficherMessage('erreur-page', message);
+  }
+}
+
+charger();
+</script>
+</body>
+</html>

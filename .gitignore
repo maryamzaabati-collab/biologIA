@@ -1,0 +1,15 @@
+backend/node_modules/
+node_modules/
+backend/labo.db
+backend/*.db
+*.db
+.env
+.env.*
+!.env.example
+.DS_Store
+**/.DS_Store
+.tools/
+*.log
+.idea/
+backend/data/csv/
+
