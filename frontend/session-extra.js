@@ -94,13 +94,10 @@
   function remplirNav(role) {
     const brand = document.querySelector('.sidebar .brand');
     if (brand) {
+      // Hélice d'ADN, le même logo que sur la page de connexion.
       brand.innerHTML = `<span class="logo-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#F7F4EC" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 2.8h6"/>
-          <path d="M10.2 2.8v4.6L6.1 18.4A3.6 3.6 0 0 0 9.4 23h5.2a3.6 3.6 0 0 0 3.3-4.6L13.8 7.4V2.8"/>
-          <path d="M8 14.2h8"/>
-        </svg>
-      </span> biologIA`;
+        <svg viewBox="0 0 28 28" fill="none"><path d="M8.5 4C8.5 10 19.5 10 19.5 14S8.5 18 8.5 24M19.5 4C19.5 10 8.5 10 8.5 14s11 4 11 10" stroke="#F7F4EC" stroke-width="1.8" stroke-linecap="round" fill="none"/><path d="M11 7.5h6M11 20.5h6" stroke="#F7F4EC" stroke-width="1.3" stroke-linecap="round"/><circle cx="23.2" cy="4.8" r="2" fill="#FCC88A"/></svg>
+      </span> <span>biolog<b class="brand-ia">IA</b></span>`;
     }
     const nav = document.querySelector('.sidebar nav');
     if (!nav) return;

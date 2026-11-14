@@ -123,7 +123,9 @@ a { color: var(--accent-strong); }
   padding: 4px 10px 22px;
 }
 
-/* Logo : hélice d'ADN dans un carré arrondi, identique à la page de connexion. */
+/* Logo : hélice d'ADN dans un carré arrondi, identique à la page de connexion.
+   Le dessin vient du SVG écrit par session-extra.js, pas d'une image de fond :
+   superposer les deux donnait deux hélices de tailles différentes. */
 .logo-mark {
   width: 32px;
   height: 32px;
@@ -131,13 +133,10 @@ a { color: var(--accent-strong); }
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background-color: var(--accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M10 6c0 5 8 5 8 8s-8 3-8 8M18 6c0 5-8 5-8 8s8 3 8 8' fill='none' stroke='%23F7F4EC' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M11 10h6M11 18h6' stroke='%23F7F4EC' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='6' r='2.2' fill='%23FCC88A'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 26px 26px;
+  background: var(--accent);
+  box-shadow: none;
 }
-.logo-mark svg { width: 20px; height: 20px; display: block; }
+.logo-mark svg { width: 24px; height: 24px; display: block; }
 .brand-ia { color: var(--accent); font-weight: 600; }
 html[data-theme="sombre"] .brand-ia { color: var(--accent-strong); }
 
