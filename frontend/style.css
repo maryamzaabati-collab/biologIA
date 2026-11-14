@@ -2,13 +2,13 @@
 
 :root {
   --sage: #3F6F55;
-  --bg: #F3EEE4;
-  --ink: #1C1A16;
-  --ink-soft: #6B675E;
-  --paper: #F3EEE4;
-  --panel: #FFFdf8;
-  --panel-2: #FFFdf8;
-  --line: rgba(28, 26, 22, 0.08);
+  --bg: #F6F5F1;
+  --ink: #16211C;
+  --ink-soft: #5B6660;
+  --paper: #F6F5F1;
+  --panel: #FFFFFF;
+  --panel-2: #FFFFFF;
+  --line: rgba(22, 33, 28, 0.12);
   --accent: #3F6F55;
   --accent-strong: #2F5742;
   --accent-soft: rgba(63, 111, 85, 0.12);
@@ -24,18 +24,18 @@
   --radius: 12px;
   --radius-lg: 16px;
   --radius-btn: 10px;
-  --shadow: 0 1px 2px rgba(28, 26, 22, 0.04), 0 8px 24px rgba(28, 26, 22, 0.04);
+  --shadow: 0 1px 2px rgba(22, 33, 28, 0.04);
   --parchment: #F3EEE4;
 }
 
 html[data-theme="clair"] {
-  --bg: #F3EEE4;
-  --ink: #1C1A16;
-  --ink-soft: #6B675E;
-  --paper: #F3EEE4;
-  --panel: #FFFdf8;
-  --panel-2: #FFFdf8;
-  --line: rgba(28, 26, 22, 0.08);
+  --bg: #F6F5F1;
+  --ink: #16211C;
+  --ink-soft: #5B6660;
+  --paper: #F6F5F1;
+  --panel: #FFFFFF;
+  --panel-2: #FFFFFF;
+  --line: rgba(22, 33, 28, 0.12);
   --accent: #3F6F55;
   --accent-strong: #2F5742;
   --accent-soft: rgba(63, 111, 85, 0.12);
@@ -47,7 +47,7 @@ html[data-theme="clair"] {
   --wait: #D4A04A;
   --wait-soft: rgba(212, 160, 74, 0.2);
   --reval: #4A6FA5;
-  --shadow: 0 1px 2px rgba(28, 26, 22, 0.04), 0 8px 24px rgba(28, 26, 22, 0.05);
+  --shadow: 0 1px 2px rgba(22, 33, 28, 0.05);
   color-scheme: light;
 }
 
@@ -123,24 +123,23 @@ a { color: var(--accent-strong); }
   padding: 4px 10px 22px;
 }
 
+/* Logo : hélice d'ADN dans un carré arrondi, identique à la page de connexion. */
 .logo-mark {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  background: var(--accent);
-  box-shadow: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-}
-.logo-mark svg { width: 20px; height: 20px; display: block; }
-.logo-mark {
   background-color: var(--accent);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23F7F4EC' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 2.8h6'/%3E%3Cpath d='M10.2 2.8v4.6L6.1 18.4A3.6 3.6 0 0 0 9.4 23h5.2a3.6 3.6 0 0 0 3.3-4.6L13.8 7.4V2.8'/%3E%3Cpath d='M8 14.2h8'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M10 6c0 5 8 5 8 8s-8 3-8 8M18 6c0 5-8 5-8 8s8 3 8 8' fill='none' stroke='%23F7F4EC' stroke-width='1.8' stroke-linecap='round'/%3E%3Cpath d='M11 10h6M11 18h6' stroke='%23F7F4EC' stroke-width='1.4' stroke-linecap='round'/%3E%3Ccircle cx='22' cy='6' r='2.2' fill='%23FCC88A'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 20px 20px;
+  background-size: 26px 26px;
 }
+.logo-mark svg { width: 20px; height: 20px; display: block; }
+.brand-ia { color: var(--accent); font-weight: 600; }
+html[data-theme="sombre"] .brand-ia { color: var(--accent-strong); }
 
 .logo-connexion {
   display: block;
@@ -1317,3 +1316,73 @@ select, input[type="date"] {
   padding: 8px 12px;
 }
 input[type="date"]:invalid, input[type="date"]:placeholder-shown { color: var(--ink-soft); }
+
+/* ===== Finition visuelle : repères de laboratoire ===== */
+
+/* Les boutons d'action ne sont plus des pilules : la forme ronde est réservée
+   aux pastilles de statut, pour qu'on ne confonde plus une action et un état. */
+button,
+button.secondary,
+.btn-link,
+.btn-link.primary {
+  border-radius: var(--radius-btn);
+}
+.badge, .tag, .pill, .statut, .role-switch button, .filtre-pastille { border-radius: 999px; }
+
+/* Cartes : bordure fine plutôt qu'une ombre portée. */
+.entry, .stat, .lot-carte, .certificat, .carte-svg {
+  box-shadow: none;
+  border: 1px solid var(--line);
+}
+.lot-carte:hover, .entry:hover, a.stat:hover { border-color: var(--accent); outline: none; }
+
+/* Menu latéral : séparé du contenu par un trait, titres de groupe plus discrets. */
+.sidebar { border-right: 1px solid var(--line); background: var(--panel); }
+.sidebar .groupe, .sidebar .gp, .sidebar h3 {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* Codes de traçabilité en police à chasse fixe, comme sur un automate. */
+.mono, .code-lot, .psn, .numero-patient { letter-spacing: 0.01em; }
+
+/* Listes déroulantes : même habillage que les champs de saisie. */
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6660' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+  padding-right: 36px;
+}
+
+/* La bascule Cartes / Tableau doit montrer la vue active. */
+.page-head-actions button.secondary.actif,
+.page-head-actions button.secondary.active,
+.vue-switch button[aria-pressed="true"],
+.vue-switch button.actif,
+.vue-switch button.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+
+/* Barre de score : la couleur suit la valeur au lieu d'être toujours verte. */
+.lot-carte .piste > i.faible { background: var(--flag); }
+.lot-carte .piste > i.moyen { background: var(--wait); }
+
+/* Texte secondaire plus lisible (le gris précédent passait sous le seuil AA). */
+.hint, .page-intro, .mt { color: var(--ink-soft); }
+
+/* Carte machine : statut et actions sur une seule ligne. */
+.machine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.machine-actions button { margin-top: 0; }
+.machine-actions button[disabled] { opacity: .5; cursor: not-allowed; }

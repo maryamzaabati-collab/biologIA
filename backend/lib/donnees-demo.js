@@ -112,7 +112,7 @@ const PRENOMS_M = [
 
 function construirePatientsFictifs() {
   const liste = [];
-  for (let i = 0; i < 64; i++) {
+  for (let i = 0; i < 120; i++) {
     const lieu = LIEUX[Math.floor(i / 5) % LIEUX.length];
     const sexe = i % 2 === 0 ? 'F' : 'M';
     const prenoms = sexe === 'F' ? PRENOMS_F : PRENOMS_M;
@@ -208,7 +208,10 @@ async function remplir({ run, get, all }) {
     ['Sysmex XN-1000', 'hematologie', '2026-08-12', 'en_service'],
     ['Architect i2000SR', 'immunologie', '2026-07-20', 'en_service'],
     ['ABL90 FLEX', 'gazometrie', '2026-06-03', 'maintenance'],
-    ['Vitek 2', 'microbiologie', '2026-05-18', 'en_service']
+    ['Vitek 2', 'microbiologie', '2026-05-18', 'en_service'],
+    ['STA R Max', 'hemostase', '2026-10-02', 'en_service'],
+    ['Atellica UAS 800', 'urines', '2026-09-15', 'en_service'],
+    ['BD BACTEC FX', 'hemocultures', '2026-04-28', 'maintenance']
   ];
   const machineIds = {};
   for (const [nom, type, cal, statut] of machines) {
@@ -398,6 +401,98 @@ async function remplir({ run, get, all }) {
       date: '2026-09-18',
       date_validation: '2026-09-20 10:15:00',
       regles: [{ parametre: 'Plaquettes', seuil_bas: '150', seuil_haut: '400', unite: 'G/L' }]
+    },
+    {
+      nom: 'LOT-2026-014',
+      machine: 'STA R Max',
+      date: '2026-08-27',
+      conditions: 'Température 21°C, Lot de réactifs H-12, Calibration 2 niveaux',
+      csv: csvDecale('TP (taux de prothrombine)', '%', serieJours(2026, 8, [
+        98, 101, 99, 97, 100, 102, 98, 99, 101, 100,
+        97, 99, 103, 98, 100, 101, 99, 98, 102, 100,
+        99, 101, 98, 100, 99
+      ])),
+      biologiste: 'Dr. Amrani',
+      date_validation: '2026-08-29 09:40:00',
+      regles: [{ parametre: 'TP (taux de prothrombine)', seuil_bas: '70', seuil_haut: '130', unite: '%' }]
+    },
+    {
+      nom: 'LOT-2026-015',
+      machine: 'STA R Max',
+      date: '2026-09-27',
+      conditions: 'Température 21°C, Lot de réactifs H-12, Calibration 2 niveaux',
+      csv: csvDecale('Fibrinogène', 'g/L', serieJours(2026, 9, [
+        3.1, 3.0, 3.2, 3.1, 2.9, 3.3, 3.0, 3.1, 3.2, 3.0,
+        2.9, 3.1, 3.2, 3.0, 3.1, 3.3, 3.0, 2.9, 3.1, 3.2,
+        3.0, 4.4, 3.1, 3.0, 3.2
+      ])),
+      regles: [{ parametre: 'Fibrinogène', seuil_bas: '2.0', seuil_haut: '4.0', unite: 'g/L' }]
+    },
+    {
+      nom: 'LOT-2026-016',
+      machine: 'Atellica UAS 800',
+      date: '2026-10-27',
+      conditions: 'Température 22°C, Lot de bandelettes U-07, Calibration matin',
+      csv: csvDecale('Densité urinaire', '', serieJours(2026, 10, [
+        1.018, 1.020, 1.016, 1.022, 1.019, 1.017, 1.021, 1.018, 1.020, 1.019,
+        1.016, 1.023, 1.018, 1.017, 1.020, 1.019, 1.021, 1.018, 1.016, 1.022,
+        1.019, 1.020, 1.017, 1.018, 1.021
+      ])),
+      biologiste: 'Dr. Chen',
+      date_validation: '2026-10-29 14:05:00',
+      regles: [{ parametre: 'Densité urinaire', seuil_bas: '1.003', seuil_haut: '1.030', unite: '' }]
+    },
+    {
+      nom: 'LOT-2026-017',
+      machine: 'Cobas 8000',
+      date: '2026-10-28',
+      conditions: 'Température 21°C, Lot de réactifs R-455, Calibration matin',
+      csv: csvDecale('ASAT', 'UI/L', serieJours(2026, 10, [
+        26, 28, 25, 27, 29, 26, 28, 27, 25, 30,
+        27, 26, 28, 29, 27, 25, 28, 26, 27, 29,
+        28, 26, 27, 28, 25
+      ])),
+      biologiste: 'Dr. Amrani',
+      date_validation: '2026-10-31 11:20:00',
+      regles: [{ parametre: 'ASAT', seuil_bas: '10', seuil_haut: '40', unite: 'UI/L' }]
+    },
+    {
+      nom: 'LOT-2026-018',
+      machine: 'Cobas 8000',
+      date: '2026-10-30',
+      conditions: 'Température 21°C, Lot de réactifs R-455, Calibration matin',
+      csv: csvDecale('ALAT', 'UI/L', serieJours(2026, 10, [
+        24, 26, 23, 25, 27, 24, 26, 25, 23, 28,
+        25, 24, 26, 27, 25, 23, 26, 24, 25, 27,
+        26, 24, 25, 26, 23
+      ])),
+      regles: [{ parametre: 'ALAT', seuil_bas: '10', seuil_haut: '40', unite: 'UI/L' }]
+    },
+    {
+      nom: 'LOT-2026-019',
+      machine: 'Architect i2000SR',
+      date: '2026-09-28',
+      conditions: 'Température 22°C, Lot de réactifs I-31, Calibration 3 niveaux',
+      csv: csvDecale('TSH', 'mUI/L', serieJours(2026, 9, [
+        1.8, 2.0, 1.9, 2.1, 1.7, 2.0, 1.8, 1.9, 2.2, 1.8,
+        2.0, 1.9, 1.7, 2.1, 1.9, 2.0, 1.8, 2.2, 1.9, 2.0,
+        1.8, 1.9, 2.1, 1.9, 2.0
+      ])),
+      biologiste: 'Dr. Chen',
+      date_validation: '2026-09-30 08:50:00',
+      regles: [{ parametre: 'TSH', seuil_bas: '0.4', seuil_haut: '4.0', unite: 'mUI/L' }]
+    },
+    {
+      nom: 'LOT-2026-020',
+      machine: 'Sysmex XN-1000',
+      date: '2026-11-02',
+      conditions: 'Température 22°C, Lot de réactifs S-21, Calibration 3 niveaux',
+      csv: csvDecale('Leucocytes', 'G/L', serieJours(2026, 10, [
+        6.2, 6.5, 6.0, 6.8, 6.3, 6.1, 6.6, 6.4, 6.2, 6.7,
+        6.0, 6.3, 6.5, 6.1, 6.4, 6.6, 6.2, 6.0, 6.5, 6.3,
+        6.4, 6.1, 6.6, 6.2, 6.3
+      ])),
+      regles: [{ parametre: 'Leucocytes', seuil_bas: '4.0', seuil_haut: '10.0', unite: 'G/L' }]
     }
   ];
 
@@ -571,7 +666,8 @@ async function remplir({ run, get, all }) {
   await synchroniserSignalements({ run, get, all });
 
   const brutes = await all(`
-    SELECT patients_identite.date_naissance, patients_identite.sexe, patients_identite.departement,
+    SELECT patients_identite.id AS personne_id,
+      patients_identite.date_naissance, patients_identite.sexe, patients_identite.departement,
       patients_identite.code_postal, mesures_reference.parametre, mesures_reference.valeur,
       mesures_reference.unite, mesures_reference.date
     FROM mesures_reference

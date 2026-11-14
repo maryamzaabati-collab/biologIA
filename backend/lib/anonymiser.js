@@ -37,8 +37,21 @@ function compterGroupes(lignes) {
   return groupes;
 }
 
+// Le k-anonymat se compte en PERSONNES, pas en lignes : un même patient peut
+// avoir dix mesures, et dix lignes issues d'une seule personne ne la protègent pas.
+// personne_id n'est jamais exporté, il sert uniquement à ce calcul.
+function tailleGroupe(groupe) {
+  const ids = new Set();
+  for (const l of groupe) {
+    if (l.personne_id === undefined || l.personne_id === null) return groupe.length;
+    ids.add(String(l.personne_id));
+  }
+  return ids.size;
+}
+
 function genererJeu(lignesBrutes) {
   let lignes = lignesBrutes.map((l) => ({
+    personne_id: l.personne_id ?? l.identite_id ?? null,
     tranche_age: trancheAge(l.date_naissance) || 'inconnu',
     sexe: l.sexe || '',
     territoire: String(l.departement || (l.code_postal || '').slice(0, 2) || ''),
@@ -53,7 +66,7 @@ function genererJeu(lignesBrutes) {
 
   for (let tour = 0; tour < 2; tour++) {
     const groupes = compterGroupes(lignes);
-    const petites = [...groupes.entries()].filter(([, g]) => g.length < 5);
+    const petites = [...groupes.entries()].filter(([, g]) => tailleGroupe(g) < 5);
     if (!petites.length) break;
     const ids = new Set(petites.flatMap(([, g]) => g));
     lignes = lignes.map((l) => {
@@ -67,7 +80,7 @@ function genererJeu(lignesBrutes) {
   const restants = [];
   const groupesFin = compterGroupes(lignes);
   for (const [, g] of groupesFin) {
-    if (g.length < 5) {
+    if (tailleGroupe(g) < 5) {
       supprimees += g.length;
     } else {
       restants.push(...g);
@@ -75,7 +88,7 @@ function genererJeu(lignesBrutes) {
   }
 
   const groupesOk = compterGroupes(restants);
-  const tailles = [...groupesOk.values()].map((g) => g.length);
+  const tailles = [...groupesOk.values()].map((g) => tailleGroupe(g));
   const kMin = tailles.length ? Math.min(...tailles) : 0;
 
   return {

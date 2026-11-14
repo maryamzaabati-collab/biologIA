@@ -15,7 +15,8 @@ router.post('/generer', async (req, res) => {
       return res.status(403).json({ erreur: 'Seul un biologiste génère le jeu anonymisé.' });
     }
     const brutes = await db.all(`
-      SELECT patients_identite.date_naissance, patients_identite.sexe, patients_identite.departement,
+      SELECT patients_identite.id AS personne_id,
+        patients_identite.date_naissance, patients_identite.sexe, patients_identite.departement,
         patients_identite.code_postal, mesures_reference.parametre, mesures_reference.valeur,
         mesures_reference.unite, mesures_reference.date
       FROM mesures_reference

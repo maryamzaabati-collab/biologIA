@@ -9,7 +9,7 @@
 <body class="page-lots">
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <div class="brand"><span class="logo-mark" aria-hidden="true"></span> <span>biolog<b class="brand-ia">IA</b></span></div>
     <nav>
       <a href="accueil.html">Tableau de bord</a>
       <a href="index.html" class="active">Lots</a>
@@ -130,7 +130,7 @@ async function chargerLots() {
         <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
         <span class="lot-carte-date">${formatDate(lot.derniere_mesure || lot.date)}</span>
         <span class="score-ligne"><span>Score de confiance ${lot.score_confiance ?? '—'} / 100</span></span>
-        <span class="piste"><i style="width:${Number(lot.score_confiance)||0}%"></i></span>
+        <span class="piste"><i class="${classeScore(lot.score_confiance)}" style="width:${Number(lot.score_confiance)||0}%"></i></span>
       </a>
     `).join('');
     }

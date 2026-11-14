@@ -9,7 +9,7 @@
 <body class="page-patients">
 <div class="layout">
   <aside class="sidebar">
-    <div class="brand"><span class="logo-mark"></span> biologIA</div>
+    <div class="brand"><span class="logo-mark" aria-hidden="true"></span> <span>biolog<b class="brand-ia">IA</b></span></div>
     <nav></nav>
   </aside>
   <main>
@@ -326,8 +326,21 @@ function afficherRapportAnon(r) {
     <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>`;
   const rapport = document.getElementById('rapport-anon');
   if (rapport) rapport.innerHTML = html;
+  // Dans l'onglet « Identifier », une seule ligne de rappel : le détail du test
+  // appartient à l'onglet « Anonymisation », pas à la recherche d'un patient.
   const resume = document.getElementById('dernier-test-anon');
-  if (resume) resume.innerHTML = html;
+  if (resume) {
+    resume.innerHTML = `
+      <div class="page-head" style="margin:0">
+        <span class="hint" style="margin:0">Dernier test d’anonymisation</span>
+        <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${titre}</span>
+      </div>
+      <p class="hint" style="margin:8px 0 0">${okN} sur ${tot || 0} contrôles réussis.
+        <button type="button" class="lien-discret" data-va-onglet="anonymisation">Voir le détail</button></p>`;
+    resume.querySelector('[data-va-onglet]')?.addEventListener('click', () => {
+      document.querySelector('[data-onglet="anonymisation"]')?.click();
+    });
+  }
 }
 document.getElementById('btn-export-anon')?.addEventListener('click', async () => {
   try {

@@ -184,6 +184,15 @@ function classeBadge(code) {
   return 'douteux';
 }
 
+// Couleur de la barre de score : verte au-dessus de 80, ambre entre 50 et 80, rouge en dessous.
+function classeScore(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return '';
+  if (n < 50) return 'faible';
+  if (n < 80) return 'moyen';
+  return '';
+}
+
 function notifier(texte, type = 'ok') {
   let barre = document.getElementById('toasts');
   if (!barre) {
