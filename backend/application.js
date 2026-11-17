@@ -22,6 +22,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Limitation globale de l'API : la connexion avait déjà la sienne, mais rien
+// ne protégeait les autres routes. Le plafond est large pour ne pas gêner un
+// usage normal, et il est marqué ici pour que la page Conformité le constate.
+const LIMITE_API_GLOBALE = { fenetreMs: 60000, max: 300 };
+app.locals.limiteApiGlobale = LIMITE_API_GLOBALE;
+app.use('/api', limiter({
+  ...LIMITE_API_GLOBALE,
+  cle: (req) => `api:${req.ip}`
+}));
+
 app.use(express.json({ limit: '2mb' }));
 app.use(attacherUtilisateur);
 app.use(csrf.middleware);

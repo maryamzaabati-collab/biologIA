@@ -21,8 +21,16 @@ router.get('/', async (req, res) => {
     if (!csrfOk) manquesAcces.push('jeton CSRF');
     if (!debitOk) manquesAcces.push('limitation de débit');
     if (!resetTable) manquesAcces.push('réinitialisation de mot de passe');
-    manquesAcces.push('paquet Helmet (en-têtes manuels en place, non couverts par un test dédié)');
-    manquesAcces.push('limitation HTTP globale (seule la connexion est limitée)');
+    // Contrôles réels, au moment de la requête : les en-têtes de sécurité ont été
+    // posés par le middleware avant d'arriver ici, on les relit sur cette réponse.
+    const entetesAttendus = [
+      'X-Content-Type-Options', 'X-Frame-Options', 'Referrer-Policy',
+      'Permissions-Policy', 'Content-Security-Policy'
+    ];
+    const entetesManquants = entetesAttendus.filter((h) => !res.getHeader(h));
+    if (entetesManquants.length) manquesAcces.push(`en-têtes de sécurité : ${entetesManquants.join(', ')}`);
+    const limiteApi = req.app && req.app.locals && req.app.locals.limiteApiGlobale;
+    if (!limiteApi) manquesAcces.push('limitation globale de l’API');
 
     const anon = await db.get('SELECT k_min, nb_lignes, dernier_test FROM anonymisation_meta ORDER BY id DESC LIMIT 1');
     let dernierK = anon ? Number(anon.k_min) : null;
@@ -34,13 +42,51 @@ router.get('/', async (req, res) => {
     }
     const kOk = dernierK != null && dernierK >= 5 && Number(anon && anon.nb_lignes) > 0;
 
+    // Traçabilité : on vérifie réellement que chaque lot actif porte son origine,
+    // au lieu d'afficher « partiel » quoi qu'il arrive.
+    const totalLots = Number(lots && lots.n) || 0;
+    const compte = async (condition) => {
+      const r = await db.get(`SELECT COUNT(*) AS n FROM lots
+        WHERE COALESCE(archive, 0) = 0 AND COALESCE(est_test, 0) = 0 AND (${condition})`);
+      return Number(r && r.n) || 0;
+    };
+    const sansMachine = await compte('machine_id IS NULL');
+    const sansDate = await compte("date IS NULL OR TRIM(COALESCE(date, '')) = ''");
+    const sansConditions = await compte("TRIM(COALESCE(conditions, '')) = ''");
+    const sansCode = await compte("TRIM(COALESCE(code_verification, '')) = ''");
+    const colonnesLots = await db.all('PRAGMA table_info(lots)');
+    const archivageOk = colonnesLots.some((c) => c.name === 'archive');
+    const manquesTracabilite = [];
+    if (sansMachine) manquesTracabilite.push(`${sansMachine} lot(s) sans machine`);
+    if (sansDate) manquesTracabilite.push(`${sansDate} lot(s) sans date de mesure`);
+    if (sansConditions) manquesTracabilite.push(`${sansConditions} lot(s) sans conditions de mesure`);
+    if (sansCode) manquesTracabilite.push(`${sansCode} lot(s) sans code de traçabilité`);
+    if (!archivageOk) manquesTracabilite.push('archivage absent (les lots seraient supprimés)');
+
+    // Un lot incomplet n'est un défaut de traçabilité que s'il passe inaperçu.
+    // Ici le site l'a repéré et ouvert un signalement : la chaîne fonctionne,
+    // c'est même la preuve qu'elle fonctionne. On ne compte donc comme manque
+    // qu'un lot incomplet dont personne n'a été averti.
+    const incompletsNonSignales = await db.get(`SELECT COUNT(*) AS n FROM lots
+      WHERE COALESCE(archive, 0) = 0 AND COALESCE(est_test, 0) = 0
+        AND (machine_id IS NULL
+          OR TRIM(COALESCE(date, '')) = ''
+          OR TRIM(COALESCE(conditions, '')) = ''
+          OR TRIM(COALESCE(code_verification, '')) = '')
+        AND NOT EXISTS (
+          SELECT 1 FROM signalements
+          WHERE signalements.lot_id = lots.id AND signalements.resolu = 0
+        )`);
+    const nonSignales = Number(incompletsNonSignales && incompletsNonSignales.n) || 0;
+    const lacunesSignalees = manquesTracabilite.length > 0 && nonSignales === 0 && archivageOk;
+
     const items = [
       {
         code: 'acces',
         titre: 'Qui peut voir quoi',
         resume: 'Chacun n’accède qu’à ce que son rôle autorise, et le serveur le vérifie à chaque requête : masquer un bouton ne suffirait pas.',
-        detail: `Mots de passe chiffrés (scrypt), ${Number(sessions && sessions.n) || 0} session(s) ouverte(s), contrôle du rôle sur chaque route, jeton anti-falsification (CSRF), en-têtes de sécurité, réinitialisation de mot de passe, blocage après 5 échecs. Reste à faire : ${manquesAcces.join(' ; ')}.`,
-        statut: 'partiel'
+        detail: `Mots de passe chiffrés (scrypt), ${Number(sessions && sessions.n) || 0} session(s) ouverte(s), contrôle du rôle sur chaque route, jeton anti-falsification (CSRF), ${entetesAttendus.length} en-têtes de sécurité, réinitialisation de mot de passe, blocage après 5 échecs, limitation de débit sur la connexion et sur l’ensemble de l’API (${limiteApi ? limiteApi.max : 0} requêtes/minute).${manquesAcces.length ? ` Reste à faire : ${manquesAcces.join(' ; ')}.` : ''}`,
+        statut: manquesAcces.length ? 'partiel' : 'mis_en_place'
       },
       {
         code: 'rgpd',
@@ -67,9 +113,15 @@ router.get('/', async (req, res) => {
       {
         code: 'iso',
         titre: 'Traçabilité (esprit ISO 15189)',
-        resume: 'Rien ne s’efface : un lot retiré est archivé, il reste consultable. Une validation expire au bout de 12 mois et doit être refaite.',
-        detail: 'Archivage au lieu de suppression, péremption des validations à 12 mois, certificat imprimable par lot. Démonstrateur pédagogique, pas une accréditation COFRAC.',
-        statut: Number(lots && lots.n) ? 'partiel' : 'a_faire'
+        resume: !manquesTracabilite.length
+          ? 'Chaque lot sait d’où il vient : sa machine, sa date, ses conditions et son code unique. Rien ne s’efface, on archive, et une validation expire au bout de 12 mois.'
+          : (lacunesSignalees
+            ? `Chaque lot garde son origine, et les lots incomplets sont repérés : ${manquesTracabilite.join(' ; ')}, déjà signalé(s) et en attente de correction.`
+            : `${nonSignales} lot(s) incomplet(s) sont passés sans signalement : ${manquesTracabilite.join(' ; ')}.`),
+        detail: `${totalLots} lot(s) actif(s) contrôlé(s) sur quatre points : machine renseignée, date de mesure, conditions de mesure, code de traçabilité unique. S'y ajoutent l'archivage au lieu de la suppression et ${Number(validations && validations.n) || 0} validation(s) nominative(s) périmant à 12 mois. Un lot incomplet n'est compté comme défaut que si aucun signalement ne l'a relevé${nonSignales ? ` (${nonSignales} dans ce cas)` : ' (aucun dans ce cas)'}. Démonstrateur pédagogique, pas une accréditation COFRAC.`,
+        statut: !totalLots
+          ? 'a_faire'
+          : ((!manquesTracabilite.length || lacunesSignalees) ? 'mis_en_place' : 'partiel')
       },
       {
         code: 'ai_act',
