@@ -1385,3 +1385,43 @@ select {
 }
 .machine-actions button { margin-top: 0; }
 .machine-actions button[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* ===== Carte de contrôle : verdict en clair avant le détail technique ===== */
+.lj-verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  margin-bottom: 14px;
+}
+.lj-verdict strong { font-size: 1rem; }
+.lj-verdict span { font-size: .85rem; color: var(--ink-soft); }
+.lj-verdict.ok { background: var(--ok-soft); }
+.lj-verdict.alerte { background: var(--flag-soft); }
+
+.lj-liste { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 12px; }
+.lj-anomalie { display: flex; gap: 10px; align-items: flex-start; font-size: .9rem; }
+.lj-puce { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--flag); }
+.lj-anomalie.surveiller .lj-puce { background: var(--wait); }
+.lj-regle {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .72rem;
+  color: var(--ink-soft);
+  cursor: help;
+}
+.lj-aide { display: block; margin-top: 3px; font-size: .82rem; color: var(--ink-soft); }
+
+.lj-explication { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.lj-explication summary { cursor: pointer; font-weight: 500; font-size: .9rem; }
+.lj-explication p { font-size: .85rem; margin: 10px 0 0; }
+
+/* Conformité : le détail technique est replié, la phrase claire reste visible. */
+.detail-technique { margin-top: 6px; }
+.detail-technique summary { cursor: pointer; font-size: .82rem; color: var(--ink-soft); }
+.detail-technique p { font-size: .82rem; color: var(--ink-soft); margin: 6px 0 0; }

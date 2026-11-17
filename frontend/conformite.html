@@ -17,7 +17,7 @@
     <div class="page-head">
       <div>
         <h1>Conformité</h1>
-        <p class="page-intro">Pastilles issues de contrôles réels. Démonstrateur, pas une certification.</p>
+        <p class="page-intro">Ce que le site protège, et ce qu’il ne garantit pas encore. Chaque état est calculé à partir d’un vrai contrôle, pas écrit à la main.</p>
       </div>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
@@ -36,7 +36,8 @@
         <div class="conformite-ligne">
           <div>
             <strong>${echap(it.titre)}</strong>
-            <p>${echap(it.detail)}</p>
+            <p>${echap(it.resume || it.detail)}</p>
+            ${it.resume && it.detail ? `<details class="detail-technique"><summary>Détail technique</summary><p>${echap(it.detail)}</p></details>` : ''}
           </div>
           <span class="badge ${badge(it.statut)}">${lib(it.statut)}</span>
         </div>`).join('')}

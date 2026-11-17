@@ -331,8 +331,9 @@ function westgard(valeurs, m, sd, dates = []) {
       alertes.push({
         regle: '1-3s',
         index: i,
-        message: `Règle 1-3s : le ${etiquettePointControle(i, dates)} sort de ±3σ`,
-        aide: 'Un seul point au-delà de 3 écarts-types : arrêt immédiat en labo.'
+        gravite: 'grave',
+        message: `Mesure très anormale le ${etiquettePointControle(i, dates)}`,
+        aide: 'Elle s’écarte de plus de 3 écarts-types de la moyenne. En laboratoire, on arrête la série et on recontrôle la machine.'
       });
     }
   });
@@ -343,16 +344,18 @@ function westgard(valeurs, m, sd, dates = []) {
       alertes.push({
         regle: '2-2s',
         index: i,
-        message: `Règle 2-2s : ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)} sont consécutifs hors ±2σ du même côté`,
-        aide: 'Deux points consécutifs du même côté au-delà de 2σ.'
+        gravite: 'grave',
+        message: `Deux mesures de suite décalées du même côté, le ${etiquettePointControle(i - 1, dates)} et le ${etiquettePointControle(i, dates)}`,
+        aide: 'Les deux dépassent 2 écarts-types dans la même direction : la machine est probablement mal réglée.'
       });
     }
     if (Math.abs(valeurs[i] - valeurs[i - 1]) > 4 * sd) {
       alertes.push({
         regle: 'R-4s',
         index: i,
-        message: `Règle R-4s : écart > 4σ entre ${etiquettePointControle(i - 1, dates)} et ${etiquettePointControle(i, dates)}`,
-        aide: 'Deux points consécutifs distants de plus de 4 écarts-types (dérive brutale).'
+        gravite: 'grave',
+        message: `Saut brutal entre le ${etiquettePointControle(i - 1, dates)} et le ${etiquettePointControle(i, dates)}`,
+        aide: 'L’écart entre ces deux mesures dépasse 4 écarts-types : la machine est devenue instable.'
       });
     }
   }
@@ -362,8 +365,9 @@ function westgard(valeurs, m, sd, dates = []) {
       alertes.push({
         regle: '4-1s',
         index: i,
-        message: `Règle 4-1s : quatre points consécutifs jusqu’au ${etiquettePointControle(i, dates)} hors ±1σ du même côté`,
-        aide: 'Quatre mesures d’affilée du même côté au-delà de 1σ.'
+        gravite: 'surveiller',
+        message: `Quatre mesures de suite du même côté, jusqu’au ${etiquettePointControle(i, dates)}`,
+        aide: 'Elles dépassent toutes 1 écart-type dans la même direction : la machine commence à dériver.'
       });
     }
   }
@@ -373,8 +377,9 @@ function westgard(valeurs, m, sd, dates = []) {
       alertes.push({
         regle: '10x̄',
         index: i,
-        message: `Règle 10x̄ : dix points consécutifs jusqu’au ${etiquettePointControle(i, dates)} du même côté de la moyenne`,
-        aide: 'Dix points d’affilée au-dessus ou en dessous de la moyenne (biais).'
+        gravite: 'surveiller',
+        message: `Dix mesures de suite du même côté de la moyenne, jusqu’au ${etiquettePointControle(i, dates)}`,
+        aide: 'Un décalage durable, même faible : la machine mesure systématiquement un peu trop haut ou trop bas.'
       });
     }
   }

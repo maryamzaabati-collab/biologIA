@@ -407,11 +407,30 @@ function htmlCarteControle(serie) {
     `<text x="${pad.l - 8}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="currentColor">${v.toFixed(2)}</text>`
   ).join('');
   const hors = pts.filter((p) => p.hors_norme);
-  const west = (serie.westgard || []).map((w) => `<li>${echap(w.message)}</li>`).join('');
+  // Chaque anomalie est annoncée en français simple ; le code de la règle
+  // (1-3s, 2-2s…) et son explication technique restent accessibles au survol
+  // et dans le repli « Comment lire cette carte ? », pour le jury.
+  // L'explication technique n'est donnée qu'à la première occurrence de chaque
+  // règle : répétée cinq fois, elle noyait le message.
+  const reglesVues = new Set();
+  const west = (serie.westgard || []).map((w) => {
+    const premiere = !reglesVues.has(w.regle);
+    reglesVues.add(w.regle);
+    return `
+    <li class="lj-anomalie ${w.gravite === 'surveiller' ? 'surveiller' : 'grave'}">
+      <span class="lj-puce" aria-hidden="true"></span>
+      <span>
+        ${echap(w.message)}
+        <span class="lj-regle" title="${echap(w.aide || '')}">${echap(w.regle || '')}</span>
+        ${w.aide && premiere ? `<span class="lj-aide">${echap(w.aide)}</span>` : ''}
+      </span>
+    </li>`;
+  }).join('');
   const listeHors = hors.length
-    ? `<p class="hint">Points hors limites (rouge) — valeurs du CSV de référence, jamais un patient :</p>
+    ? `<p class="hint">Mesures hors limites (en rouge) — ce sont des contrôles de la machine, jamais des patients :</p>
        <ul class="urgence">${hors.map((p) => `<li>${echap(p.nom || serie.nom || '')} · ${p.date ? formatDate(p.date) : '#' + p.index} · ${p.moyenne_controle}</li>`).join('')}</ul>`
-    : '<p class="hint">Aucun point hors ±2σ sur cette série.</p>';
+    : '';
+  const nbAnomalies = (serie.westgard || []).length;
   return `
     <div class="lj-grille">
     <svg class="carte-svg" viewBox="0 0 ${w} ${h}" role="img" aria-label="Carte de contrôle Levey-Jennings">
@@ -428,9 +447,28 @@ function htmlCarteControle(serie) {
       <text x="16" y="${h / 2}" font-size="10" fill="currentColor" transform="rotate(-90 16 ${h / 2})">${echap(serie.unite || serie.parametre || 'valeur')}</text>
     </svg>
     <div class="lj-panneau">
-      <h3>Règles de Westgard déclenchées</h3>
-      ${west ? `<ul>${west}</ul>` : '<p class="hint">Aucune règle 1-3s / 2-2s / 4-1s / R-4s / 10x̄ sur cette série.</p>'}
+      ${nbAnomalies
+        ? `<div class="lj-verdict alerte">
+             <strong>${nbAnomalies === 1 ? '1 anomalie détectée' : nbAnomalies + ' anomalies détectées'}</strong>
+             <span>Cette machine s’écarte de son comportement habituel.</span>
+           </div>
+           <ul class="lj-liste">${west}</ul>`
+        : `<div class="lj-verdict ok">
+             <strong>Série normale</strong>
+             <span>Toutes les mesures restent dans les écarts attendus.</span>
+           </div>`}
       ${listeHors}
+      <details class="lj-explication">
+        <summary>Comment lire cette carte ?</summary>
+        <p>Chaque point est une mesure de contrôle, dans l’ordre des dates. La ligne du
+        milieu est la <strong>moyenne habituelle</strong> de la machine ; les pointillés
+        marquent les écarts acceptés autour d’elle.</p>
+        <p>Un point qui sort des pointillés rouges n’est pas un patient malade : c’est la
+        <strong>machine</strong> qui mesure mal ce jour-là.</p>
+        <p class="hint">Les repères σ (sigma) mesurent la dispersion habituelle. Les codes
+        1-3s, 2-2s, 4-1s, R-4s et 10x̄ sont les règles de Westgard, la grille utilisée dans
+        les laboratoires d’analyses pour décider quand arrêter une machine.</p>
+      </details>
     </div>
     </div>`;
 }

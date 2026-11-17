@@ -37,46 +37,58 @@ router.get('/', async (req, res) => {
     const items = [
       {
         code: 'acces',
-        titre: 'Contrôle des accès',
-        detail: `Présent : sessions (${Number(sessions && sessions.n) || 0}), rôles serveur, scrypt, CSRF, en-têtes (nosniff/frame/CSP), reset MDP, limite de connexion. Manque ou non testé : ${manquesAcces.join(' ; ')}.`,
+        titre: 'Qui peut voir quoi',
+        resume: 'Chacun n’accède qu’à ce que son rôle autorise, et le serveur le vérifie à chaque requête : masquer un bouton ne suffirait pas.',
+        detail: `Mots de passe chiffrés (scrypt), ${Number(sessions && sessions.n) || 0} session(s) ouverte(s), contrôle du rôle sur chaque route, jeton anti-falsification (CSRF), en-têtes de sécurité, réinitialisation de mot de passe, blocage après 5 échecs. Reste à faire : ${manquesAcces.join(' ; ')}.`,
         statut: 'partiel'
       },
       {
         code: 'rgpd',
-        titre: 'RGPD / pseudonymisation',
+        titre: 'Protection des patients',
+        resume: identiteSeparee
+          ? 'Les lots ne contiennent jamais de nom : chaque patient est remplacé par un code. Les identités sont rangées à part, visibles du seul biologiste.'
+          : 'Les fichiers importés sont contrôlés, mais aucune identité n’est encore enregistrée.',
         detail: identiteSeparee
-          ? 'Identités fictives isolées (patients_identite) ; lots et mesures ne voient que le code PSN. Scan CSV colonnes + contenu.'
-          : 'Scan CSV présent ; table d’identités encore vide.',
+          ? 'Identités dans une table séparée ; lots et mesures ne portent que le code PSN. À l’import, les noms de colonnes et le contenu des cellules sont scannés pour repérer un nom, un NIR, un e-mail ou un téléphone oublié.'
+          : 'Le scan des fichiers importés fonctionne ; la table d’identités est encore vide.',
         statut: identiteSeparee ? 'mis_en_place' : 'partiel'
       },
       {
         code: 'journal',
-        titre: 'Journal de validation',
+        titre: 'Historique infalsifiable',
+        resume: Number(journal && journal.n)
+          ? `Chaque action est enregistrée avec son auteur et sa date. ${hashOk ? 'Modifier une ligne après coup se verrait immédiatement.' : 'La protection contre la modification n’est pas active.'}`
+          : 'Le journal est prêt, aucune action n’a encore été enregistrée.',
         detail: Number(journal && journal.n)
-          ? `${journal.n} événements d’audit. Chaîne SHA-256 ${hashOk ? 'en place' : 'absente'}. Validations biologiste nominatives.`
-          : 'Le journal est prêt, aucune action enregistrée pour l’instant.',
+          ? `${journal.n} événements. Chaque ligne contient l’empreinte (SHA-256) de la précédente : les lignes forment une chaîne, et en casser un maillon se détecte. Validations signées au nom du biologiste.`
+          : '',
         statut: Number(validations && validations.n) && hashOk ? 'mis_en_place' : 'partiel'
       },
       {
         code: 'iso',
-        titre: 'ISO 15189',
-        detail: 'Archivage (pas de suppression), péremption 12 mois, certificat par lot. Démonstrateur pédagogique, pas une accréditation COFRAC.',
+        titre: 'Traçabilité (esprit ISO 15189)',
+        resume: 'Rien ne s’efface : un lot retiré est archivé, il reste consultable. Une validation expire au bout de 12 mois et doit être refaite.',
+        detail: 'Archivage au lieu de suppression, péremption des validations à 12 mois, certificat imprimable par lot. Démonstrateur pédagogique, pas une accréditation COFRAC.',
         statut: Number(lots && lots.n) ? 'partiel' : 'a_faire'
       },
       {
         code: 'ai_act',
-        titre: 'AI Act — transparence',
-        detail: 'Aucun diagnostic n’est posé. Les seuils d’alerte sont des exemples pédagogiques ; la décision finale reste humaine. Classification de risque : à confirmer avec l’enseignant.',
+        titre: 'Ce que le site ne fait pas',
+        resume: 'Le site ne pose aucun diagnostic et ne remplace pas un biologiste : il signale, un humain décide.',
+        detail: 'Les seuils d’alerte sont des exemples pédagogiques. Classification de risque au sens du règlement européen sur l’IA (AI Act) : à confirmer avec l’enseignant.',
         statut: 'partiel'
       },
       {
         code: 'anonymisation',
-        titre: 'Anonymisation (k ≥ 5)',
-        detail: kOk
-          ? `Dernier jeu / test : ${anon.nb_lignes} lignes, k minimum = ${dernierK}.`
+        titre: 'Impossible de retrouver quelqu’un',
+        resume: kOk
+          ? `Dans le jeu anonymisé, chaque profil est partagé par au moins ${dernierK} personnes : on ne peut désigner personne.`
           : (anon
-            ? `Dernier k = ${dernierK}. Générez à nouveau ou relancez le test k ≥ 5.`
-            : 'Aucun test k enregistré. Générez le jeu (onglet Patients) puis lancez le test.'),
+            ? 'Certains profils sont trop rares dans le jeu anonymisé : une personne pourrait être reconnue. Relancez la génération.'
+            : 'Aucun jeu anonymisé n’a encore été produit (onglet Patients).'),
+        detail: kOk
+          ? `${anon.nb_lignes} lignes produites. Le plus petit groupe (tranche d’âge + sexe + territoire) compte ${dernierK} personnes distinctes : c’est le k-anonymat, et le seuil retenu est 5.`
+          : '',
         statut: kOk ? 'mis_en_place' : 'partiel'
       }
     ];

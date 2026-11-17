@@ -46,7 +46,7 @@
         + `<p class="hint">${pluriel(serie.nb_points || 0, 'valeur')} CSV — minimum 20 pour un seul analyte.</p>`;
     }
     const note = serie.nb_reference
-      ? `<p class="hint">Limites calculées sur les ${serie.nb_reference} premiers points (période de référence), puis appliquées à toute la série.</p>`
+      ? `<p class="hint">Le comportement normal de la machine est calculé sur ses ${serie.nb_reference} premières mesures, puis les suivantes sont comparées à lui.</p>`
       : '';
     return titre + note + dessinerCarte(serie);
   }
