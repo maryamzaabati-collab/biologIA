@@ -17,6 +17,19 @@
     <h1>Bienvenue dans biologIA</h1>
     <p class="page-intro" style="max-width:62ch">Pour chaque lot de mesures d’un laboratoire, on sait <strong>d’où il vient</strong>, <strong>quelle machine l’a produit</strong>, <strong>s’il est fiable</strong> et <strong>qui l’a validé</strong>.</p>
     <p id="erreur-page" class="message erreur" hidden></p>
+    <div class="accueil-reseau">
+      <div class="card">
+        <p class="sur-titre">La problématique</p>
+        <h2>Les seuils d’alerte d’un laboratoire reposent-ils sur des données fiables ?</h2>
+        <p class="hint">La biologie contribue à environ 70 % des diagnostics. Mais si un analyseur dérive pendant des semaines, les « valeurs normales » calculées à partir de ses mesures deviennent fausses, et personne ne sait quels résultats revoir. biologIA trace chaque lot, surveille chaque machine et relie automatiquement une dérive aux données qu’elle a touchées.</p>
+        <a class="btn-link" href="apropos.html">Lire la problématique complète</a>
+      </div>
+      <div class="card">
+        <p class="sur-titre">Réseau biologIA Sud</p>
+        <div id="reseau-accueil" class="mini-stats" style="grid-template-columns:1fr 1fr"><p class="empty">Chargement…</p></div>
+        <a class="btn-link primary" href="reseau.html">Ouvrir l’observatoire</a>
+      </div>
+    </div>
     <div class="cards" style="margin:18px 0">
       <div class="card">
         <div class="etape-num">1</div>
@@ -71,6 +84,15 @@
   } catch (err) {
     afficherMessage('erreur-page', err.message);
   }
+  try {
+    const r = await api('/reseau/resume');
+    const fr = (n) => Number(n).toLocaleString('fr-FR');
+    document.getElementById('reseau-accueil').innerHTML = `
+      <div><b>${r.sites}</b><span>laboratoires en région Sud</span></div>
+      <div><b>${(r.examens_10_mois / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M</b><span>examens (janv.–oct. 2026)</span></div>
+      <div><b>${fr(r.controles_qc)}</b><span>contrôles qualité analysés</span></div>
+      <div><b>${r.derives}</b><span>dérives vues en ${String(r.delai_moyen_detection).replace('.', ',')} j en moyenne</span></div>`;
+  } catch { /* observatoire indisponible */ }
 })();
 </script>
 </body>

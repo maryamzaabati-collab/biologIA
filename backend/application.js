@@ -203,6 +203,7 @@ app.use('/api/patients', require('./routes/patients'));
 app.use('/api/anonymisation', require('./routes/anonymisation'));
 app.use('/api/conformite', require('./routes/conformite'));
 app.use('/api/coherence', require('./routes/coherence'));
+app.use('/api/reseau', require('./routes/reseau'));
 app.use('/api/comptes', (req, res, next) => {
   if (!req.utilisateur || req.utilisateur.role !== 'biologiste') {
     return res.status(403).json({ erreur: 'Seuls les biologistes peuvent valider les comptes.' });

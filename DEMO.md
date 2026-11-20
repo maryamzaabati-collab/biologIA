@@ -74,3 +74,13 @@ Conclure sur la page **Conformité** en expliquant comment chaque choix techniqu
 - Data lineage → Historisation complète pour audit
 
 Cela montre que le projet n'est pas qu'un exercice de code, mais une vraie réflexion métier alignée sur les pratiques professionnelles des laboratoires de biologie médicale.
+
+
+## Scénario « réseau » (3 minutes, à faire en premier devant le jury)
+
+1. **Problématique** (menu) : lire la question encadrée, montrer les 4 chiffres publics, puis le bloc « Ce que ça change ».
+2. **Observatoire réseau → Vue d’ensemble** : 2,65 M d’examens, Sigma médian, 5 dérives, −90 % de résultats exposés.
+3. **Carte** : cliquer sur Toulon puis sur Digne-les-Bains (en alerte : créatinine à 1,4 Sigma).
+4. **Dérives** : la dérive potassium de Toulon (nouveau lot de réactif) → vue le jour même par 1-3s/2-2s, au lieu du 30/06 → lot REF-TLN-K-2026T2 passé « à revalider ».
+5. **Inter-laboratoires → Créatinine** : Digne s’écarte tous les mois (biais de 6 %) — invisible au contrôle interne, visible seulement en comparant les sites.
+6. **Données** : montrer ce qui est réel / simulé et télécharger un CSV.

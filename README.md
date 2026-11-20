@@ -4,6 +4,31 @@ Projet 4 BUT Science des Données (Biologie / Laboratoires). Application web pou
 
 Aucun dossier patient réel n’est stocké ni interprété.
 
+## Problématique
+
+> Comment un réseau de laboratoires peut-il prouver, à tout moment, que ses seuils d’alerte reposent sur des données fiables, traçables et conformes ?
+
+biologIA répond en trois couches :
+
+1. **Registre** (plateau de Nice) : chaque lot de référence a sa fiche, sa machine, sa pseudonymisation vérifiée, sa validation par un biologiste, son historique et son certificat.
+2. **Surveillance** : règles de Westgard appliquées chaque jour aux contrôles qualité ; une dérive passe automatiquement les lots de référence touchés en « à revalider ».
+3. **Observatoire du réseau** (`reseau.html`) : 12 laboratoires de la région Sud, carte, Sigma par analyse, dérives, comparaison inter-laboratoires, lots de référence, jeux de données téléchargeables.
+
+Page de présentation : `apropos.html` (menu « Problématique »).
+
+## Données de l’observatoire
+
+| Donnée | Nature | Source |
+|---|---|---|
+| Volumes nationaux d’actes par code NABM (janv.–juin 2026) | réelle | Assurance Maladie (Cnam) |
+| Communes, codes INSEE, populations municipales | réelle | `@etalab/decoupage-administratif` 6.0.0 |
+| Contours des 6 départements de la région Sud | réelle | france-geojson (IGN Admin Express simplifié) → `frontend/donnees/carte-sud.json` |
+| Erreurs totales admissibles, imprécisions cibles | référentiel | ordres de grandeur CLIA 2024 / EFLM |
+| Sites, analyseurs, 38 880 contrôles qualité, 720 résultats inter-labos, 288 lots de référence, 5 dérives | simulée | `backend/lib/donnees-reseau.js` (graine fixe, reproductible) |
+
+Le jeu est créé automatiquement au premier lancement (tables `reseau_*`, moins d’une seconde). Pour le régénérer : `cd backend && npm run seed`.
+API (lecture, tous rôles connectés) : `/api/reseau/resume`, `/sites`, `/repartition`, `/performance`, `/derives`, `/qc`, `/eeq`, `/lots`, `/dictionnaire`, `/export/<jeu>` (CSV).
+
 Fonctionne avec **Node.js 20+**. Sur Node 22, SQLite utilise le module intégré `node:sqlite` ; sur Node 20 (Replit), le module `better-sqlite3`.
 
 ## Lancer en local

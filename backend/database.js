@@ -317,6 +317,12 @@ async function init() {
     console.error('Chargement des données de démonstration :', err);
   }
 
+  try {
+    await require('./lib/donnees-reseau').remplir({ run, get, all });
+  } catch (err) {
+    console.error('Chargement des données du réseau :', err);
+  }
+
   await run(`UPDATE utilisateurs SET email = NULL, statut = 'refuse'
     WHERE lower(COALESCE(email, '')) IN ('maryam@biol', 'mary@biologie')`);
   await run(`DELETE FROM sessions WHERE utilisateur_id IN (

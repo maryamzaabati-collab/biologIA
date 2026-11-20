@@ -24,6 +24,7 @@ async function main() {
   await db.init();
   await viderDonneesMetier();
   await remplir({ run: db.run, get: db.get, all: db.all });
+  await require('./lib/donnees-reseau').remplir({ run: db.run, get: db.get, all: db.all }, { forcer: true });
   const machines = await db.get('SELECT COUNT(*) AS n FROM machines');
   const lots = await db.get('SELECT COUNT(*) AS n FROM lots');
   const signalements = await db.get('SELECT COUNT(*) AS n FROM signalements WHERE resolu = 0');

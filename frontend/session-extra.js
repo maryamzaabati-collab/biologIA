@@ -78,6 +78,8 @@
     conformite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 20 7v6c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V7z"/><path d="m9 12 2 2 4-4"/></svg>',
     comptes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3"/><path d="M5 20c1.5-4 12.5-4 14 0"/></svg>',
     journal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 4h11v16H8z"/><path d="M5 4h3v16H5z"/></svg>',
+    reseau: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="2.2"/><circle cx="5" cy="18" r="2.2"/><circle cx="19" cy="18" r="2.2"/><path d="M11 7 6 16M13 7l5 9M7.2 18h9.6"/></svg>',
+    probleme: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14m0 3v.5"/></svg>',
     patients: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c1-4 11-4 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M21 20c-.6-3-5-3.5-7-2"/></svg>'
   };
 
@@ -110,6 +112,7 @@
     nav.innerHTML = `
       <p class="nav-section">Suivi</p>
       ${lienNav('accueil.html', 'Accueil', 'accueil', page)}
+      ${lienNav('reseau.html', 'Observatoire réseau', 'reseau', page)}
       ${lienNav('tableau.html', 'Tableau de bord', 'synthese', page)}
       ${lienNav('index.html', 'Lots', 'lots', page)}
       ${lienNav('machines.html', 'Machines', 'machines', page)}
@@ -119,6 +122,7 @@
       ${lienNav('documents.html', 'Documents', 'synthese', page)}
       <p class="nav-section">Conformité</p>
       ${lienNav('conformite.html', 'Conformité', 'conformite', page)}
+      ${lienNav('apropos.html', 'Problématique', 'probleme', page)}
       ${admin}
     `;
   }
