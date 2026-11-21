@@ -38,19 +38,21 @@ const id = new URLSearchParams(location.search).get('id');
     document.title = `${m.nom} — biologIA`;
     const horsTest = (m.lots || []).filter((l) => !Number(l.est_test));
     const st = m.stats || {};
-    const maint = m.statut_service === 'maintenance';
+    const maint = m.statut_service === 'maintenance' || m.statut_service === 'hors_service';
+    const libEtat = m.statut_service === 'hors_service' ? 'Hors service' : (m.statut_service === 'maintenance' ? 'Maintenance' : 'En service');
     const calOk = !m.calibration_a_renouveler && !maint;
     document.getElementById('fiche').innerHTML = `
       <div class="page-head">
         <div>
-          <h1>${echap(m.nom)} <span class="badge ${maint ? 'douteux' : 'ok'}">${maint ? 'Maintenance' : 'En service'}</span></h1>
-          <p class="page-intro">${echap(m.type || 'type n/r')} · dernière calibration ${m.date_calibration ? formatDate(m.date_calibration) : '—'}</p>
+          <h1>${echap(m.nom)} <span class="badge ${maint ? 'douteux' : 'ok'}">${libEtat}</span></h1>
+          <p class="page-intro">${echap(m.fabricant || 'fabricant n/r')} · ${echap(m.type || 'type n/r')}${m.secteur ? ` · ${echap(m.secteur)}` : ''}</p>
+          <p class="hint" style="margin:0">${m.numero_serie ? `N° de série ${echap(m.numero_serie)} · ` : ''}${m.mise_en_service ? `en service depuis le ${formatDate(m.mise_en_service)} · ` : ''}dernière calibration ${m.date_calibration ? formatDate(m.date_calibration) : '—'}</p>
         </div>
         <a class="btn-link" href="controle.html?machine_id=${m.id}">Ouvrir la carte de contrôle</a>
       </div>
       <div class="card anneaux-ligne" style="margin-bottom:14px">
         ${htmlAnneau(`${st.valides || 0} / ${st.lots || 0}`, 'lots validés', st.lots ? 100 * st.valides / st.lots : 0)}
-        ${htmlAnneau(String(st.score_moyen || 0), 'score moyen', st.score_moyen)}
+        ${htmlAnneau(String(st.score_moyen || 0), 'note de confiance moyenne', st.score_moyen)}
         ${htmlAnneau(String(st.signalements || 0), 'signalements ouverts', st.signalements ? 80 : 8, st.signalements ? 'faible' : 'ok')}
         ${htmlAnneau(calOk ? 'OK' : 'KO', 'calibration', calOk ? 100 : 20, calOk ? 'ok' : 'faible')}
       </div>

@@ -82,12 +82,12 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { nom, type, date_calibration, statut_service, date_maintenance } = req.body;
+  const { nom, type, date_calibration, statut_service, date_maintenance, fabricant, secteur } = req.body;
   if (!nom) return res.status(400).json({ erreur: 'Le nom de la machine est obligatoire.' });
   try {
     const { id } = await db.run(
-      'INSERT INTO machines (nom, type, date_calibration, statut_service, date_maintenance) VALUES (?, ?, ?, ?, ?)',
-      [nom, type || '', date_calibration || null, statut_service || 'en_service', date_maintenance || null]
+      'INSERT INTO machines (nom, type, date_calibration, statut_service, date_maintenance, fabricant, secteur, mise_en_service) VALUES (?, ?, ?, ?, ?, ?, ?, date(\'now\'))',
+      [nom, type || '', date_calibration || null, statut_service || 'en_service', date_maintenance || null, fabricant || null, secteur || null]
     );
     if (date_calibration) {
       await db.run(

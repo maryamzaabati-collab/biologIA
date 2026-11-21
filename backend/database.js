@@ -182,6 +182,10 @@ async function init() {
   await ajouterColonneSiAbsente('signalements', 'regle_id', 'INTEGER');
   await ajouterColonneSiAbsente('machines', 'date_maintenance', 'TEXT');
   await ajouterColonneSiAbsente('machines', 'prochaine_calibration', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'fabricant', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'numero_serie', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'mise_en_service', 'TEXT');
+  await ajouterColonneSiAbsente('machines', 'secteur', 'TEXT');
   await ajouterColonneSiAbsente('journal_audit', 'hash', 'TEXT');
   await ajouterColonneSiAbsente('journal_audit', 'hash_precedent', 'TEXT');
   await ajouterColonneSiAbsente('sessions', 'csrf', 'TEXT');

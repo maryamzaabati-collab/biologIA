@@ -201,31 +201,150 @@ async function remplirPatients({ run, get, all }) {
   await run(`UPDATE patients_pseudo SET identite_id = COALESCE(identite_id, patient_id)`);
 }
 
+// Parc d'automates du plateau technique de Nice (modèles réels, données fictives).
+// [nom, discipline, dernière calibration, état, fabricant, mise en service, secteur]
+const MACHINES = [
+  ['Cobas 8000', 'biochimie', '2026-09-01', 'en_service', 'Roche', '2019-03-12', 'Biochimie – chaîne principale'],
+  ['Cobas pure', 'biochimie', '2026-10-21', 'en_service', 'Roche', '2023-06-05', 'Urgences 24 h/24'],
+  ['Alinity ci', 'biochimie', '2026-10-14', 'en_service', 'Abbott', '2022-09-19', 'Biochimie – secours'],
+  ['Atellica CH 930', 'biochimie', '2026-08-30', 'en_service', 'Siemens Healthineers', '2021-01-11', 'Biochimie – chaîne principale'],
+  ['Sysmex XN-1000', 'hematologie', '2026-08-12', 'en_service', 'Sysmex', '2018-11-26', 'Hématologie'],
+  ['Sysmex XN-550', 'hematologie', '2026-10-09', 'en_service', 'Sysmex', '2022-02-14', 'Urgences 24 h/24'],
+  ['DxH 900', 'hematologie', '2026-07-28', 'en_service', 'Beckman Coulter', '2020-05-04', 'Hématologie'],
+  ['BC-6800 Plus', 'hematologie', '2026-03-17', 'maintenance', 'Mindray', '2021-10-18', 'Hématologie – secours'],
+  ['Architect i2000SR', 'immunologie', '2026-07-20', 'en_service', 'Abbott', '2017-09-04', 'Immuno-analyse'],
+  ['cobas e 801', 'immunologie', '2026-10-01', 'en_service', 'Roche', '2022-04-25', 'Immuno-analyse'],
+  ['Liaison XL', 'immunologie', '2026-09-08', 'en_service', 'DiaSorin', '2020-02-10', 'Sérologies – vitamine D'],
+  ['Tosoh HLC-723 G11', 'biochimie', '2026-10-06', 'en_service', 'Tosoh', '2021-06-21', 'HbA1c (diabète)'],
+  ['ABL90 FLEX', 'gazometrie', '2026-06-03', 'maintenance', 'Radiometer', '2019-12-02', 'Urgences 24 h/24'],
+  ['GEM Premier 5000', 'gazometrie', '2026-10-27', 'en_service', 'Werfen', '2023-01-16', 'Réanimation'],
+  ['STA R Max', 'hemostase', '2026-10-02', 'en_service', 'Stago', '2020-08-31', 'Hémostase'],
+  ['CS-5100', 'hemostase', '2026-09-24', 'en_service', 'Sysmex', '2021-03-29', 'Hémostase'],
+  ['Atellica UAS 800', 'urines', '2026-09-15', 'en_service', 'Siemens Healthineers', '2021-01-11', 'Urines'],
+  ['UF-5000', 'urines', '2026-08-18', 'en_service', 'Sysmex', '2022-11-07', 'Urines'],
+  ['Vitek 2', 'microbiologie', '2026-05-18', 'en_service', 'bioMérieux', '2016-05-23', 'Microbiologie'],
+  ['MALDI Biotyper sirius', 'microbiologie', '2026-09-30', 'en_service', 'Bruker', '2023-09-11', 'Microbiologie'],
+  ['BD BACTEC FX', 'hemocultures', '2026-04-28', 'maintenance', 'BD', '2015-10-12', 'Microbiologie'],
+  ['BacT/ALERT VIRTUO', 'hemocultures', '2026-10-19', 'en_service', 'bioMérieux', '2024-02-05', 'Microbiologie'],
+  ['Capillarys 3 Tera', 'electrophorese', '2026-09-12', 'en_service', 'Sebia', '2022-07-04', 'Protéines'],
+  ['GeneXpert XVI', 'biologie_moleculaire', '2026-10-11', 'en_service', 'Cepheid', '2020-04-06', 'Biologie moléculaire'],
+  ['Hydrasys 2 Scan', 'electrophorese', '2025-11-03', 'hors_service', 'Sebia', '2014-01-20', 'Protéines – ancien'],
+  ['Centrifugeuse Rotina 380', 'centrifugeuse', '2026-09-02', 'en_service', 'Hettich', '2019-05-13', 'Pré-analytique']
+];
+
+// Analyses qu'on peut produire sur chaque machine, pour fabriquer des lots réalistes.
+// [paramètre, unité, moyenne, écart-type, seuil bas, seuil haut, décimales]
+const PARAMETRES = {
+  'Cobas 8000': [['Glycémie à jeun', 'g/L', 0.92, 0.05, '0.70', '1.10', 2], ['Créatinine', 'µmol/L', 78, 6, '45', '105', 0], ['Sodium', 'mmol/L', 140, 1.6, '136', '145', 0], ['Calcium', 'mmol/L', 2.38, 0.06, '2.20', '2.60', 2]],
+  'Cobas pure': [['Potassium', 'mmol/L', 4.2, 0.12, '3.5', '5.1', 1], ['Troponine T hs', 'ng/L', 8, 2.2, null, '14', 0], ['CRP', 'mg/L', 2.6, 0.5, null, '5.0', 1]],
+  'Alinity ci': [['Urée', 'mmol/L', 5.2, 0.5, '2.5', '7.5', 1], ['Bilirubine totale', 'µmol/L', 10, 1.8, null, '21', 0], ['ALAT', 'UI/L', 24, 2.5, '10', '40', 0]],
+  'Atellica CH 930': [['Triglycérides', 'g/L', 1.15, 0.12, null, '1.50', 2], ['Acide urique', 'µmol/L', 300, 22, '150', '420', 0], ['Gamma-GT', 'UI/L', 28, 4, null, '55', 0]],
+  'Sysmex XN-1000': [['Hémoglobine', 'g/dL', 13.8, 0.25, '12.0', '16.0', 1], ['Plaquettes', 'G/L', 250, 8, '150', '400', 0]],
+  'Sysmex XN-550': [['Leucocytes', 'G/L', 6.4, 0.25, '4.0', '10.0', 1], ['Hémoglobine', 'g/dL', 13.7, 0.3, '12.0', '16.0', 1]],
+  'DxH 900': [['Hématocrite', '%', 41.5, 0.9, '36', '48', 1], ['VGM', 'fL', 89, 1.4, '80', '100', 0]],
+  'BC-6800 Plus': [['Réticulocytes', 'G/L', 55, 6, '20', '120', 0]],
+  'Architect i2000SR': [['TSH', 'mUI/L', 1.9, 0.15, '0.4', '4.0', 2], ['Ferritine', 'µg/L', 110, 9, '30', '300', 0]],
+  'cobas e 801': [['T4 libre', 'pmol/L', 15.5, 0.9, '12', '22', 1], ['PSA total', 'ng/mL', 1.3, 0.12, null, '4.0', 2], ['Vitamine B12', 'pmol/L', 330, 25, '145', '570', 0]],
+  'Liaison XL': [['Vitamine D (25-OH)', 'ng/mL', 31, 2.6, '30', '100', 0]],
+  'Tosoh HLC-723 G11': [['HbA1c', '%', 5.6, 0.12, null, '6.0', 1]],
+  'ABL90 FLEX': [['pH', '', 7.40, 0.012, '7.35', '7.45', 2], ['Lactate', 'mmol/L', 1.2, 0.15, null, '2.0', 1]],
+  'GEM Premier 5000': [['pO2', 'mmHg', 92, 3, '80', '100', 0], ['pCO2', 'mmHg', 40, 1.4, '35', '45', 0]],
+  'STA R Max': [['TP (taux de prothrombine)', '%', 99, 1.6, '70', '130', 0], ['Fibrinogène', 'g/L', 3.1, 0.12, '2.0', '4.0', 1]],
+  'CS-5100': [['TCA (ratio)', '', 1.02, 0.04, '0.80', '1.20', 2], ['D-dimères', 'µg/mL', 0.32, 0.05, null, '0.50', 2]],
+  'Atellica UAS 800': [['Densité urinaire', '', 1.019, 0.002, '1.003', '1.030', 3]],
+  'UF-5000': [['Leucocytes urinaires', '/µL', 8, 2, null, '20', 0]],
+  'Capillarys 3 Tera': [['Albumine (électrophorèse)', '%', 60, 1.5, '55', '66', 1]],
+  // Microbiologie : on suit des contrôles chiffrés (souches de référence, contrôle interne PCR)
+  'MALDI Biotyper sirius': [['Score d’identification (souche de contrôle)', '', 2.25, 0.06, '2.00', null, 2]],
+  'BacT/ALERT VIRTUO': [['Délai de positivité (souche de contrôle)', 'h', 14, 1.2, null, '24', 1]],
+  'BD BACTEC FX': [['Délai de positivité (souche de contrôle)', 'h', 15, 1.3, null, '24', 1]],
+  'GeneXpert XVI': [['Ct du contrôle interne (PCR)', '', 28.5, 0.6, '25', '32', 1]],
+  'Vitek 2': [['CMI amoxicilline (souche E. coli ATCC 25922)', 'mg/L', 4, 0.45, '2', '8', 1]]
+};
+
+// Fabrique, pour chaque machine, un lot par trimestre en 2025–2026 (sauf machines
+// sans mesure chiffrée). Quelques lots ont volontairement un défaut, pour que
+// le site ait quelque chose à détecter.
+function lotsGeneres(csvDecale) {
+  const res = [];
+  const BIOS = ['Dr. Amrani', 'Dr. Chen', 'Dr. El Fassi'];
+  const TRIM = [[2025, 1], [2025, 4], [2025, 7], [2025, 10], [2026, 1], [2026, 4], [2026, 7], [2026, 10]];
+  let n25 = 0;
+  let n26 = 20;
+  const normal = () => Math.sqrt(-2 * Math.log(tirage() + 1e-12)) * Math.cos(2 * Math.PI * tirage());
+  Object.entries(PARAMETRES).forEach(([machine, params], im) => {
+    const statut = (MACHINES.find((m) => m[0] === machine) || [])[3];
+    TRIM.forEach(([annee, mois], it) => {
+      const param = params[(it + im) % params.length];
+      const [nomP, unite, moy, sd, bas, haut, dec] = param;
+      if (statut === 'maintenance' && annee === 2026 && mois >= 7) return; // machine arrêtée
+      if ((it + im) % 3 === 2 && annee === 2025) return; // pas de lot ce trimestre-là
+      const moisLot = mois + Math.floor(tirage() * 3);
+      const jour = 3 + Math.floor(tirage() * 20);
+      const date = `${annee}-${String(moisLot).padStart(2, '0')}-${String(jour).padStart(2, '0')}`;
+      if (date > '2026-11-15') return;
+      const k = (im * 7 + it * 3) % 23; // « dé » déterministe pour choisir les défauts
+      const valeurs = [];
+      for (let i = 0; i < 25; i++) {
+        let v = moy + normal() * sd;
+        if (k === 4 && i === 17) v = moy + 4.2 * sd + (haut ? 0 : 0); // point aberrant -> alerte
+        valeurs.push(Number(v.toFixed(dec)));
+      }
+      if (k === 9 && haut) valeurs[12] = Number((Number(haut) * 1.25).toFixed(dec)); // valeur au-dessus du seuil
+      // 25 jours de mesures qui se terminent le jour du lot (jamais dans le futur)
+      const points = valeurs.map((valeur, i) => {
+        const d = new Date(Date.UTC(annee, moisLot - 1, jour - (valeurs.length - 1 - i)));
+        return { valeur, date: d.toISOString().slice(0, 10) };
+      });
+      const recent = date >= '2026-10-01';
+      const bio = recent && k % 2 === 0 ? null : BIOS[(im + it) % 3];
+      // Une validation dure 12 mois : la plupart des lots de 2025 ont été revalidés en 2026,
+      // les autres apparaissent « à revalider » (validation périmée).
+      let dateVal = bio ? `${date.slice(0, 8)}${String(Math.min(28, jour + 3)).padStart(2, '0')}` : null;
+      if (bio && annee === 2025 && k % 3 !== 0) dateVal = `2026-${String(Math.min(10, moisLot)).padStart(2, '0')}-${String(Math.min(28, jour + 2)).padStart(2, '0')}`;
+      const reactif = `${nomP.slice(0, 1).toUpperCase()}-${100 + ((im * 13 + it * 7) % 400)}`;
+      const lot = {
+        nom: null,
+        machine,
+        date,
+        conditions: k === 13
+          ? 'Température 21°C'
+          : `Température ${18 + (k % 6)}°C, Lot de réactifs ${reactif}, Calibration ${['matin', 'hebdomadaire', '2 niveaux', '3 niveaux'][k % 4]}`,
+        csv: csvDecale(nomP, unite, points),
+        biologiste: bio,
+        date_validation: bio ? `${dateVal} ${String(9 + (k % 8)).padStart(2, '0')}:${String((k * 7) % 60).padStart(2, '0')}:00` : undefined,
+        regles: [{ parametre: nomP, seuil_bas: bas, seuil_haut: haut, unite }]
+      };
+      res.push(lot);
+    });
+  });
+  // Numérotation dans l'ordre des dates, comme dans un vrai registre.
+  res.sort((a, b) => a.date.localeCompare(b.date) || a.machine.localeCompare(b.machine));
+  for (const lot of res) {
+    lot.nom = lot.date.startsWith('2025') ? `LOT-2025-${String(++n25).padStart(3, '0')}` : `LOT-2026-${String(++n26).padStart(3, '0')}`;
+  }
+  return res;
+}
+
 async function remplir({ run, get, all }) {
   initialiserHasard(20261009);
-  const machines = [
-    ['Cobas 8000', 'biochimie', '2026-09-01', 'en_service'],
-    ['Sysmex XN-1000', 'hematologie', '2026-08-12', 'en_service'],
-    ['Architect i2000SR', 'immunologie', '2026-07-20', 'en_service'],
-    ['ABL90 FLEX', 'gazometrie', '2026-06-03', 'maintenance'],
-    ['Vitek 2', 'microbiologie', '2026-05-18', 'en_service'],
-    ['STA R Max', 'hemostase', '2026-10-02', 'en_service'],
-    ['Atellica UAS 800', 'urines', '2026-09-15', 'en_service'],
-    ['BD BACTEC FX', 'hemocultures', '2026-04-28', 'maintenance']
-  ];
   const machineIds = {};
-  for (const [nom, type, cal, statut] of machines) {
+  for (const m of MACHINES) {
+    const [nom, type, cal, statut, fabricant, miseEnService, secteur] = m;
+    const serie = `${fabricant.slice(0, 3).toUpperCase()}-${codeVerificationStable(nom).slice(3, 9)}`;
     const existante = await get('SELECT id FROM machines WHERE nom = ?', [nom]);
     if (existante) {
       machineIds[nom] = existante.id;
       await run(
-        'UPDATE machines SET type = ?, date_calibration = COALESCE(date_calibration, ?), statut_service = COALESCE(statut_service, ?) WHERE id = ?',
-        [type, cal, statut, existante.id]
+        `UPDATE machines SET type = ?, date_calibration = COALESCE(date_calibration, ?), statut_service = COALESCE(statut_service, ?),
+          fabricant = ?, numero_serie = COALESCE(numero_serie, ?), mise_en_service = COALESCE(mise_en_service, ?), secteur = ? WHERE id = ?`,
+        [type, cal, statut, fabricant, serie, miseEnService, secteur, existante.id]
       );
     } else {
       const { id } = await run(
-        'INSERT INTO machines (nom, type, date_calibration, statut_service) VALUES (?, ?, ?, ?)',
-        [nom, type, cal, statut]
+        `INSERT INTO machines (nom, type, date_calibration, statut_service, fabricant, numero_serie, mise_en_service, secteur)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [nom, type, cal, statut, fabricant, serie, miseEnService, secteur]
       );
       machineIds[nom] = id;
     }
@@ -495,6 +614,7 @@ async function remplir({ run, get, all }) {
       regles: [{ parametre: 'Leucocytes', seuil_bas: '4.0', seuil_haut: '10.0', unite: 'G/L' }]
     }
   ];
+  lots.push(...lotsGeneres(csvDecale));
 
   const lotsArchives = [
     {

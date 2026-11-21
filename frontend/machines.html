@@ -25,10 +25,17 @@
     <div class="page-head">
       <div>
         <h1>Machines</h1>
-        <p class="page-intro">Appareils du laboratoire.</p>
+        <p class="page-intro">Les automates du plateau technique de Nice : qui les fabrique, où ils sont, s’ils sont en service et combien de lots ils ont produits.</p>
       </div>
     </div>
     <p id="erreur-liste" class="message erreur" hidden></p>
+    <div id="resume-machines" class="stats-row"></div>
+    <div class="filtres">
+      <input type="search" id="filtre-machine" placeholder="Rechercher (nom, fabricant, secteur)" autocomplete="off">
+      <select id="filtre-discipline"><option value="">Toutes les disciplines</option></select>
+      <select id="filtre-etat"><option value="">Tous les états</option><option value="en_service">En service</option><option value="maintenance">En maintenance</option><option value="hors_service">Hors service</option><option value="calibration">Calibration à renouveler</option></select>
+    </div>
+    <p class="hint" id="compte-machines"></p>
     <div id="liste-machines" class="cards"><p class="empty">Chargement…</p></div>
     <div class="only-technicien card" style="margin-top:24px;max-width:480px">
       <h2>Ajouter une machine</h2>
@@ -36,14 +43,19 @@
         <p id="erreur-form" class="message erreur" hidden></p>
         <label for="nom">Nom</label>
         <input type="text" id="nom" required placeholder="Nom de l'analyseur">
-        <label for="type">Type / site</label>
+        <label for="type">Discipline</label>
         <input type="text" id="type" placeholder="ex. biochimie — laisser vide si inconnu">
+        <label for="fabricant">Fabricant</label>
+        <input type="text" id="fabricant" placeholder="ex. Roche">
+        <label for="secteur">Secteur</label>
+        <input type="text" id="secteur" placeholder="ex. Urgences 24 h/24">
         <label for="date_calibration">Date de dernière calibration</label>
         <input type="date" id="date_calibration">
         <label for="statut_service">Statut</label>
         <select id="statut_service">
           <option value="en_service">En service</option>
           <option value="maintenance">Maintenance</option>
+          <option value="hors_service">Hors service</option>
         </select>
         <button type="submit">Ajouter une machine</button>
       </form>
@@ -52,13 +64,45 @@
 </div>
 <script src="app.js"></script>
 <script>
+['filtre-machine', 'filtre-discipline', 'filtre-etat'].forEach((id) => {
+  document.getElementById(id)?.addEventListener(id === 'filtre-machine' ? 'input' : 'change', () => chargerMachines());
+});
 async function chargerMachines() {
   const conteneur = document.getElementById('liste-machines');
   afficherMessage('erreur-liste', '');
   try {
-    const machines = await api('/machines');
-    if (machines.length === 0) {
+    const toutes = await api('/machines');
+    if (toutes.length === 0) {
       conteneur.innerHTML = '<p class="empty">Aucune machine enregistrée pour le moment.</p>';
+      return;
+    }
+    // Résumé du parc
+    const nb = (f) => toutes.filter(f).length;
+    const totalLots = toutes.reduce((t, m) => t + (Number(m.nb_lots) || 0), 0);
+    document.getElementById('resume-machines').innerHTML = `
+      <div class="stat"><div class="label"><span class="stat-dot" style="background:var(--accent)"></span>Machines</div><div class="valeur">${toutes.length}</div></div>
+      <div class="stat stat-ok"><div class="label"><span class="stat-dot" style="background:var(--ok)"></span>En service</div><div class="valeur">${nb((m) => (m.statut_service || 'en_service') === 'en_service')}</div></div>
+      <div class="stat stat-wait"><div class="label"><span class="stat-dot" style="background:var(--wait)"></span>Maintenance / hors service</div><div class="valeur">${nb((m) => ['maintenance', 'hors_service'].includes(m.statut_service))}</div></div>
+      <div class="stat"><div class="label"><span class="stat-dot" style="background:var(--reval)"></span>Lots produits</div><div class="valeur">${totalLots}</div></div>`;
+    const NOMS_DISC = { biochimie: 'Biochimie', hematologie: 'Hématologie', immunologie: 'Immunologie', gazometrie: 'Gaz du sang', microbiologie: 'Microbiologie', hemostase: 'Hémostase', urines: 'Urines', hemocultures: 'Hémocultures', electrophorese: 'Électrophorèse', biologie_moleculaire: 'Biologie moléculaire', centrifugeuse: 'Pré-analytique' };
+    const selD = document.getElementById('filtre-discipline');
+    if (selD.options.length <= 1) {
+      [...new Set(toutes.map((m) => m.type).filter(Boolean))].sort().forEach((t) => selD.insertAdjacentHTML('beforeend', `<option value="${echap(t)}">${echap(NOMS_DISC[t] || t)}</option>`));
+    }
+    const q = document.getElementById('filtre-machine').value.trim().toLowerCase();
+    const disc = selD.value;
+    const etatF = document.getElementById('filtre-etat').value;
+    const machines = toutes.filter((m) => {
+      const texte = [m.nom, m.fabricant, m.secteur, m.type, NOMS_DISC[m.type]].join(' ').toLowerCase();
+      if (q && !texte.includes(q)) return false;
+      if (disc && m.type !== disc) return false;
+      if (etatF === 'calibration') return Boolean(m.calibration_a_renouveler);
+      if (etatF && (m.statut_service || 'en_service') !== etatF) return false;
+      return true;
+    }).sort((a, b) => (Number(b.nb_lots) || 0) - (Number(a.nb_lots) || 0));
+    document.getElementById('compte-machines').textContent = `${machines.length} machine(s) affichée(s) sur ${toutes.length}.`;
+    if (!machines.length) {
+      conteneur.innerHTML = '<p class="empty">Aucune machine ne correspond à ces filtres.</p>';
       return;
     }
     conteneur.innerHTML = machines.map((m) => {
@@ -66,20 +110,23 @@ async function chargerMachines() {
       const nTest = Number(m.nb_test) || 0;
       const t = String(m.type || '').toLowerCase();
       const ico = t.includes('centrif') ? 'centrifugeuse' : (t.includes('pipet') ? 'pipeteur' : 'analyseur');
-      const maint = m.statut_service === 'maintenance';
+      const maint = m.statut_service === 'maintenance' || m.statut_service === 'hors_service';
+      const libEtat = m.statut_service === 'hors_service' ? 'Hors service' : (m.statut_service === 'maintenance' ? 'Maintenance' : 'En service');
       return `
       <div class="card ${maint ? 'machine-maintenance' : ''}">
         <div class="machine-head">
           ${icone(ico)}
           <div>
             <h3><a href="machine.html?id=${m.id}">${echap(m.nom)}</a></h3>
-            <p class="hint" style="margin:0">${pluriel(n, 'lot')}${nTest ? ` (dont ${nTest} test)` : ''} · ${echap(m.type || 'type non précisé')}</p>
+            <p class="hint" style="margin:0">${echap(m.fabricant || 'fabricant n/r')} · ${echap(NOMS_DISC[m.type] || m.type || 'type non précisé')}</p>
+            <p class="hint" style="margin:0">${echap(m.secteur || '')}${m.mise_en_service ? ` · en service depuis ${new Date(m.mise_en_service).getFullYear()}` : ''}</p>
+            <p class="hint" style="margin:0"><b>${pluriel(n, 'lot')}</b>${nTest ? ` (dont ${nTest} test)` : ''}${m.numero_serie ? ` · n° ${echap(m.numero_serie)}` : ''}</p>
             <p class="hint">Dernière calibration : ${m.date_calibration ? formatDate(m.date_calibration) : (m.derniere_calibration ? formatDate(m.derniere_calibration) : '—')}</p>
             ${m.calibration_a_renouveler ? '<p class="machine-cal">Calibration à renouveler</p>' : ''}
           </div>
         </div>
         <div class="actions machine-actions">
-          <span class="badge ${maint ? 'douteux' : 'ok'}">${maint ? '⚠ Maintenance' : 'En service'}</span>
+          <span class="badge ${maint ? 'douteux' : 'ok'}">${maint ? '⚠ ' : ''}${libEtat}</span>
           <a class="btn-link" href="machine.html?id=${m.id}">Ouvrir</a>
           ${n
             ? `<button class="secondary only-biologiste" disabled title="Impossible : ${pluriel(n, 'lot')} rattaché${n > 1 ? 's' : ''} à cette machine.">Retirer</button>`
@@ -116,6 +163,8 @@ document.getElementById('form-machine').addEventListener('submit', async (e) => 
         nom: document.getElementById('nom').value,
         type: document.getElementById('type').value,
         date_calibration: document.getElementById('date_calibration').value || null,
+        fabricant: document.getElementById('fabricant').value.trim() || null,
+        secteur: document.getElementById('secteur').value.trim() || null,
         statut_service: document.getElementById('statut_service').value
       })
     });
