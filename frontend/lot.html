@@ -28,6 +28,20 @@
 </div>
 <script src="app.js"></script>
 <script>
+// Explique la note de confiance du lot : chaque critère rempli rapporte des points.
+function htmlCalculNote(lot) {
+  const d = Array.isArray(lot.score_detail) ? lot.score_detail : [];
+  if (!d.length) return '';
+  return `<div class="card calcul-note" style="margin-bottom:16px">
+    <div class="page-head" style="margin:0 0 6px"><strong>Comment la note de confiance (${lot.score_confiance}/100) est calculée</strong></div>
+    <p class="hint" style="margin:0 0 8px">Six critères. Chaque critère rempli rapporte ses points ; la note est la somme. Elle dit si le lot est <b>complet et bien contrôlé</b> (80 et plus = bien, 50 à 79 = à compléter, moins de 50 = insuffisant). Le <b>statut</b> (Validé, Signalé…) dit, lui, si on peut l’utiliser.</p>
+    <table class="table-audit"><tbody>${d.map((l) => `<tr>
+      <td>${l.ok ? '<span class="badge ok">oui</span>' : '<span class="badge douteux">non</span>'}</td>
+      <td>${echap(l.label)}</td><td class="num"><b>${l.points}</b> / ${l.max}</td></tr>`).join('')}
+      <tr><td></td><td><b>Total</b></td><td class="num"><b>${lot.score_confiance}</b> / 100</td></tr></tbody></table>
+  </div>`;
+}
+
 const idLot = new URLSearchParams(window.location.search).get('id');
 const ouvrirEdition = new URLSearchParams(window.location.search).get('edit') === '1';
 let machines = [];
@@ -101,7 +115,7 @@ async function charger() {
             ${Number(lot.est_test) ? '<span class="badge brouillon">Lot TEST</span>' : ''}
           </h1>
         </div>
-        ${htmlJauge(lot.score_confiance, 'Score', lot.score_detail, { mini: true })}
+        ${htmlJauge(lot.score_confiance, 'Note de confiance', lot.score_detail, { mini: true })}
       </div>
 
       <div class="onglets-page" id="onglets-lot">
@@ -114,6 +128,7 @@ async function charger() {
       </div>
       <section class="panneau-lot" data-panneau="resume">
       ${htmlChaineTracabilite(lot)}
+      ${htmlCalculNote(lot)}
 
       <div class="grid-2" style="margin-bottom:24px">
         <div class="card">
@@ -266,9 +281,16 @@ async function charger() {
         el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';
         return;
       }
-      const anoms = liste.map((a) => `<tr><td>${echap(a.severite || '')}</td><td>${echap(a.code)}</td><td>${echap(a.detail)}</td></tr>`).join('');
-      el.innerHTML = `<p>Complétude ${s.completude ?? '—'} · Cohérence ${s.coherence ?? '—'} · Conformité ${s.conformite ?? '—'} · Global ${s.global ?? '—'}</p>
-        ${anoms ? `<table class="table-audit"><thead><tr><th>Sévérité</th><th>Code</th><th>Message</th></tr></thead><tbody>${anoms}</tbody></table>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
+      const NOMS = { valeur_manquante: 'Valeur manquante', doublon: 'Doublon', unites_melangees: 'Unités mélangées', date_future: 'Date dans le futur', date_avant_naissance: 'Mesure avant la naissance', valeur_impossible: 'Valeur impossible', validation_avant_mesure: 'Validé avant la mesure', machine_maintenance: 'Machine en maintenance', psn_inconnu: 'Code patient inconnu' };
+      const anoms = liste.map((a) => `<tr><td>${echap(a.severite || '')}</td><td>${echap(NOMS[a.code] || a.code)}</td><td>${echap(a.detail)}</td></tr>`).join('');
+      el.innerHTML = `<p class="hint">Ce contrôle regarde les <b>valeurs elles-mêmes</b> (et non la fiche du lot) :</p>
+        <div class="mini-stats">
+          <div><b>${s.completude ?? '—'} %</b><span>complétude : aucune valeur manquante</span></div>
+          <div><b>${s.coherence ?? '—'} %</b><span>cohérence : pas de doublon, de date impossible ni d’unités mélangées</span></div>
+          <div><b>${s.conformite ?? '—'} %</b><span>conformité : validation après la mesure, machine en service (−25 par problème)</span></div>
+          <div><b>${s.global ?? '—'} %</b><span>qualité des données = moyenne des trois</span></div>
+        </div>
+        ${anoms ? `<table class="table-audit"><thead><tr><th>Gravité</th><th>Problème</th><th>Détail</th></tr></thead><tbody>${anoms}</tbody></table>` : '<p class="hint">Aucune anomalie détectée sur ce lot.</p>'}`;
     }).catch(() => {
       const el = document.getElementById('bloc-coherence');
       if (el) el.innerHTML = '<p class="empty">Aucune anomalie de cohérence pour ce lot.</p>';

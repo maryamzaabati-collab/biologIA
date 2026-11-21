@@ -12,7 +12,7 @@
 //     les dérives, les campagnes inter-laboratoires et les lots de référence.
 // La simulation est déterministe (graine fixe) : tout le monde voit les mêmes chiffres.
 
-const VERSION_JEU = 'reseau-sud-v2';
+const VERSION_JEU = 'reseau-sud-v3';
 
 // Population municipale totale de la France (somme des communes du référentiel
 // @etalab/decoupage-administratif 6.0.0, métropole + DROM).
@@ -377,10 +377,12 @@ function construireJeu() {
           if (inc.type === 'tendance') decalSans += -inc.ampleur * 8 * a.cv * part * 2;
           if (inc.type === 'imprecision') decalSans += 0;
         }
-        const seuilHautSans = arrondi((a.moy_pop + 1.96 * a.sd_pop) * (1 + decalSans / 100), a.decimales + 1);
+        // Limites « normal / anormal » recalculées sur le lot : les valeurs usuelles de
+        // l'analyse, décalées par le biais propre de la machine (et par la panne éventuelle).
+        const seuilHautSans = arrondi(a.ref_haut * (1 + decalSans / 100), a.decimales + 1);
         const k = 1 + decalPct / 100;
-        const p975 = (a.moy_pop + 1.96 * a.sd_pop) * k;
-        const p025 = Math.max(0, (a.moy_pop - 1.96 * a.sd_pop) * k);
+        const p975 = a.ref_haut * k;
+        const p025 = a.ref_bas == null ? null : a.ref_bas * k;
         const enCours = t === '2026T4';
         let statut = 'valide';
         // en 2025, les lots touchés ont déjà été recalculés et revalidés par un biologiste

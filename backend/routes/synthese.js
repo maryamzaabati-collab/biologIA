@@ -141,7 +141,8 @@ router.get('/csv', async (req, res) => {
 
 const {
   SAGE, INK, MUTED,
-  urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr
+  urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr,
+  protegerTexte, enTete, piedsDePage, place, blocSignature
 } = require('../lib/pdf-maquettes');
 
 router.get('/pdf', async (req, res) => {
@@ -159,77 +160,54 @@ router.get('/pdf', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="fiche-synthese.pdf"');
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    const doc = protegerTexte(new PDFDocument({ margin: 40, size: 'A4', bufferPages: true }));
     doc.pipe(res);
-
-    doc.roundedRect(40, 28, 22, 22, 5).fill(SAGE);
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(SAGE).text('biologIA', 68, 33);
-    doc.fontSize(9).fillColor(MUTED).text('Registre de traçabilité', 320, 32, { width: 230, align: 'right' });
-    doc.fontSize(8).text('Données fictives · démonstrateur pédagogique', 320, 46, { width: 230, align: 'right' });
-    doc.strokeColor(SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
-
-    doc.fontSize(16).fillColor(INK).font('Helvetica-Bold')
-      .text('Fiche de synthèse — Contrôle qualité', 40, 80);
     const emise = req.utilisateur
       ? `Émise par ${req.utilisateur.nom} (${req.utilisateur.role}) · ${formaterParis(s.genereLe)}`
       : `Générée le ${formaterParis(s.genereLe)}`;
-    doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(emise, 40, 102);
+    enTete(doc, 'Fiche de synthèse — contrôle qualité', emise);
 
-    dessinerAnneau(doc, 70, 160, 100, String(s.totalLots), 'lots enregistrés', SAGE);
-    dessinerAnneau(doc, 190, 160, s.pourcentageValides, `${s.pourcentageValides} %`, 'validés par un biologiste', SAGE);
-    dessinerAnneau(doc, 310, 160, s.pourcentageAnonymises, `${s.pourcentageAnonymises} %`, 'pseudonymisés', SAGE);
-    dessinerAnneau(doc, 430, 160, s.signalementsEnCours ? 70 : 8, String(s.signalementsEnCours), 'signalements ouverts', '#C85A4A');
+    dessinerAnneau(doc, 75, 150, 100, String(s.totalLots), 'lots enregistrés', SAGE);
+    dessinerAnneau(doc, 205, 150, s.pourcentageValides, `${s.pourcentageValides} %`, 'validés par un biologiste', SAGE);
+    dessinerAnneau(doc, 335, 150, s.pourcentageAnonymises, `${s.pourcentageAnonymises} %`, 'pseudonymisés', SAGE);
+    const pctSig = s.totalLots ? Math.round(100 * s.signalementsEnCours / s.totalLots) : 0;
+    dessinerAnneau(doc, 465, 150, pctSig, String(s.signalementsEnCours), 'signalements ouverts', '#C85A4A');
 
-    doc.y = 210;
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('Lots', 40, 210);
-    const yLots = tableauSimple(doc, [
-      { label: 'Lot', w: 2.4 },
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('1. Les lots', 40, 212);
+    doc.font('Helvetica').fontSize(8).fillColor(MUTED)
+      .text('Note de confiance /100 : machine (15) + date (15) + conditions (15) + pseudonymisation (20) + aucun signalement ouvert (20) + validation de moins de 12 mois (15).', 40, 228, { width: 515 });
+    const lots = [...s.lots].sort((a, b) => String(a.nom).localeCompare(String(b.nom), 'fr', { numeric: true }));
+    let y = tableauSimple(doc, [
+      { label: 'Lot', w: 2.2 },
       { label: 'Machine', w: 2.2 },
-      { label: 'Date', w: 1.4 },
-      { label: 'Statut', w: 1.6 },
-      { label: 'Score', w: 0.8 }
-    ], s.lots.map((lot) => ({
+      { label: 'Date de mesure', w: 1.5 },
+      { label: 'Statut', w: 1.7 },
+      { label: 'Note /100', w: 1 }
+    ], lots.map((lot) => ({
       cellules: [
         lot.nom,
-        lot.machine_nom || 'n/r',
+        lot.machine_nom || 'non renseignée',
         formaterJour(lot.date),
         { point: couleurPoint(lot.statut_affiche), texte: lot.statut_libelle },
         String(lot.score_confiance)
       ]
-    })), 228);
+    })), 252, { hauteur: 19 });
 
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text('Signalements ouverts', 40, yLots + 10);
-    let yFin = yLots + 28;
+    y = place(doc, y + 16, 60);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text(`2. Signalements ouverts (${signalements.length})`, 40, y);
+    y += 18;
     if (!signalements.length) {
-      doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Aucun signalement ouvert.', 40, yFin);
-      yFin += 16;
+      doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Aucun signalement ouvert.', 40, y);
+      y += 16;
     } else {
-      yFin = tableauSimple(doc, [
-        { label: 'Lot', w: 2 },
-        { label: 'Motif', w: 5 }
-      ], signalements.map((sig) => ({
-        cellules: [sig.lot_nom, sig.raison]
-      })), yFin);
+      y = tableauSimple(doc, [
+        { label: 'Lot', w: 1.6 },
+        { label: 'Motif', w: 6 }
+      ], signalements.map((sig) => ({ cellules: [sig.lot_nom, sig.raison] })), y);
     }
 
-    const ySign = Math.min(yFin + 16, 700);
-    doc.strokeColor(SAGE).lineWidth(0.8).rect(40, ySign, 280, 56).stroke();
-    doc.fontSize(8).fillColor(MUTED).text('Signature du biologiste · nom, date, paraphe', 48, ySign + 8);
-
-    if (qr) {
-      try { doc.image(qr, 470, ySign, { width: 72 }); } catch { /* ignore */ }
-    }
-
-    const plage = doc.bufferedPageRange();
-    for (let i = 0; i < plage.count; i++) {
-      doc.switchToPage(plage.start + i);
-      doc.fontSize(8).fillColor(MUTED).text(
-        `biologIA · Page ${i + 1} / ${plage.count}`,
-        40,
-        792,
-        { width: doc.page.width - 80, align: 'center', lineBreak: false }
-      );
-    }
+    blocSignature(doc, y, qr, 'Scannez pour ouvrir le site');
+    piedsDePage(doc, 'Fiche de synthèse biologIA · aucune donnée nominative');
     doc.end();
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ erreur: err.message });

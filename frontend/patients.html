@@ -125,6 +125,7 @@
         <input type="search" id="filtre-psn" placeholder="Rechercher un PSN ou un numéro" autocomplete="off">
         <a class="btn-link" id="lien-export" href="/api/patients/export.csv">Exporter CSV</a>
       </div>
+      <div id="bandeau-lot"></div>
       <div id="liste-identifiants"><p class="empty">Chargement…</p></div>
       <div id="pagination-id" class="pagination"></div>
       <div id="identite-box"></div>
@@ -133,6 +134,16 @@
 </div>
 <script src="app.js"></script>
 <script>
+// Un client (prescripteur) n'a pas accès aux données patients : message clair au lieu d'erreurs.
+if (roleActuel() === 'client') {
+  document.querySelector('main').innerHTML = `<div class="page-head"><h1>Patients</h1></div>
+    <div class="card"><p>Cette page est réservée au personnel du laboratoire (techniciens et biologistes).</p>
+    <p class="hint">Le RGPD impose que seules les personnes qui en ont besoin voient les données des patients.</p>
+    <a class="btn-link" href="accueil.html">Retour à l’accueil</a></div>`;
+  throw new Error('Accès réservé');
+}
+let pageId = 1;
+let lotFiltre = new URLSearchParams(location.search).get('lot') || '';
 function montrerOnglet(id) {
   if (id === 'tester-anon') id = 'anonymiser';
   document.querySelectorAll('.onglets-page [data-onglet]').forEach((b) => {
@@ -155,29 +166,83 @@ if (qPsn && document.getElementById('filtre-psn')) {
   montrerOnglet('identifiants');
 }
 
-let pageId = 1;
 async function chargerIdentifiants() {
   const q = document.getElementById('filtre-psn')?.value.trim() || '';
-  const exportQ = q ? `?q=${encodeURIComponent(q)}` : '';
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (lotFiltre) params.set('lot', lotFiltre);
   const lien = document.getElementById('lien-export');
-  if (lien) lien.href = '/api/patients/export.csv' + exportQ;
+  if (lien) lien.href = '/api/patients/export.csv' + (params.toString() ? '?' + params : '');
+  const bandeau = document.getElementById('bandeau-lot');
+  bandeau.innerHTML = lotFiltre
+    ? `<p class="message ok" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+         <span>Seulement les patients du lot n° ${echap(lotFiltre)}.</span>
+         <button type="button" class="secondary" id="btn-tous-patients">Voir tous les patients</button></p>`
+    : '';
+  document.getElementById('btn-tous-patients')?.addEventListener('click', () => {
+    lotFiltre = '';
+    history.replaceState(null, '', 'patients.html?onglet=identifiants');
+    pageId = 1;
+    chargerIdentifiants();
+  });
   try {
-    const data = await api(`/patients?page=${pageId}&taille=20&q=${encodeURIComponent(q)}`);
+    params.set('page', pageId);
+    params.set('taille', 20);
+    const data = await api(`/patients?${params}`);
     const box = document.getElementById('liste-identifiants');
     const bio = roleActuel() === 'biologiste';
     if (!data.identifiants.length) {
       box.innerHTML = '<p class="empty">Aucun identifiant pour cette recherche.</p>';
+      document.getElementById('pagination-id').innerHTML = '';
       return;
     }
-    box.innerHTML = `<table class="table-audit"><thead><tr><th>PSN</th>${bio ? '<th>Numéro</th>' : ''}<th>Lots</th><th>Mesures</th></tr></thead><tbody>
+    box.innerHTML = `<p class="hint">${data.total} patient(s). Cliquez sur « Voir » pour afficher ses mesures.</p>
+      <table class="table-audit"><thead><tr><th>PSN (code patient)</th>${bio ? '<th>Numéro</th>' : ''}<th class="num">Lots</th><th class="num">Mesures</th><th></th></tr></thead><tbody>
       ${data.identifiants.map((l) => `<tr>
         <td class="mono">${echap(l.psn)}</td>
         ${bio ? `<td class="mono">${echap(l.numero_patient || '')}</td>` : ''}
-        <td>${l.nb_lots || 0}</td>
-        <td>${l.nb_mesures || 0}</td>
+        <td class="num">${l.nb_lots || 0}</td>
+        <td class="num">${l.nb_mesures || 0}</td>
+        <td><button type="button" class="secondary" data-voir-psn="${echap(l.psn)}">Voir</button></td>
       </tr>`).join('')}</tbody></table>`;
+    box.querySelectorAll('[data-voir-psn]').forEach((b) => b.addEventListener('click', () => voirPatient(b.dataset.voirPsn)));
+    const pages = Math.max(1, Math.ceil(data.total / data.taille));
+    const pag = document.getElementById('pagination-id');
+    pag.innerHTML = pages > 1
+      ? `<button type="button" class="secondary" data-p="${pageId - 1}" ${pageId <= 1 ? 'disabled' : ''}>Précédent</button>
+         <span>Page ${pageId} / ${pages}</span>
+         <button type="button" class="secondary" data-p="${pageId + 1}" ${pageId >= pages ? 'disabled' : ''}>Suivant</button>`
+      : '';
+    pag.querySelectorAll('[data-p]').forEach((b) => b.addEventListener('click', () => { pageId = Number(b.dataset.p); chargerIdentifiants(); }));
   } catch (err) {
     afficherMessage('erreur-page', err.message);
+  }
+}
+
+// Affiche, dans l'onglet « Identifier », le PSN choisi et toutes ses mesures.
+async function voirPatient(psn) {
+  montrerOnglet('identifier');
+  await afficherResultat({ trouve: true, psn });
+  document.getElementById('resultat-recherche').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function htmlMesures(psn) {
+  try {
+    const r = await api(`/patients/${encodeURIComponent(psn)}/mesures`);
+    if (!r.mesures.length) return `<p class="hint">Ce patient n’a encore aucune mesure dans un lot.</p>
+      <a class="btn-link" href="/api/patients/${encodeURIComponent(psn)}/pdf" download>Fiche PDF</a>`;
+    const badge = { normal: 'ok', 'trop bas': 'a-valider', 'trop haut': 'douteux', 'sans règle': 'a-revalider' };
+    return `<div class="page-head" style="margin:16px 0 0"><h3>Ses mesures (${r.mesures.length})</h3>
+        <a class="btn-link" href="/api/patients/${encodeURIComponent(psn)}/pdf" download>Fiche PDF</a></div>
+      <table class="table-audit"><thead><tr><th>Date</th><th>Analyse</th><th class="num">Valeur</th><th>Résultat</th><th>Lot</th></tr></thead><tbody>
+      ${r.mesures.map((m) => `<tr><td>${formatDate(m.date)}</td><td>${echap(m.parametre)}</td>
+        <td class="num">${echap(String(m.valeur).replace('.', ','))} ${echap(m.unite || '')}</td>
+        <td><span class="badge ${badge[m.interpretation]}">${echap(m.interpretation)}</span></td>
+        <td style="white-space:nowrap"><a href="lot.html?id=${m.lot_id}">${echap(m.lot_nom)}</a></td></tr>`).join('')}
+      </tbody></table>
+      <p class="hint">« Résultat » compare la valeur aux seuils de la règle d’alerte du lot. Consultation écrite dans le journal.</p>`;
+  } catch (err) {
+    return `<p class="message erreur">${echap(err.message)}</p>`;
   }
 }
 document.getElementById('filtre-psn')?.addEventListener('input', () => { pageId = 1; chargerIdentifiants(); });
@@ -205,7 +270,14 @@ function blocResultat(r) {
 async function identifier(corps) {
   afficherMessage('erreur-page', '');
   const r = await api('/patients/identifier', { method: 'POST', body: JSON.stringify(corps) });
-  document.getElementById('resultat-recherche').innerHTML = blocResultat(r);
+  await afficherResultat(r);
+}
+
+async function afficherResultat(r) {
+  const boite = document.getElementById('resultat-recherche');
+  boite.innerHTML = blocResultat(r);
+  if (r.trouve && r.psn) boite.insertAdjacentHTML('beforeend', await htmlMesures(r.psn));
+
   const formMotif = document.getElementById('form-motif');
   if (formMotif) {
     formMotif.addEventListener('submit', async (e) => {
@@ -217,7 +289,7 @@ async function identifier(corps) {
         });
         const i = idn.identite;
         document.getElementById('identite-revelee').innerHTML =
-          `<p class="message ok">${echap(i.nom)} ${echap(i.prenom)} — ${echap(i.numero_patient)} — ${echap(i.date_naissance)}</p>
+          `<p class="message ok">${echap(i.nom)} ${echap(i.prenom)} — ${echap(i.numero_patient)} — né(e) le ${echap(formatDate(i.date_naissance))}</p>
            <p class="hint">Action écrite dans le journal d’audit.</p>`;
         notifier('Identité affichée et journalisée', 'ok');
       } catch (err) {
@@ -337,9 +409,10 @@ function afficherRapportAnon(r) {
         <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${titre}</span>
       </div>
       <p class="hint" style="margin:8px 0 0">${okN} sur ${tot || 0} contrôles réussis.
-        <button type="button" class="lien-discret" data-va-onglet="anonymisation">Voir le détail</button></p>`;
+        <button type="button" class="lien-discret" data-va-onglet="anonymiser">Voir le détail</button></p>`;
     resume.querySelector('[data-va-onglet]')?.addEventListener('click', () => {
-      document.querySelector('[data-onglet="anonymisation"]')?.click();
+      montrerOnglet('anonymiser');
+      document.getElementById('rapport-anon')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   }
 }

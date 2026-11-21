@@ -21,9 +21,10 @@ router.get('/', async (req, res) => {
         db.all('SELECT id, parametre, seuil_bas, seuil_haut, unite, statut, validee_par, date_validation_regle FROM regles_alerte WHERE lot_id = ?', [lot.id]),
         db.all('SELECT nom_biologiste, date_validation FROM validations WHERE lot_id = ? ORDER BY date_validation DESC', [lot.id]),
         db.all('SELECT raison, date, mesures_json, regle_id FROM signalements WHERE lot_id = ? AND resolu = 0', [lot.id]),
-        db.all('SELECT DISTINCT code_patient FROM mesures_reference WHERE lot_id = ?', [lot.id])
+        db.all('SELECT code_patient, COUNT(*) AS n FROM mesures_reference WHERE lot_id = ? GROUP BY code_patient', [lot.id])
       ]);
       const vu = libelleStatut(lot, validations, signalements.length);
+      const nbMesures = mesures.reduce((t, m) => t + Number(m.n || 0), 0);
       resultat.push({
         ...lot,
         machine: lot.machine_nom,
@@ -43,17 +44,20 @@ router.get('/', async (req, res) => {
           {
             type: 'patient',
             libelle: 'Patients',
-            valeur: mesures.length ? `${mesures.length} patients` : '—',
-            auteur: Number(lot.anonymise) ? 'pseudonymisés' : 'à confirmer',
+            valeur: mesures.length ? `${mesures.length} patient${mesures.length > 1 ? 's' : ''}` : '—',
+            auteur: Number(lot.anonymise) ? 'pseudonymisés (PSN)' : 'pseudonymisation à confirmer',
             date: lot.date,
-            href: 'patients.html?onglet=identifiants',
+            href: mesures.length ? `patients.html?onglet=identifiants&lot=${lot.id}` : null,
+            reserve: 'patients',
             details: mesures.map((m) => m.code_patient)
           },
           {
             type: 'mesures',
             libelle: 'Mesures',
-            valeur: mesures.length ? `${mesures.length} valeurs` : '—',
-            date: lot.date
+            valeur: nbMesures ? `${nbMesures} mesure${nbMesures > 1 ? 's' : ''}` : '—',
+            auteur: mesures.length ? `${(nbMesures / mesures.length).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} par patient` : '',
+            date: lot.date,
+            href: `lot.html?id=${lot.id}`
           },
           {
             type: 'lot',

@@ -248,7 +248,7 @@ function htmlAnneau(texte, label, pct, variante) {
   </div>`;
 }
 
-function htmlJauge(score, libelle = 'Score de confiance', detail, opts = {}) {
+function htmlJauge(score, libelle = 'Note de confiance', detail, opts = {}) {
   const n = Number(score) || 0;
   const modePct = opts.mode === 'pourcent';
   const classe = modePct

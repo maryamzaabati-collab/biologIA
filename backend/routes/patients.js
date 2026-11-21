@@ -125,8 +125,11 @@ async function identifierInterne(body) {
   };
 }
 
-async function lignesIdentifiants(q) {
+async function lignesIdentifiants(q, lotId) {
   const recherche = String(q || '').trim().toUpperCase();
+  const duLot = lotId
+    ? new Set((await db.all('SELECT DISTINCT upper(code_patient) AS psn FROM mesures_reference WHERE lot_id = ?', [Number(lotId)])).map((r) => r.psn))
+    : null;
   const rows = await db.all(`
     SELECT COALESCE(patients_pseudo.psn, patients_pseudo.code) AS psn,
       patients_identite.numero_patient,
@@ -146,7 +149,7 @@ async function lignesIdentifiants(q) {
      GROUP BY upper(m.code_patient)`
   );
   const parPsn = new Map(mesures.map((m) => [m.psn, m]));
-  let liste = rows.map((r) => {
+  let liste = rows.filter((r) => !duLot || duLot.has(String(r.psn).toUpperCase())).map((r) => {
     const stats = parPsn.get(String(r.psn).toUpperCase()) || { nb_mesures: 0, nb_lots: 0, date_derniere: null };
     return {
       psn: r.psn,
@@ -185,7 +188,7 @@ router.get('/', async (req, res) => {
     const role = roleDe(req);
     const page = Math.max(1, Number(req.query.page) || 1);
     const taille = Math.min(100, Math.max(10, Number(req.query.taille) || 20));
-    const toutes = await lignesIdentifiants(req.query.q);
+    const toutes = await lignesIdentifiants(req.query.q, req.query.lot);
     const total = toutes.length;
     const tranche = toutes.slice((page - 1) * taille, page * taille);
     const identifiants = tranche.map((l) => {
@@ -207,11 +210,119 @@ router.get('/', async (req, res) => {
   }
 });
 
+async function mesuresDuPatient(psn) {
+  const mesures = await db.all(`
+      SELECT m.parametre, m.valeur, m.unite, COALESCE(NULLIF(trim(m.date), ''), lots.date) AS date,
+        lots.id AS lot_id, lots.nom AS lot_nom, machines.nom AS machine_nom,
+        r.seuil_bas, r.seuil_haut
+      FROM mesures_reference m
+      JOIN lots ON lots.id = m.lot_id
+      LEFT JOIN machines ON machines.id = lots.machine_id
+      LEFT JOIN regles_alerte r ON r.lot_id = lots.id AND lower(r.parametre) = lower(m.parametre)
+      WHERE upper(m.code_patient) = ? AND COALESCE(lots.archive, 0) = 0
+      ORDER BY date DESC`, [psn]);
+  return mesures.map((m) => {
+      const v = Number(m.valeur);
+      let interpretation = 'sans règle';
+      if (m.seuil_bas != null || m.seuil_haut != null) {
+        interpretation = (m.seuil_bas != null && v < Number(m.seuil_bas)) ? 'trop bas'
+          : (m.seuil_haut != null && v > Number(m.seuil_haut)) ? 'trop haut' : 'normal';
+      }
+    return { ...m, interpretation };
+  });
+}
+
+function psnValide(req, res) {
+  const psn = String(req.params.psn || '').trim().toUpperCase();
+  if (!/^PSN-[A-Z0-9-]{4,}$/.test(psn)) {
+    res.status(400).json({ erreur: 'Code PSN invalide.' });
+    return null;
+  }
+  return psn;
+}
+
+// Mesures d'un patient (par son PSN) : dans quels lots il apparaît, avec quelles valeurs.
+router.get('/:psn/mesures', async (req, res) => {
+  try {
+    if (interditClient(req, res)) return;
+    const psn = psnValide(req, res);
+    if (!psn) return;
+    const lignes = await mesuresDuPatient(psn);
+    await journal.enregistrer(req, 'consultation mesures patient', 'identification', `${psn} · ${lignes.length} mesure(s)`);
+    res.json({ psn, mesures: lignes });
+  } catch (err) {
+    res.status(500).json({ erreur: err.message });
+  }
+});
+
+// Fiche PDF d'un patient : uniquement son code PSN et ses mesures (jamais son nom).
+router.get('/:psn/pdf', async (req, res) => {
+  try {
+    if (interditClient(req, res)) return;
+    const psn = psnValide(req, res);
+    if (!psn) return;
+    const existe = await db.get('SELECT 1 AS ok FROM patients_pseudo WHERE upper(COALESCE(psn, code)) = ?', [psn]);
+    if (!existe) return res.status(404).json({ erreur: 'Aucun patient avec ce code.' });
+    const lignes = await mesuresDuPatient(psn);
+    await journal.enregistrer(req, 'export fiche patient PDF', 'identification', `${psn} · ${lignes.length} mesure(s)`);
+    const pdf = require('../lib/pdf-maquettes');
+    const { formaterJour } = require('../lib/dates');
+    const PDFDocument = require('pdfkit');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="fiche-${psn}.pdf"`);
+    const doc = pdf.protegerTexte(new PDFDocument({ margin: 40, size: 'A4', bufferPages: true }));
+    doc.pipe(res);
+    pdf.enTete(doc, 'Fiche patient pseudonymisée',
+      `Émise le ${formaterJour(new Date().toISOString().slice(0, 10))}${req.utilisateur ? ` par ${req.utilisateur.nom}` : ''}`);
+    doc.roundedRect(40, 122, 515, 64, 8).strokeColor(pdf.LINE).lineWidth(0.8).stroke();
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED).text('Code patient (PSN)', 52, 132);
+    doc.font('Helvetica-Bold').fontSize(15).fillColor(pdf.INK).text(psn, 52, 146);
+    const lotsDistincts = new Set(lignes.map((l) => l.lot_id)).size;
+    const hors = lignes.filter((l) => l.interpretation === 'trop bas' || l.interpretation === 'trop haut').length;
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.INK)
+      .text(`${lignes.length} mesure(s) · ${lotsDistincts} lot(s) · ${hors} hors des seuils`, 300, 136, { width: 245, align: 'right' })
+      .fillColor(pdf.MUTED)
+      .text('Aucun nom, prénom ni date de naissance sur ce document.', 300, 152, { width: 245, align: 'right' });
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('Mesures', 40, 204);
+    const couleur = { normal: pdf.SAGE, 'trop bas': '#D4A04A', 'trop haut': '#C85A4A' };
+    let y = lignes.length
+      ? pdf.tableauSimple(doc, [
+        { label: 'Date', w: 1.2 },
+        { label: 'Analyse', w: 2.2 },
+        { label: 'Valeur', w: 1.3 },
+        { label: 'Seuils du lot', w: 1.5 },
+        { label: 'Résultat', w: 1.3 },
+        { label: 'Lot', w: 1.6 }
+      ], lignes.map((m) => ({
+        cellules: [
+          formaterJour(m.date),
+          m.parametre,
+          `${String(m.valeur).replace('.', ',')} ${m.unite || ''}`,
+          m.seuil_bas != null || m.seuil_haut != null
+            ? `${m.seuil_bas != null ? String(m.seuil_bas).replace('.', ',') : '…'} – ${m.seuil_haut != null ? String(m.seuil_haut).replace('.', ',') : '…'}`
+            : 'aucune règle',
+          { point: couleur[m.interpretation] || '#9A958A', texte: m.interpretation },
+          m.lot_nom
+        ]
+      })), 222)
+      : (doc.font('Helvetica').fontSize(9).fillColor(pdf.MUTED).text('Aucune mesure pour ce patient.', 40, 224), 240);
+    y = pdf.place(doc, y + 14, 50);
+    doc.font('Helvetica').fontSize(7.5).fillColor(pdf.MUTED).text(
+      'Le lien entre ce code et l’identité du patient est conservé à part, accessible seulement à un biologiste avec un motif écrit dans le journal (RGPD, article 4.5 : pseudonymisation).',
+      40, y, { width: 515 });
+    pdf.blocSignature(doc, y + 20, null);
+    pdf.piedsDePage(doc, `Fiche ${psn} · document pseudonymisé · biologIA`);
+    doc.end();
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ erreur: err.message });
+  }
+});
+
 router.get('/export.csv', async (req, res) => {
   try {
     if (interditClient(req, res)) return;
     const role = roleDe(req);
-    const toutes = await lignesIdentifiants(req.query.q);
+    const toutes = await lignesIdentifiants(req.query.q, req.query.lot);
     const lignes = role === 'technicien'
       ? [['psn', 'nb_lots', 'nb_mesures', 'date_derniere'], ...toutes.map((l) => [l.psn, l.nb_lots, l.nb_mesures, l.date_derniere || ''])]
       : [['psn', 'numero_patient', 'nb_lots', 'nb_mesures', 'date_derniere'], ...toutes.map((l) => [l.psn, l.numero_patient, l.nb_lots, l.nb_mesures, l.date_derniere || ''])];

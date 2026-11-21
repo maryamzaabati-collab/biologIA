@@ -51,14 +51,71 @@ function dessinerAnneau(doc, x, y, pct, texte, label, couleur) {
   return y + r + 28;
 }
 
+// Les polices standard des PDF (Helvetica) ne connaissent pas certains caractères
+// (≥, ≤, →, σ, espaces fines insérées par toLocaleString…). On les remplace
+// avant d'écrire, pour éviter les symboles bizarres dans le document.
+const REMPLACEMENTS = [
+  [/[   ]/g, ' '], [/≥/g, '>='], [/≤/g, '<='], [/→/g, '->'], [/←/g, '<-'],
+  [/σ/g, 's'], [/[✓✔]/g, 'OK'], [/[✗✘]/g, 'X'], [/[“”«»]/g, '"'], [/…/g, '...'], [/−/g, '-'], [/[≈]/g, '~']
+];
+function nettoyer(texte) {
+  let t = String(texte ?? '');
+  for (const [re, par] of REMPLACEMENTS) t = t.replace(re, par);
+  return t;
+}
+function protegerTexte(doc) {
+  const texteOriginal = doc.text.bind(doc);
+  doc.text = (t, ...reste) => texteOriginal(nettoyer(t), ...reste);
+  const hauteurOriginale = doc.heightOfString.bind(doc);
+  doc.heightOfString = (t, ...reste) => hauteurOriginale(nettoyer(t), ...reste);
+  return doc;
+}
+
+// En-tête commun à tous les PDF du site.
+function enTete(doc, titre, sousTitre) {
+  doc.roundedRect(40, 28, 22, 22, 5).fill(SAGE);
+  doc.font('Helvetica-Bold').fontSize(12).fillColor('#FFFFFF').text('b', 40, 33, { width: 22, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(11).fillColor(SAGE).text('biologIA', 68, 33);
+  doc.font('Helvetica').fontSize(9).fillColor(MUTED).text('Registre de traçabilité des laboratoires', 300, 32, { width: 255, align: 'right' });
+  doc.fontSize(8).text('Données fictives · projet pédagogique BUT SD', 300, 46, { width: 255, align: 'right' });
+  doc.strokeColor(SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
+  doc.font('Helvetica-Bold').fontSize(16).fillColor(INK).text(titre, 40, 80);
+  if (sousTitre) doc.font('Helvetica').fontSize(8).fillColor(MUTED).text(sousTitre, 40, 102);
+}
+
+// Pied de page sur toutes les pages : « Page 1 / 2 ».
+function piedsDePage(doc, texte) {
+  const plage = doc.bufferedPageRange();
+  for (let i = 0; i < plage.count; i++) {
+    doc.switchToPage(plage.start + i);
+    const marge = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0; // sinon pdfkit crée une page vide
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(
+      `${texte} · Page ${i + 1} / ${plage.count}`,
+      40, doc.page.height - 34, { width: doc.page.width - 80, align: 'center', lineBreak: false }
+    );
+    doc.page.margins.bottom = marge;
+  }
+}
+
+// Saut de page si la place restante est trop petite.
+function place(doc, y, besoin) {
+  if (y + besoin > doc.page.height - 60) {
+    doc.addPage();
+    return 50;
+  }
+  return y;
+}
+
+// Tableau avec retour à la ligne dans les cellules et saut de page automatique
+// (l'en-tête du tableau est répété sur la nouvelle page).
 function tableauSimple(doc, colonnes, lignes, y0, opts = {}) {
   const x0 = 48;
   const largeur = doc.page.width - 96;
-  const totalW = colonnes.reduce((s, c) => s + c.w, 0);
+  const totalW = colonnes.reduce((s2, c) => s2 + c.w, 0);
   const largeurs = colonnes.map((c) => (c.w / totalW) * largeur);
   let y = y0;
   const haut = opts.entete || 18;
-  const h = opts.hauteur || 22;
   const dessinerEntete = () => {
     let x = x0;
     doc.strokeColor(SAGE).lineWidth(0.8);
@@ -71,18 +128,30 @@ function tableauSimple(doc, colonnes, lignes, y0, opts = {}) {
     y += haut;
   };
   dessinerEntete();
-  doc.font('Helvetica').fontSize(8).fillColor(INK);
   for (const ligne of lignes) {
-    if (y > doc.page.height - 90) break;
+    doc.font('Helvetica').fontSize(8);
+    const hauteurs = colonnes.map((c, i) => {
+      const cell = ligne.cellules[i];
+      const texte = cell && cell.point ? cell.texte : String(cell ?? '');
+      const w = largeurs[i] - (cell && cell.point ? 18 : 6);
+      return doc.heightOfString(texte, { width: w });
+    });
+    const h = Math.max(opts.hauteur || 22, Math.max(...hauteurs) + 12);
+    if (y + h > doc.page.height - 60) {
+      doc.addPage();
+      y = 50;
+      dessinerEntete();
+      doc.font('Helvetica').fontSize(8);
+    }
     let x = x0;
-    const ty = y + 4;
+    const ty = y + 5;
     colonnes.forEach((c, i) => {
       const cell = ligne.cellules[i];
       if (cell && cell.point) {
         doc.circle(x + 5, ty + 4, 3).fill(cell.point);
-        doc.fillColor(INK).text(cell.texte, x + 14, ty, { width: largeurs[i] - 18, lineBreak: false });
+        doc.fillColor(INK).text(cell.texte, x + 14, ty, { width: largeurs[i] - 18 });
       } else {
-        doc.fillColor(INK).text(String(cell ?? ''), x, ty, { width: largeurs[i] - 6, lineBreak: false });
+        doc.fillColor(INK).text(String(cell ?? ''), x, ty, { width: largeurs[i] - 6 });
       }
       x += largeurs[i];
     });
@@ -91,6 +160,20 @@ function tableauSimple(doc, colonnes, lignes, y0, opts = {}) {
     y += h;
   }
   return y;
+}
+
+// Zone de signature + QR code, placées après le contenu (nouvelle page si besoin).
+function blocSignature(doc, y, qr, legendeQr) {
+  y = place(doc, y + 14, 80);
+  doc.strokeColor(SAGE).lineWidth(0.8).rect(40, y, 280, 60).stroke();
+  doc.font('Helvetica').fontSize(8).fillColor(MUTED).text('Validation du biologiste · nom, date, signature', 48, y + 8);
+  if (qr) {
+    try {
+      doc.image(qr, 483, y - 4, { width: 64 });
+      if (legendeQr) doc.fontSize(6.5).fillColor(MUTED).text(legendeQr, 380, y + 62, { width: 175, align: 'right' });
+    } catch { /* image invalide : on ignore */ }
+  }
+  return y + 76;
 }
 
 async function bufferQr(url) {
@@ -104,5 +187,6 @@ async function bufferQr(url) {
 
 module.exports = {
   SAGE, INK, MUTED, LINE, PAPER,
-  urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr
+  urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr,
+  nettoyer, protegerTexte, enTete, piedsDePage, place, blocSignature
 };

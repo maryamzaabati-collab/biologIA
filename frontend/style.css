@@ -1576,3 +1576,10 @@ details.derive[open] .derive-resume { margin-bottom: 12px; padding-bottom: 10px;
 details.derive { padding-left: 30px; }
 .derive-date { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: .86rem; }
 @media (max-width: 700px) { .derive-resume { grid-template-columns: 1fr; gap: 4px; } }
+.limites-grille { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.limites-grille h3 { display: flex; gap: 8px; align-items: center; margin-top: 0; }
+.limites-grille ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; }
+.limites-grille li { margin: 4px 0; font-size: .92rem; }
+details.en-clair summary { cursor: pointer; }
+@media (max-width: 900px) { .limites-grille { grid-template-columns: 1fr; } }
+.jauge text.jauge-sous { font-size: 11px; font-weight: 400; fill: var(--ink-soft); }

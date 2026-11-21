@@ -46,7 +46,7 @@ document.getElementById('retour').href = idLot ? `lot.html?id=${idLot}` : 'index
       <article class="certificat">
         <h1>Certificat de traçabilité</h1>
         <p class="hint" style="text-align:center;">Registre des données de référence — esprit ISO 15189 / ISO 17025</p>
-        ${htmlJauge(lot.score_confiance, 'Score de confiance', lot.score_detail)}
+        ${htmlJauge(lot.score_confiance, 'Note de confiance', lot.score_detail)}
         <p>
           ${icone('lot')}<strong>Lot</strong> ${echap(lot.nom)} (${echap(lot.code_verification || '')})<br>
           ${icone('machine')}<strong>Machine</strong> ${echap(lot.machine_nom || 'non renseignée')}<br>

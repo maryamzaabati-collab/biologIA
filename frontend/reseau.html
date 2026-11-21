@@ -52,7 +52,16 @@
         </div>
       </div>
       <div class="card" style="margin-top:14px">
-        <div class="titre-ligne"><h2>Les laboratoires, du meilleur au moins bon</h2><span class="hint">Note sur 100 : fiabilité des machines + accord avec les autres labos + données à jour</span></div>
+        <div class="titre-ligne"><h2>Les laboratoires, du meilleur au moins bon</h2></div>
+        <details class="en-clair" style="margin:6px 0 12px">
+          <summary><b>Comment la note sur 100 est calculée ?</b> (cliquez)</summary>
+          <ul style="margin:8px 0 0">
+            <li><b>50 points : fiabilité des machines.</b> Moyenne des notes Sigma du labo. Une moyenne de 6 ou plus donne les 50 points ; 3 donne 25 points.</li>
+            <li><b>30 points : accord avec les autres labos.</b> Écart moyen (|z|) aux campagnes communes. 0 d’écart = 30 points ; un écart de 1,5 ou plus = 0.</li>
+            <li><b>20 points : lots à jour.</b> 20 si tout est validé, 16 si des lots attendent une validation, 6 si un lot doit être revalidé après une panne.</li>
+            <li><b>État :</b> « Problème » si une machine a une note sous 2 ou si la note est sous 65 · « À surveiller » si un lot est à revalider ou si la note est sous 78 · sinon « Bon ».</li>
+          </ul>
+        </details>
         <div id="classement"></div>
       </div>
     </section>
@@ -166,7 +175,7 @@
       </div>
       <div class="card" style="margin-top:14px">
         <h2>Tous les jeux de données</h2>
-        <p class="hint">Fichiers CSV (séparateur « ; », décimales avec un point) : à ouvrir dans R, Python, Power BI ou Excel. Cliquez sur un jeu pour voir ses colonnes.</p>
+        <p class="hint">Fichiers CSV « à la française » (séparateur « ; », décimales avec une virgule) : s’ouvrent directement dans Excel, et dans R avec read.csv2(). Cliquez sur un jeu pour voir ses colonnes.</p>
         <div id="jeux"></div>
       </div>
     </section>

@@ -30,6 +30,15 @@
         <a class="btn-link primary only-technicien" href="nouveau-lot.html">+ Nouveau lot</a>
       </div>
     </div>
+    <details class="en-clair" style="margin-bottom:14px">
+      <summary><b>En clair :</b> un lot = un paquet de mesures qui sert à fixer les limites « normal / anormal ». Chaque lot a une <b>note de confiance sur 100</b>. <u>Comment est-elle calculée ?</u></summary>
+      <ul style="margin:8px 0 0">
+        <li>Machine renseignée : <b>15</b> points · Date de mesure : <b>15</b> · Conditions de mesure : <b>15</b></li>
+        <li>Patients pseudonymisés, aucune colonne avec un nom : <b>20</b></li>
+        <li>Aucun signalement ouvert : <b>20</b> · Validé par un biologiste il y a moins de 12 mois : <b>15</b></li>
+        <li>Total sur 100. <b>80 et plus</b> : bien documenté · <b>50 à 79</b> : à compléter · <b>moins de 50</b> : insuffisant. Le <b>statut</b> (Validé, Signalé…) dit si on peut utiliser le lot.</li>
+      </ul>
+    </details>
     <div class="lots-toolbar">
     <div class="filtres" style="margin-bottom:10px">
       <input type="search" id="filtre-q" placeholder="Rechercher un lot" autocomplete="off" name="recherche-lot">
@@ -130,7 +139,7 @@ async function chargerLots() {
         <span class="lot-carte-ref">${echap(lot.code_verification || '')}</span>
         <span class="lot-carte-machine">${echap(lot.machine_nom || 'machine non renseignée')}</span>
         <span class="lot-carte-date">${formatDate(lot.derniere_mesure || lot.date)}</span>
-        <span class="score-ligne"><span>Score de confiance ${lot.score_confiance ?? '—'} / 100</span></span>
+        <span class="score-ligne"><span>Note de confiance ${lot.score_confiance ?? '—'} / 100</span></span>
         <span class="piste"><i class="${classeScore(lot.score_confiance)}" style="width:${Number(lot.score_confiance)||0}%"></i></span>
       </a>
     `).join('');

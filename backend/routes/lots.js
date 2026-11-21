@@ -297,7 +297,7 @@ router.get('/:id/certificat', async (req, res) => {
       {
         libelle: 'Série de contrôle',
         resultat: `${nPoints} points`,
-        ref: `≥ ${MIN_POINTS_CONTROLE} points`,
+        ref: `au moins ${MIN_POINTS_CONTROLE} points`,
         code: nPoints >= MIN_POINTS_CONTROLE ? 'valide' : 'signale',
         interp: nPoints >= MIN_POINTS_CONTROLE ? 'Conforme' : 'Insuffisant'
       },
@@ -321,53 +321,50 @@ router.get('/:id/certificat', async (req, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="certificat-${lot.code_verification || lot.id}.pdf"`);
 
-    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    const doc = pdf.protegerTexte(new PDFDocument({ margin: 40, size: 'A4', bufferPages: true }));
     doc.pipe(res);
-    doc.roundedRect(40, 28, 22, 22, 5).fill(pdf.SAGE);
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.SAGE).text('biologIA', 68, 33);
-    doc.fontSize(9).fillColor(pdf.MUTED).text('Registre de traçabilité', 320, 32, { width: 230, align: 'right' });
-    doc.fontSize(8).text('Données fictives · démonstrateur pédagogique', 320, 46, { width: 230, align: 'right' });
-    doc.strokeColor(pdf.SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
+    pdf.enTete(doc, 'Certificat de traçabilité',
+      `Lot de données de référence · émis le ${formaterJour(new Date().toISOString().slice(0, 10))} · démarche inspirée de la norme ISO 15189`);
 
-    doc.font('Helvetica-Bold').fontSize(16).fillColor(pdf.INK).text('Certificat de traçabilité', 40, 80);
-    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED)
-      .text(`Esprit ISO 15189 / ISO 17025 · émis le ${formaterJour(new Date().toISOString().slice(0, 10))}`, 40, 102);
-
-    doc.roundedRect(40, 122, 515, 88, 8).strokeColor('#DDD6C8').lineWidth(0.8).stroke();
+    doc.roundedRect(40, 122, 515, 88, 8).strokeColor(pdf.LINE).lineWidth(0.8).stroke();
     doc.font('Helvetica-Bold').fontSize(13).fillColor(pdf.INK).text(lot.nom, 52, 134);
-    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED).text(lot.code_verification || '', 52, 152);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED).text(`Code de vérification : ${lot.code_verification || '-'}`, 52, 152);
     doc.fillColor(pdf.INK).fontSize(8)
-      .text(`Machine ${lot.machine_nom || 'non renseignée'}`, 250, 134)
-      .text(`Date de mesure ${formaterJour(lot.date)}`, 250, 148);
-    doc.circle(250, 166, 3).fill(pdf.couleurPoint(vu.statut_affiche));
-    doc.fillColor(pdf.INK).fontSize(8).text(`Statut  ${vu.statut_libelle}`, 258, 162);
-    pdf.dessinerAnneau(doc, 500, 166, vu.score_confiance, String(vu.score_confiance), 'score / 100', pdf.SAGE);
+      .text(`Machine : ${lot.machine_nom || 'non renseignée'}`, 250, 134)
+      .text(`Date de mesure : ${formaterJour(lot.date)}`, 250, 148);
+    doc.circle(253, 170, 3).fill(pdf.couleurPoint(vu.statut_affiche));
+    doc.fillColor(pdf.INK).fontSize(8).text(`Statut : ${vu.statut_libelle}`, 261, 166);
+    pdf.dessinerAnneau(doc, 500, 160, vu.score_confiance, String(vu.score_confiance), 'note de confiance /100', pdf.SAGE);
 
-    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('Contrôles et résultats', 40, 228);
-    pdf.tableauSimple(doc, [
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('1. Contrôles et résultats', 40, 228);
+    let y = pdf.tableauSimple(doc, [
       { label: 'Contrôle', w: 2.2 },
       { label: 'Résultat', w: 2.4 },
-      { label: 'Référence', w: 1.8 },
-      { label: 'Interprétation', w: 1.6 }
+      { label: 'Exigence', w: 1.8 },
+      { label: 'Conclusion', w: 1.6 }
     ], lignesControle.map((l) => ({
-      cellules: [
-        l.libelle,
-        l.resultat,
-        l.ref,
-        { point: pdf.couleurPoint(l.code), texte: l.interp }
-      ]
-    })), 246, { hauteur: 26, entete: 20 });
+      cellules: [l.libelle, l.resultat, l.ref, { point: pdf.couleurPoint(l.code), texte: l.interp }]
+    })), 246, { hauteur: 24, entete: 20 });
 
-    doc.strokeColor(pdf.SAGE).lineWidth(0.8).rect(40, 700, 280, 56).stroke();
-    doc.fontSize(8).fillColor(pdf.MUTED).text('Validation du biologiste · nom, date, paraphe', 48, 708);
+    // Détail de la note : chaque critère rapporte des points, le total fait la note sur 100.
+    y = pdf.place(doc, y + 14, 200);
+    doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('2. Comment la note de confiance est calculée', 40, y);
+    doc.font('Helvetica').fontSize(8).fillColor(pdf.MUTED)
+      .text('Six critères, chacun rapporte des points s’il est rempli. Total sur 100.', 40, y + 16);
+    y = pdf.tableauSimple(doc, [
+      { label: 'Critère', w: 5 },
+      { label: 'Points obtenus', w: 1.4 },
+      { label: 'Maximum', w: 1.2 }
+    ], [
+      ...(vu.score_detail || []).map((l) => ({
+        cellules: [{ point: l.ok ? pdf.SAGE : '#C85A4A', texte: l.label }, String(l.points), String(l.max)]
+      })),
+      { cellules: ['Note de confiance du lot', String(vu.score_confiance), '100'] }
+    ], y + 32, { hauteur: 20 });
+
     const qr = await pdf.bufferQr(pdf.urlPublique(req) + `/lot.html?id=${lot.id}`);
-    if (qr) {
-      try { doc.image(qr, 470, 688, { width: 72 }); } catch { /* ignore */ }
-    }
-    doc.fontSize(8).fillColor(pdf.MUTED).text(
-      'Aucun bilan patient · biologIA · Page 1 / 1',
-      40, 792, { width: 515, align: 'center', lineBreak: false }
-    );
+    pdf.blocSignature(doc, y, qr, 'Scannez pour ouvrir la fiche du lot');
+    pdf.piedsDePage(doc, `Certificat ${lot.nom} · aucune donnée nominative · biologIA`);
     doc.end();
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ erreur: err.message });

@@ -628,8 +628,14 @@ function testerAnonymisation(csvTexte) {
   };
 }
 
+// Une cellule de CSV « à la française » (séparateur ;, décimales avec une virgule),
+// comme Excel en français l'attend. Les nombres négatifs restent des nombres ;
+// seuls les textes qui ressemblent à une formule (=, +, -, @) sont protégés.
 function celluleCsv(valeur) {
+  if (typeof valeur === 'number' && Number.isFinite(valeur)) return String(valeur).replace('.', ',');
   let s = String(valeur ?? '');
+  if (/^-?\d+\.\d+$/.test(s)) return s.replace('.', ',');
+  if (/^-?\d+(,\d+)?$/.test(s)) return s;
   if (/^[=+\-@]/.test(s)) s = `'${s}`;
   if (/[;"\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
   return s;

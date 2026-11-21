@@ -33,14 +33,14 @@
     <h2 class="section-titre">Le problème, en trois points</h2>
     <div class="etapes-pb">
       <div class="card"><h3><span class="num-rond">1</span>Des données sans mémoire</h3><p class="hint">Un fichier de référence circule entre tableurs et e-mails. Six mois plus tard, on ne sait plus quelle machine l’a produit, dans quelles conditions, ni qui l’a validé. Impossible de le prouver à un auditeur.</p></div>
-      <div class="card"><h3><span class="num-rond">2</span>Des dérives vues trop tard</h3><p class="hint">Un analyseur peut se décaler après un changement de réactif ou une panne. Si le contrôle qualité n’est relu qu’en fin de mois, des milliers de résultats sont rendus entre-temps, et les lots de référence de la période sont faussés.</p></div>
+      <div class="card"><h3><span class="num-rond">2</span>Des pannes vues trop tard</h3><p class="hint">Une machine peut se dérégler après un changement de réactif ou une usure. Si le contrôle qualité n’est relu qu’en fin de mois, des milliers de résultats sont rendus entre-temps, et les lots de référence de la période sont faussés.</p></div>
       <div class="card"><h3><span class="num-rond">3</span>Des sites qui ne se comparent pas</h3><p class="hint">Dans un réseau, chaque site a ses machines. Un biais systématique (un appareil qui mesure toujours 6 % trop haut) est invisible localement : il n’apparaît qu’en comparant les sites entre eux.</p></div>
     </div>
 
     <h2 class="section-titre">Notre solution : biologIA</h2>
     <div class="etapes-pb solution">
       <div class="card"><h3><span class="num-rond">1</span>Un registre qui garde la mémoire</h3><p class="hint">Chaque lot a une fiche : machine, conditions, fichier, pseudonymisation vérifiée, validation par un biologiste, historique et journal d’audit infalsifiable (empreintes SHA-256 chaînées), certificat avec QR code.</p></div>
-      <div class="card"><h3><span class="num-rond">2</span>Une surveillance quotidienne</h3><p class="hint">Les règles de Westgard sont appliquées chaque jour aux contrôles qualité. Dès qu’une machine dérive, biologIA retrouve les lots de référence touchés et les passe en « à revalider ».</p></div>
+      <div class="card"><h3><span class="num-rond">2</span>Une surveillance quotidienne</h3><p class="hint">Les règles de Westgard sont appliquées chaque jour aux contrôles qualité. Dès qu’une machine se dérègle, biologIA retrouve les lots de référence touchés et les passe en « à revalider ».</p></div>
       <div class="card"><h3><span class="num-rond">3</span>Un observatoire du réseau</h3><p class="hint">Carte des sites, Sigma de chaque analyse, comparaison inter-laboratoires mensuelle, recommandations de contrôle adaptées : la direction qualité voit d’un coup d’œil où agir.</p></div>
     </div>
 
@@ -55,7 +55,7 @@
     <div class="roles-grille">
       <div class="card"><h3>Technicien</h3><p class="hint">Enregistre les lots, voit tout de suite ce qui manque ou ce qui cloche.</p></div>
       <div class="card"><h3>Biologiste</h3><p class="hint">Valide les lots et les règles d’alerte, signe, garde la décision finale (le logiciel ne décide jamais seul).</p></div>
-      <div class="card"><h3>Direction qualité</h3><p class="hint">Pilote le réseau : Sigma, dérives, écarts inter-labos, lots à revalider.</p></div>
+      <div class="card"><h3>Direction qualité</h3><p class="hint">Pilote le réseau : fiabilité des machines, pannes, écarts entre labos, lots à revalider.</p></div>
       <div class="card"><h3>Auditeur (Cofrac, ARS)</h3><p class="hint">Remonte la lignée d’un seuil jusqu’aux données brutes, avec le certificat et le journal d’audit.</p></div>
     </div>
 
@@ -66,18 +66,48 @@
       <div class="card"><h3>AI Act</h3><p class="hint">Les alertes sont des aides : la validation reste humaine et chaque décision est journalisée.</p></div>
     </div>
 
-    <h2 class="section-titre">Méthode et limites (soyons honnêtes)</h2>
-    <div class="card">
-      <ul>
-        <li><b>Données réelles :</b> volumes nationaux d’actes par code NABM (Cnam, 1er semestre 2026), populations municipales (INSEE), contours des départements (IGN).</li>
-        <li><b>Données simulées :</b> les laboratoires, les machines, les contrôles qualité et les dérives. Les vraies valeurs de contrôle d’un laboratoire ne sont pas publiques et les données patients sont protégées ; la simulation suit les lois statistiques du contrôle qualité et utilise une graine fixe (résultats reproductibles).</li>
-        <li><b>Hypothèse forte :</b> la comparaison « sans registre » suppose une relecture mensuelle des contrôles. Beaucoup de laboratoires font déjà mieux ; l’apport principal de biologIA reste le <b>lien automatique</b> entre une dérive, les lots de référence et les seuils d’alerte.</li>
-        <li><b>Pistes :</b> connexion directe aux automates (norme HL7 / ASTM), import des rapports d’EEQ officiels, alertes envoyées aux prescripteurs.</li>
-      </ul>
-      <p class="hint">Sources : rapport IGF-IGAS « Pertinence et efficience des dépenses de biologie médicale » (mai 2025) ; Assurance Maladie, données de remboursement de biologie 2026 ; ARS Île-de-France, schéma régional de santé 2023-2028 ; ordonnance n° 2010-49 relative à la biologie médicale.</p>
+    <h2 class="section-titre">Nos données et nos limites, en toute honnêteté</h2>
+    <div class="limites-grille">
+      <div class="card">
+        <h3><span class="badge ok">vrai</span> Ce qui vient de sources officielles</h3>
+        <ul>
+          <li>Le nombre d’analyses et leur prix remboursé en France (Assurance Maladie, janvier–juin 2026, 14 codes d’analyses).</li>
+          <li>Les villes, leurs codes et leur nombre d’habitants (INSEE).</li>
+          <li>Les contours des départements sur la carte (IGN).</li>
+          <li>Les règles de contrôle qualité (règles de Westgard, méthode Sigma) : méthodes utilisées dans les vrais laboratoires.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge a-valider">simulé</span> Ce que nous avons fabriqué</h3>
+        <ul>
+          <li>Les 20 laboratoires, leurs 43 machines, les contrôles, les pannes et les résultats de patients.</li>
+          <li><b>Pourquoi ?</b> Les vrais contrôles d’un laboratoire ne sont pas publics et les données de patients sont protégées (RGPD, secret médical).</li>
+          <li>La simulation suit les lois statistiques réelles et donne <b>toujours les mêmes chiffres</b> (graine fixe) : on peut la vérifier.</li>
+          <li>Aucun vrai patient, aucun vrai laboratoire.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge a-revalider">limite</span> Ce que l’outil ne fait pas</h3>
+        <ul>
+          <li>Le chiffre « résultats faux en moins » compare biologIA à une vérification <b>une fois par mois</b>. Beaucoup de laboratoires vérifient déjà chaque jour : pour eux, le gain est surtout le <b>lien automatique</b> entre une panne et les données à refaire.</li>
+          <li>biologIA <b>ne pose aucun diagnostic</b> et ne remplace pas le biologiste : il prévient, l’humain décide (exigence de l’AI Act).</li>
+          <li>Les limites « normal / anormal » sont les valeurs usuelles des manuels, légèrement ajustées par machine ; un vrai labo les adapterait à sa population (âge, sexe).</li>
+          <li>Les données sont saisies ou importées en CSV : pas encore de connexion directe aux machines.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="badge ok">suite</span> Pour un vrai déploiement</h3>
+        <ul>
+          <li>Brancher les machines directement (normes HL7 / ASTM).</li>
+          <li>Importer les vrais rapports de comparaison entre laboratoires (organismes d’évaluation externe).</li>
+          <li>Héberger les données de santé chez un hébergeur certifié HDS.</li>
+          <li>Faire tester l’outil par des techniciens et des biologistes.</li>
+        </ul>
+      </div>
     </div>
+    <p class="hint" style="margin-top:10px">Sources : IGF-IGAS, « Pertinence et efficience des dépenses de biologie médicale » (mai 2025) ; Assurance Maladie, remboursements de biologie 2026 ; ARS Île-de-France, schéma régional de santé 2023-2028 ; ordonnance n° 2010-49 du 13 janvier 2010 relative à la biologie médicale.</p>
     <div class="actions" style="margin-top:18px">
-      <a class="btn-link primary" href="reseau.html">Explorer l’observatoire</a>
+      <a class="btn-link primary" href="reseau.html">Voir les 20 laboratoires</a>
       <a class="btn-link" href="demo.html">Voir la démonstration (5 min)</a>
     </div>
   </main>
@@ -90,12 +120,12 @@
     const fr = (n) => Number(n).toLocaleString('fr-FR');
     const baisse = Math.round(100 * (1 - r.resultats_exposes_avec / r.resultats_exposes_sans));
     document.getElementById('sans').innerHTML = `
-      <li>Les ${r.derives} dérives de l’année restent actives jusqu’à la revue mensuelle : <b>${fr(r.resultats_exposes_sans)}</b> résultats patients rendus pendant qu’un appareil mesurait faux.</li>
-      <li>Aucun lien entre une dérive et les lots de référence qu’elle a faussés.</li>
+      <li>Les ${r.derives} pannes restent actives jusqu’à la revue mensuelle : <b>${fr(r.resultats_exposes_sans)}</b> résultats patients rendus pendant qu’un appareil mesurait faux.</li>
+      <li>Aucun lien entre une panne et les données qu’elle a faussées.</li>
       <li>Biais systématiques entre sites invisibles (aucune vue réseau).</li>
       <li>Pour un auditeur : retrouver l’origine d’un seuil prend des heures, voire est impossible.</li>`;
     document.getElementById('avec').innerHTML = `
-      <li>Dérives repérées en <b>${String(r.delai_moyen_detection).replace('.', ',')} jour(s)</b> en moyenne : <b>${fr(r.resultats_exposes_avec)}</b> résultats concernés, soit <b>−${baisse} %</b>.</li>
+      <li>Pannes repérées en <b>${String(r.delai_moyen_detection).replace('.', ',')} jour(s)</b> en moyenne : <b>${fr(r.resultats_exposes_avec)}</b> résultats concernés, soit <b>−${baisse} %</b>.</li>
       <li><b>${r.lots.a_revalider || 0}</b> lots de référence passés automatiquement « à revalider ».</li>
       <li><b>${r.eeq_hors_limites}</b> écarts inter-laboratoires détectés, dont des biais persistants expliqués.</li>
       <li>${fr(r.controles_qc)} contrôles qualité analysés ; chaque seuil est relié à son lot, sa machine et son validateur.</li>`;
