@@ -12,7 +12,7 @@ biologIA répond en trois couches :
 
 1. **Registre** (plateau de Nice) : chaque lot de référence a sa fiche, sa machine, sa pseudonymisation vérifiée, sa validation par un biologiste, son historique et son certificat.
 2. **Surveillance** : règles de Westgard appliquées chaque jour aux contrôles qualité ; une dérive passe automatiquement les lots de référence touchés en « à revalider ».
-3. **Observatoire du réseau** (`reseau.html`) : 12 laboratoires de la région Sud, carte, Sigma par analyse, dérives, comparaison inter-laboratoires, lots de référence, jeux de données téléchargeables.
+3. **Le réseau** (`reseau.html`, menu « 20 laboratoires ») : 20 laboratoires de la région Sud en 6 onglets simples — En bref, Carte, Activité, Machines, Alertes, Données. Chaque onglet commence par un encadré « En clair ».
 
 Page de présentation : `apropos.html` (menu « Problématique »).
 
@@ -20,14 +20,14 @@ Page de présentation : `apropos.html` (menu « Problématique »).
 
 | Donnée | Nature | Source |
 |---|---|---|
-| Volumes nationaux d’actes par code NABM (janv.–juin 2026) | réelle | Assurance Maladie (Cnam) |
+| Nombre d’actes et montants remboursés pour 14 codes NABM (janv.–juin 2026) | réelle | Assurance Maladie (Cnam) |
 | Communes, codes INSEE, populations municipales | réelle | `@etalab/decoupage-administratif` 6.0.0 |
 | Contours des 6 départements de la région Sud | réelle | france-geojson (IGN Admin Express simplifié) → `frontend/donnees/carte-sud.json` |
 | Erreurs totales admissibles, imprécisions cibles | référentiel | ordres de grandeur CLIA 2024 / EFLM |
-| Sites, analyseurs, 38 880 contrôles qualité, 720 résultats inter-labos, 288 lots de référence, 5 dérives | simulée | `backend/lib/donnees-reseau.js` (graine fixe, reproductible) |
+| 20 sites, 43 analyseurs, 133 860 contrôles qualité (janv. 2025 → nov. 2026), 7,3 M d’analyses, 2 530 résultats inter-labos, 920 lots de référence, 8 pannes, 32 093 résultats patients pseudonymisés | simulée | `backend/lib/donnees-reseau.js` (graine fixe, reproductible) |
 
-Le jeu est créé automatiquement au premier lancement (tables `reseau_*`, moins d’une seconde). Pour le régénérer : `cd backend && npm run seed`.
-API (lecture, tous rôles connectés) : `/api/reseau/resume`, `/sites`, `/repartition`, `/performance`, `/derives`, `/qc`, `/eeq`, `/lots`, `/dictionnaire`, `/export/<jeu>` (CSV).
+Le jeu est créé automatiquement au premier lancement (tables `reseau_*`, environ 2 secondes ; une ancienne version est remplacée toute seule). Pour le régénérer : `cd backend && npm run seed`.
+API (lecture, tous rôles connectés) : `/api/reseau/resume`, `/sites`, `/repartition`, `/performance`, `/derives`, `/qc`, `/eeq`, `/lots`, `/resultats`, `/dictionnaire`, `/export/<jeu>` (CSV).
 
 Fonctionne avec **Node.js 20+**. Sur Node 22, SQLite utilise le module intégré `node:sqlite` ; sur Node 20 (Replit), le module `better-sqlite3`.
 

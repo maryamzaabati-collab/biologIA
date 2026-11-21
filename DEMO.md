@@ -78,9 +78,9 @@ Cela montre que le projet n'est pas qu'un exercice de code, mais une vraie réfl
 
 ## Scénario « réseau » (3 minutes, à faire en premier devant le jury)
 
-1. **Problématique** (menu) : lire la question encadrée, montrer les 4 chiffres publics, puis le bloc « Ce que ça change ».
-2. **Observatoire réseau → Vue d’ensemble** : 2,65 M d’examens, Sigma médian, 5 dérives, −90 % de résultats exposés.
-3. **Carte** : cliquer sur Toulon puis sur Digne-les-Bains (en alerte : créatinine à 1,4 Sigma).
-4. **Dérives** : la dérive potassium de Toulon (nouveau lot de réactif) → vue le jour même par 1-3s/2-2s, au lieu du 30/06 → lot REF-TLN-K-2026T2 passé « à revalider ».
-5. **Inter-laboratoires → Créatinine** : Digne s’écarte tous les mois (biais de 6 %) — invisible au contrôle interne, visible seulement en comparant les sites.
-6. **Données** : montrer ce qui est réel / simulé et télécharger un CSV.
+1. **Le problème** (menu « Comprendre ») : l’image de la balance de cuisine, la question encadrée, les 4 chiffres officiels, puis « Ce que ça change ».
+2. **20 laboratoires → En bref** : 7,3 M d’analyses, 43 machines, 8 pannes, et la barre « résultats faux en moins ».
+3. **Carte** : cliquer sur Nice puis sur Digne-les-Bains (en rouge : machine de créatinine à 1,9 de note).
+4. **Alertes** : ouvrir la panne de Toulon (potassium, nouveau lot de réactif) : vue le jour même au lieu du 30/06, lot REF-TLN-K-2026T2 à revalider. En bas, Digne mesure trop haut chaque mois.
+5. **Activité** : nos analyses comparées à la France (les barres se ressemblent), le prix de chaque analyse, puis les résultats patients et la vérification de l’anonymat (Briançon → regroupement par département).
+6. **Données** : ce qui est vrai, ce qui est simulé, et les 9 fichiers CSV à télécharger.

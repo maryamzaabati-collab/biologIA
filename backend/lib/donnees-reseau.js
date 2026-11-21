@@ -12,7 +12,7 @@
 //     les dérives, les campagnes inter-laboratoires et les lots de référence.
 // La simulation est déterministe (graine fixe) : tout le monde voit les mêmes chiffres.
 
-const VERSION_JEU = 'reseau-sud-v1';
+const VERSION_JEU = 'reseau-sud-v2';
 
 // Population municipale totale de la France (somme des communes du référentiel
 // @etalab/decoupage-administratif 6.0.0, métropole + DROM).
@@ -32,7 +32,15 @@ const SITES = [
   { code: 'MEN', nom: 'biologIA Menton', ville: 'Menton', insee: '06083', dep: '06', population: 30604, lat: 43.7747, lon: 7.4975, type: 'proximite', plateau: 'NIC', accredite: '2019-09-01', responsable: 'Dr. Amrani' },
   { code: 'FRE', nom: 'biologIA Fréjus', ville: 'Fréjus', insee: '83061', dep: '83', population: 59719, lat: 43.4331, lon: 6.7370, type: 'proximite', plateau: 'TLN', accredite: '2019-01-15', responsable: 'Dr. El Fassi' },
   { code: 'GAP', nom: 'biologIA Gap Alpes', ville: 'Gap', insee: '05061', dep: '05', population: 41293, lat: 44.5594, lon: 6.0786, type: 'proximite', plateau: 'MRS', accredite: '2019-06-01', responsable: 'Dr. Chen' },
-  { code: 'DIG', nom: 'biologIA Digne', ville: 'Digne-les-Bains', insee: '04070', dep: '04', population: 17979, lat: 44.0925, lon: 6.2356, type: 'proximite', plateau: 'MRS', accredite: '2020-02-01', responsable: 'Dr. Chen' }
+  { code: 'DIG', nom: 'biologIA Digne', ville: 'Digne-les-Bains', insee: '04070', dep: '04', population: 17979, lat: 44.0925, lon: 6.2356, type: 'proximite', plateau: 'MRS', accredite: '2020-02-01', responsable: 'Dr. Chen' },
+  { code: 'GRA', nom: 'biologIA Grasse', ville: 'Grasse', insee: '06069', dep: '06', population: 50970, lat: 43.6589, lon: 6.9236, type: 'proximite', plateau: 'NIC', accredite: '2019-03-01', responsable: 'Dr. Amrani' },
+  { code: 'HYE', nom: 'biologIA Hyères', ville: 'Hyères', insee: '83069', dep: '83', population: 55858, lat: 43.1204, lon: 6.1286, type: 'proximite', plateau: 'TLN', accredite: '2018-11-01', responsable: 'Dr. El Fassi' },
+  { code: 'DRA', nom: 'biologIA Draguignan', ville: 'Draguignan', insee: '83050', dep: '83', population: 40826, lat: 43.5366, lon: 6.4646, type: 'proximite', plateau: 'TLN', accredite: '2019-04-01', responsable: 'Dr. El Fassi' },
+  { code: 'SAL', nom: 'biologIA Salon-de-Provence', ville: 'Salon-de-Provence', insee: '13103', dep: '13', population: 44194, lat: 43.6403, lon: 5.0973, type: 'proximite', plateau: 'MRS', accredite: '2019-02-01', responsable: 'Dr. Chen' },
+  { code: 'MAR', nom: 'biologIA Martigues', ville: 'Martigues', insee: '13056', dep: '13', population: 48298, lat: 43.4053, lon: 5.0476, type: 'proximite', plateau: 'MRS', accredite: '2019-02-01', responsable: 'Dr. Chen' },
+  { code: 'MAN', nom: 'biologIA Manosque', ville: 'Manosque', insee: '04112', dep: '04', population: 22718, lat: 43.8343, lon: 5.7836, type: 'proximite', plateau: 'MRS', accredite: '2020-01-15', responsable: 'Dr. Chen' },
+  { code: 'BRI', nom: 'biologIA Briançon', ville: 'Briançon', insee: '05023', dep: '05', population: 11411, lat: 44.8986, lon: 6.6436, type: 'proximite', plateau: 'MRS', accredite: '2020-06-01', responsable: 'Dr. Chen' },
+  { code: 'CAR', nom: 'biologIA Carpentras', ville: 'Carpentras', insee: '84031', dep: '84', population: 31619, lat: 44.0556, lon: 5.0489, type: 'proximite', plateau: 'MRS', accredite: '2019-10-01', responsable: 'Dr. Chen' }
 ];
 
 // Analytes suivis. actes_s1_2026 = actes remboursés en France de janvier à juin 2026 (Cnam).
@@ -41,20 +49,26 @@ const SITES = [
 // valeurs indicatives inspirées de la réglementation américaine CLIA (2024)
 // et de la base de variation biologique EFLM.
 const ANALYTES = [
-  { code: 'HB', libelle: 'Hémoglobine (NFS)', unite: 'g/dL', nabm: '1104', libelle_nabm: 'Hémogramme y compris plaquettes', actes_s1_2026: 35921622, cible_n1: 8.0, cible_n2: 14.5, cv: 0.8, eta: 4, discipline: 'hematologie', ref_bas: 12.0, ref_haut: 16.0, moy_pop: 13.9, sd_pop: 1.2, decimales: 1 },
-  { code: 'CREA', libelle: 'Créatinine', unite: 'µmol/L', nabm: '0592', libelle_nabm: 'Créatinine (créatininémie)', actes_s1_2026: 34469747, cible_n1: 90, cible_n2: 400, cv: 2.4, eta: 10, discipline: 'biochimie', ref_bas: 45, ref_haut: 105, moy_pop: 78, sd_pop: 15, decimales: 0 },
-  { code: 'K', libelle: 'Potassium (ionogramme)', unite: 'mmol/L', nabm: '1609', libelle_nabm: 'Ionogramme (Na + K ± Cl)', actes_s1_2026: 26960306, cible_n1: 4.0, cible_n2: 6.5, cv: 1.3, eta: 7.5, discipline: 'biochimie', ref_bas: 3.5, ref_haut: 5.1, moy_pop: 4.25, sd_pop: 0.38, decimales: 2 },
-  { code: 'ALAT', libelle: 'ALAT (transaminases)', unite: 'UI/L', nabm: '0522', libelle_nabm: 'Transaminases ALAT et ASAT', actes_s1_2026: 26134266, cible_n1: 35, cible_n2: 150, cv: 3.0, eta: 15, discipline: 'biochimie', ref_bas: 7, ref_haut: 45, moy_pop: 24, sd_pop: 9, decimales: 0 },
-  { code: 'CRP', libelle: 'CRP', unite: 'mg/L', nabm: '1804', libelle_nabm: 'Protéine C réactive', actes_s1_2026: 20924098, cible_n1: 8, cible_n2: 60, cv: 3.5, eta: 20, discipline: 'biochimie', ref_bas: null, ref_haut: 5, moy_pop: 2.4, sd_pop: 1.3, decimales: 1 },
-  { code: 'CHOL', libelle: 'Cholestérol total', unite: 'g/L', nabm: '0996', libelle_nabm: 'Exploration d’une anomalie lipidique', actes_s1_2026: 19198021, cible_n1: 1.6, cible_n2: 2.8, cv: 2.0, eta: 10, discipline: 'biochimie', ref_bas: null, ref_haut: 2.0, moy_pop: 1.9, sd_pop: 0.32, decimales: 2 },
-  { code: 'TSH', libelle: 'TSH', unite: 'mUI/L', nabm: '1208', libelle_nabm: 'TSH (sang)', actes_s1_2026: 16121768, cible_n1: 0.9, cible_n2: 9.0, cv: 4.0, eta: 20, discipline: 'immunologie', ref_bas: 0.4, ref_haut: 4.0, moy_pop: 1.8, sd_pop: 0.75, decimales: 2 },
-  { code: 'FERR', libelle: 'Ferritine', unite: 'µg/L', nabm: '1213', libelle_nabm: 'Ferritine (dosage)', actes_s1_2026: 15235228, cible_n1: 60, cible_n2: 400, cv: 4.0, eta: 20, discipline: 'immunologie', ref_bas: 30, ref_haut: 300, moy_pop: 110, sd_pop: 55, decimales: 0 },
-  { code: 'HBA1C', libelle: 'HbA1c', unite: '%', nabm: '1577', libelle_nabm: 'HbA1c (dosage)', actes_s1_2026: 10333555, cible_n1: 5.5, cible_n2: 9.5, cv: 1.6, eta: 8, discipline: 'biochimie', ref_bas: null, ref_haut: 6.0, moy_pop: 5.6, sd_pop: 0.45, decimales: 1 }
+  { code: 'HB', libelle: 'Hémoglobine (NFS)', unite: 'g/dL', nabm: '1104', libelle_nabm: 'Hémogramme y compris plaquettes', actes_s1_2026: 35921622, montant_s1_2026: 118663468, cible_n1: 8.0, cible_n2: 14.5, cv: 0.8, eta: 4, discipline: 'hematologie', ref_bas: 12.0, ref_haut: 16.0, moy_pop: 13.9, sd_pop: 1.2, decimales: 1 },
+  { code: 'CREA', libelle: 'Créatinine', unite: 'µmol/L', nabm: '0592', libelle_nabm: 'Créatinine (créatininémie)', actes_s1_2026: 34469747, montant_s1_2026: 41074254, cible_n1: 90, cible_n2: 400, cv: 2.4, eta: 10, discipline: 'biochimie', ref_bas: 45, ref_haut: 105, moy_pop: 78, sd_pop: 15, decimales: 0 },
+  { code: 'K', libelle: 'Potassium (ionogramme)', unite: 'mmol/L', nabm: '1609', libelle_nabm: 'Ionogramme (Na + K ± Cl)', actes_s1_2026: 26960306, montant_s1_2026: 47764830, cible_n1: 4.0, cible_n2: 6.5, cv: 1.3, eta: 7.5, discipline: 'biochimie', ref_bas: 3.5, ref_haut: 5.1, moy_pop: 4.25, sd_pop: 0.38, decimales: 2 },
+  { code: 'ALAT', libelle: 'ALAT (transaminases)', unite: 'UI/L', nabm: '0522', libelle_nabm: 'Transaminases ALAT et ASAT', actes_s1_2026: 26134266, montant_s1_2026: 45501521, cible_n1: 35, cible_n2: 150, cv: 3.0, eta: 15, discipline: 'biochimie', ref_bas: 7, ref_haut: 45, moy_pop: 24, sd_pop: 9, decimales: 0 },
+  { code: 'CRP', libelle: 'CRP', unite: 'mg/L', nabm: '1804', libelle_nabm: 'Protéine C réactive', actes_s1_2026: 20924098, montant_s1_2026: 28430745, cible_n1: 8, cible_n2: 60, cv: 3.5, eta: 20, discipline: 'biochimie', ref_bas: null, ref_haut: 5, moy_pop: 2.4, sd_pop: 1.3, decimales: 1 },
+  { code: 'CHOL', libelle: 'Cholestérol total', unite: 'g/L', nabm: '0996', libelle_nabm: 'Exploration d’une anomalie lipidique', actes_s1_2026: 19198021, montant_s1_2026: 56621705, cible_n1: 1.6, cible_n2: 2.8, cv: 2.0, eta: 10, discipline: 'biochimie', ref_bas: null, ref_haut: 2.0, moy_pop: 1.9, sd_pop: 0.32, decimales: 2 },
+  { code: 'TSH', libelle: 'TSH', unite: 'mUI/L', nabm: '1208', libelle_nabm: 'TSH (sang)', actes_s1_2026: 16121768, montant_s1_2026: 57955532, cible_n1: 0.9, cible_n2: 9.0, cv: 4.0, eta: 20, discipline: 'immunologie', ref_bas: 0.4, ref_haut: 4.0, moy_pop: 1.8, sd_pop: 0.75, decimales: 2 },
+  { code: 'FERR', libelle: 'Ferritine', unite: 'µg/L', nabm: '1213', libelle_nabm: 'Ferritine (dosage)', actes_s1_2026: 15235228, montant_s1_2026: 47138066, cible_n1: 60, cible_n2: 400, cv: 4.0, eta: 20, discipline: 'immunologie', ref_bas: 30, ref_haut: 300, moy_pop: 110, sd_pop: 55, decimales: 0 },
+  { code: 'HBA1C', libelle: 'HbA1c', unite: '%', nabm: '1577', libelle_nabm: 'HbA1c (dosage)', actes_s1_2026: 10333555, montant_s1_2026: 28998872, cible_n1: 5.5, cible_n2: 9.5, cv: 1.6, eta: 8, discipline: 'biochimie', ref_bas: null, ref_haut: 6.0, moy_pop: 5.6, sd_pop: 0.45, decimales: 1 },
+  { code: 'PSA', libelle: 'PSA (prostate)', unite: 'ng/mL', nabm: '7318', libelle_nabm: 'Antigène prostatique spécifique (PSA total)', actes_s1_2026: 4812512, montant_s1_2026: 27429931, cible_n1: 1.0, cible_n2: 20, cv: 3.5, eta: 20, discipline: 'immunologie', ref_bas: null, ref_haut: 4.0, moy_pop: 1.3, sd_pop: 0.9, decimales: 2 },
+  // Analyses suivies seulement en volume (pas de contrôle quantitatif dans la simulation)
+  { code: 'ECBU', libelle: 'ECBU (urines)', unite: null, nabm: '5201', libelle_nabm: 'Examen cytobactériologique des urines', actes_s1_2026: 5234141, montant_s1_2026: 47775415, discipline: 'microbiologie', qc: false },
+  { code: 'HEPB', libelle: 'Hépatite B (dépistage)', unite: null, nabm: '4500', libelle_nabm: 'Hépatite B : dépistage et/ou diagnostic', actes_s1_2026: 2288309, montant_s1_2026: 38401017, discipline: 'serologie', qc: false },
+  { code: 'HEPC', libelle: 'Hépatite C (dépistage)', unite: null, nabm: '3784', libelle_nabm: 'Hépatite C : anticorps anti-VHC', actes_s1_2026: 2274280, montant_s1_2026: 24425728, discipline: 'serologie', qc: false },
+  { code: 'VIH', libelle: 'VIH (dépistage)', unite: null, nabm: '0388', libelle_nabm: 'Infection à VIH 1 et 2 : dépistage', actes_s1_2026: 2357451, montant_s1_2026: 23589266, discipline: 'serologie', qc: false }
 ];
 
 const BIOCHIMIE_PLATEAU = ['CREA', 'K', 'ALAT', 'CRP', 'CHOL', 'HBA1C'];
 const BIOCHIMIE_PROXIMITE = ['CREA', 'K', 'ALAT', 'CRP'];
-const IMMUNO = ['TSH', 'FERR'];
+const IMMUNO = ['TSH', 'FERR', 'PSA'];
 
 // Analyseurs : à Nice, on réutilise les machines déjà présentes dans le registre.
 const MODELES = {
@@ -80,7 +94,16 @@ const INCIDENTS = [
     action: 'Remplacement de la lampe par le fabricant, maintenance préventive replanifiée.' },
   { site: 'AVI', discipline: 'biochimie', analyte: 'CREA', debut: '2026-10-06', type: 'imprecision', ampleur: 2.8,
     cause: 'Aiguille de prélèvement encrassée : volumes pipetés irréguliers.',
-    action: 'Nettoyage et changement de l’aiguille, vérification de la répétabilité.' }
+    action: 'Nettoyage et changement de l’aiguille, vérification de la répétabilité.' },
+  { site: 'MRS', discipline: 'hematologie', analyte: 'HB', debut: '2025-02-10', type: 'decalage', ampleur: 2.3,
+    cause: 'Nouveau lot de réactif de lyse mis en service sans vérification sur les contrôles.',
+    action: 'Retour à l’ancien lot, vérification du nouveau lot, repasse des NFS du jour.' },
+  { site: 'NIC', discipline: 'immunologie', analyte: 'FERR', debut: '2025-05-12', type: 'tendance', ampleur: 0.06,
+    cause: 'Calibrant ferritine utilisé au-delà de sa durée de stabilité après ouverture.',
+    action: 'Nouveau calibrant, recalibration, rappel de la règle de stabilité aux techniciens.' },
+  { site: 'HYE', discipline: 'biochimie', analyte: 'CRP', debut: '2025-11-17', type: 'imprecision', ampleur: 2.6,
+    cause: 'Bulles d’air dans le circuit de réactif après une maintenance.',
+    action: 'Purge du circuit, contrôle de répétabilité, maintenance validée par un second technicien.' }
 ];
 
 const BIAIS_STRUCTURELS = [
@@ -88,7 +111,7 @@ const BIAIS_STRUCTURELS = [
   { analyseur: 'FRE-BIO', analyte: 'ALAT', biais: -7.6, explication: 'Réactif ALAT sans phosphate de pyridoxal : sous-estimation chez certains patients.' }
 ];
 
-const DEBUT = '2026-01-05';
+const DEBUT = '2025-01-06';
 const FIN = '2026-11-14';
 
 function creerHasard(graine) {
@@ -256,8 +279,16 @@ function construireJeu() {
   }
 
   // 3. Activité mensuelle par site et par analyte (volumes calés sur la Cnam)
-  const MOIS = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10'];
-  const SAISON = [1.08, 1.03, 1.05, 1.0, 0.97, 1.0, 0.9, 0.78, 1.02, 1.06];
+  const MOIS = [];
+  for (const an of [2025, 2026]) {
+    for (let m = 1; m <= 12; m++) {
+      if (an === 2026 && m > 10) break;
+      MOIS.push(`${an}-${String(m).padStart(2, '0')}`);
+    }
+  }
+  const PROFIL = [1.08, 1.03, 1.05, 1.0, 0.97, 1.0, 0.9, 0.78, 1.02, 1.06, 1.02, 0.95];
+  // 2025 : même rythme que 2026, un peu plus bas (l'activité de biologie augmente chaque année)
+  const SAISON = MOIS.map((m) => PROFIL[Number(m.slice(5)) - 1] * (m.startsWith('2025') ? 0.97 : 1));
   const activite = [];
   for (const site of SITES) {
     const part = PART_DE_MARCHE[site.type];
@@ -312,8 +343,10 @@ function construireJeu() {
   // 5. Lots de référence : chaque trimestre, chaque analyseur construit un lot
   // à partir des résultats patients pseudonymisés pour recalculer ses seuils d'alerte.
   const TRIMESTRES = [
-    ['T1', '2026-01-01', '2026-03-31'], ['T2', '2026-04-01', '2026-06-30'],
-    ['T3', '2026-07-01', '2026-09-30'], ['T4', '2026-10-01', '2026-11-14']
+    ['2025T1', '2025-01-01', '2025-03-31'], ['2025T2', '2025-04-01', '2025-06-30'],
+    ['2025T3', '2025-07-01', '2025-09-30'], ['2025T4', '2025-10-01', '2025-12-31'],
+    ['2026T1', '2026-01-01', '2026-03-31'], ['2026T2', '2026-04-01', '2026-06-30'],
+    ['2026T3', '2026-07-01', '2026-09-30'], ['2026T4', '2026-10-01', '2026-11-14']
   ];
   const lots = [];
   for (const app of analyseurs) {
@@ -321,7 +354,7 @@ function construireJeu() {
     for (const code of app.analytes) {
       const a = analyte[code];
       const vol = activite.filter((x) => x.site === app.site && x.analyte === code && x.site_analyse === app.site)
-        .reduce((s, x) => s + x.nb_examens, 0) / 10;
+        .reduce((s, x) => s + x.nb_examens, 0) / MOIS.length;
       for (const [t, debut, fin] of TRIMESTRES) {
         const d = derives.find((x) => x.analyseur === app.code && x.analyte === code);
         const chevauche = Boolean(d && d.debut <= fin && (d.correction || FIN) >= debut);
@@ -348,12 +381,13 @@ function construireJeu() {
         const k = 1 + decalPct / 100;
         const p975 = (a.moy_pop + 1.96 * a.sd_pop) * k;
         const p025 = Math.max(0, (a.moy_pop - 1.96 * a.sd_pop) * k);
-        const enCours = t === 'T4';
+        const enCours = t === '2026T4';
         let statut = 'valide';
-        if (chevauche) statut = 'a_revalider';
+        // en 2025, les lots touchés ont déjà été recalculés et revalidés par un biologiste
+        if (chevauche) statut = t.startsWith('2025') ? 'revalide' : 'a_revalider';
         else if (enCours) statut = h.unif() < 0.55 ? 'a_valider' : 'valide';
         lots.push({
-          nom: `REF-${app.site}-${code}-2026${t}`,
+          nom: `REF-${app.site}-${code}-${t}`,
           analyseur: app.code,
           site: app.site,
           analyte: code,
@@ -365,14 +399,84 @@ function construireJeu() {
           statut,
           derive_liee: chevauche ? `${d.analyseur}|${code}` : null,
           seuil_haut_sans_registre: chevauche ? seuilHautSans : null,
-          valide_par: statut === 'valide' ? site.responsable : null,
+          valide_par: statut === 'valide' || statut === 'revalide' ? site.responsable : null,
           resultats_exposes: chevauche ? Math.round((vol / 26) * Math.max(1, ecartJours(d.debut, d.correction || fin)) * 6 / 7) : 0
         });
       }
     }
   }
 
-  return { analyseurs, qc, derives, activite, eeq, lots };
+  // 6. Échantillon de résultats patients pseudonymisés (2026) : 1 résultat sur 100.
+  // Sert à vérifier les seuils d'alerte et la k-anonymisation (aucun vrai patient).
+  const resultats = construireResultats(h, activite, analyte);
+
+  return { analyseurs, qc, derives, activite, eeq, lots, resultats };
+}
+
+const CLASSES_AGE = [['0-17', 0.12], ['18-39', 0.22], ['40-59', 0.27], ['60-74', 0.23], ['75+', 0.16]];
+
+// Valeurs usuelles selon le sexe quand elles diffèrent (hémoglobine, créatinine, ferritine).
+function seuilsPour(a, sexe) {
+  if (a.code === 'HB') return sexe === 'F' ? [12.0, 16.0] : [13.0, 17.0];
+  if (a.code === 'CREA') return sexe === 'F' ? [45, 90] : [60, 110];
+  if (a.code === 'FERR') return sexe === 'F' ? [15, 150] : [30, 300];
+  return [a.ref_bas, a.ref_haut];
+}
+
+function tirerValeur(h, a, sexe, iAge) {
+  const age = iAge; // 0 à 4
+  const malade = h.unif() < 0.14; // la population qui fait une prise de sang n'est pas « en bonne santé »
+  const n = h.normal();
+  switch (a.code) {
+    case 'HB': return (sexe === 'F' ? 13.4 : 14.8) - (age >= 4 ? 0.6 : 0) + n * 1.1 - (malade ? 2.6 * h.unif() + 0.8 : 0);
+    case 'CREA': return ((sexe === 'F' ? 66 : 84) + age * 4) * Math.exp(n * 0.16) * (malade ? 1.4 + h.unif() * 1.5 : 1);
+    case 'K': return 4.25 + n * 0.36 + (malade ? (h.unif() < 0.5 ? -0.9 : 1.1) * h.unif() + (h.unif() < 0.5 ? -0.3 : 0.3) : 0);
+    case 'ALAT': return (sexe === 'F' ? 18 : 25) * Math.exp(n * 0.4) * (malade ? 2 + h.unif() * 3 : 1);
+    case 'CRP': return 1.4 * Math.exp(n * 0.9) * (malade ? 6 + h.unif() * 30 : 1);
+    case 'CHOL': return 1.65 + age * 0.08 + n * 0.32 + (malade ? 0.5 * h.unif() : 0);
+    case 'TSH': return 1.6 * Math.exp(n * 0.45) * (malade ? (h.unif() < 0.5 ? 0.12 : 3.5) : 1);
+    case 'FERR': return (sexe === 'F' ? 60 : 140) * Math.exp(n * 0.6) * (malade ? (h.unif() < 0.5 ? 0.25 : 3) : 1);
+    case 'HBA1C': return 5.3 + age * 0.12 + n * 0.3 + (malade ? 1 + h.unif() * 3 : 0);
+    case 'PSA': return (0.6 + age * 0.45) * Math.exp(n * 0.6) * (malade ? 3 + h.unif() * 4 : 1);
+    default: return null;
+  }
+}
+
+function construireResultats(h, activite, analyte) {
+  const lignes = [];
+  let numero = 0;
+  for (const act of activite) {
+    if (!act.mois.startsWith('2026')) continue;
+    const a = analyte[act.analyte];
+    if (!a || a.qc === false) continue;
+    const n = Math.round(act.nb_examens / 100);
+    const [an, mm] = act.mois.split('-').map(Number);
+    const joursDuMois = new Date(Date.UTC(an, mm, 0)).getUTCDate();
+    for (let i = 0; i < n; i++) {
+      let sexe = h.unif() < 0.56 ? 'F' : 'M'; // les femmes font davantage d'analyses
+      if (a.code === 'PSA') sexe = 'M';
+      let r = h.unif();
+      let iAge = 0;
+      for (; iAge < CLASSES_AGE.length - 1; iAge++) { r -= CLASSES_AGE[iAge][1]; if (r < 0) break; }
+      if (a.code === 'PSA' && iAge < 2) iAge = 2;
+      const v = Math.max(0.01, tirerValeur(h, a, sexe, iAge));
+      const [bas, haut] = seuilsPour(a, sexe);
+      const interpretation = bas != null && v < bas ? 'bas' : v > haut ? 'haut' : 'normal';
+      numero++;
+      const jour = String(1 + Math.floor(h.unif() * joursDuMois)).padStart(2, '0');
+      lignes.push({
+        pseudo: `PSN-${(Math.imul(numero, 2654435761) >>> 0).toString(16).toUpperCase().padStart(8, '0')}`,
+        site: act.site,
+        date: `${act.mois}-${jour}`,
+        analyte: a.code,
+        sexe,
+        classe_age: CLASSES_AGE[iAge][0],
+        valeur: arrondi(v, a.decimales),
+        interpretation
+      });
+    }
+  }
+  return lignes;
 }
 
 async function creerTables(run) {
@@ -383,8 +487,12 @@ async function creerTables(run) {
     accredite_depuis TEXT, responsable TEXT)`);
   await run(`CREATE TABLE IF NOT EXISTS reseau_analytes (
     code TEXT PRIMARY KEY, libelle TEXT, unite TEXT, code_nabm TEXT, libelle_nabm TEXT,
-    actes_s1_2026 INTEGER, cible_n1 REAL, cible_n2 REAL, cv_cible REAL, eta REAL,
-    discipline TEXT, ref_bas REAL, ref_haut REAL)`);
+    actes_s1_2026 INTEGER, montant_s1_2026 INTEGER, cible_n1 REAL, cible_n2 REAL, cv_cible REAL, eta REAL,
+    discipline TEXT, ref_bas REAL, ref_haut REAL, controle_qualite INTEGER)`);
+  await run(`CREATE TABLE IF NOT EXISTS reseau_resultats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, pseudo TEXT, site TEXT, date TEXT, analyte TEXT,
+    sexe TEXT, classe_age TEXT, valeur REAL, interpretation TEXT)`);
+  await run('CREATE INDEX IF NOT EXISTS idx_reseau_resultats ON reseau_resultats(analyte, site)');
   await run(`CREATE TABLE IF NOT EXISTS reseau_analyseurs (
     code TEXT PRIMARY KEY, site TEXT, nom TEXT, modele TEXT, fabricant TEXT, discipline TEXT,
     analytes TEXT, machine_id INTEGER)`);
@@ -407,25 +515,33 @@ async function creerTables(run) {
     statut TEXT, derive_liee TEXT, valide_par TEXT, resultats_exposes INTEGER, seuil_haut_sans_registre REAL)`);
 }
 
+const TABLES = ['reseau_resultats', 'reseau_sites', 'reseau_analytes', 'reseau_analyseurs', 'reseau_qc', 'reseau_derives', 'reseau_activite', 'reseau_eeq', 'reseau_lots'];
+
 async function remplir({ run, get }, { forcer = false } = {}) {
-  await creerTables(run);
+  await run(`CREATE TABLE IF NOT EXISTS reseau_meta (cle TEXT PRIMARY KEY, valeur TEXT)`);
   const meta = await get("SELECT valeur FROM reseau_meta WHERE cle = 'version'");
   if (!forcer && meta && meta.valeur === VERSION_JEU) return false;
+  // Nouvelle version du jeu : on supprime les anciennes tables (leur structure a pu changer).
+  for (const t of TABLES) await run(`DROP TABLE IF EXISTS ${t}`);
+  await creerTables(run);
 
   const t0 = Date.now();
   const jeu = construireJeu();
   await run('BEGIN');
   try {
-    for (const t of ['reseau_sites', 'reseau_analytes', 'reseau_analyseurs', 'reseau_qc', 'reseau_derives', 'reseau_activite', 'reseau_eeq', 'reseau_lots']) {
-      await run(`DELETE FROM ${t}`);
-    }
     for (const s of SITES) {
       await run(`INSERT INTO reseau_sites VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
         [s.code, s.nom, s.ville, s.insee, s.dep, s.population, s.lat, s.lon, s.type, s.plateau || null, s.accredite, s.responsable]);
     }
     for (const a of ANALYTES) {
-      await run(`INSERT INTO reseau_analytes VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [a.code, a.libelle, a.unite, a.nabm, a.libelle_nabm, a.actes_s1_2026, a.cible_n1, a.cible_n2, a.cv, a.eta, a.discipline, a.ref_bas, a.ref_haut]);
+      await run(`INSERT INTO reseau_analytes (code, libelle, unite, code_nabm, libelle_nabm, actes_s1_2026, montant_s1_2026,
+        cible_n1, cible_n2, cv_cible, eta, discipline, ref_bas, ref_haut, controle_qualite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [a.code, a.libelle, a.unite ?? null, a.nabm, a.libelle_nabm, a.actes_s1_2026, a.montant_s1_2026, a.cible_n1 ?? null, a.cible_n2 ?? null,
+          a.cv ?? null, a.eta ?? null, a.discipline, a.ref_bas ?? null, a.ref_haut ?? null, a.qc === false ? 0 : 1]);
+    }
+    for (const r of jeu.resultats) {
+      await run(`INSERT INTO reseau_resultats (pseudo, site, date, analyte, sexe, classe_age, valeur, interpretation) VALUES (?,?,?,?,?,?,?,?)`,
+        [r.pseudo, r.site, r.date, r.analyte, r.sexe, r.classe_age, r.valeur, r.interpretation]);
     }
     for (const app of jeu.analyseurs) {
       let machineId = null;
@@ -465,7 +581,7 @@ async function remplir({ run, get }, { forcer = false } = {}) {
     await run('ROLLBACK');
     throw err;
   }
-  console.log(`Réseau biologIA Sud : ${SITES.length} sites, ${jeu.analyseurs.length} analyseurs, ${jeu.qc.length} contrôles qualité, ${jeu.lots.length} lots de référence (${Date.now() - t0} ms).`);
+  console.log(`Réseau biologIA Sud : ${SITES.length} sites, ${jeu.analyseurs.length} analyseurs, ${jeu.qc.length} contrôles qualité, ${jeu.lots.length} lots de référence, ${jeu.resultats.length} résultats pseudonymisés (${Date.now() - t0} ms).`);
   return true;
 }
 

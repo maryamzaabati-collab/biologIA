@@ -62,7 +62,7 @@ describe('Jeu de données du réseau', () => {
   });
   it('détecte chaque dérive simulée avant la revue mensuelle', () => {
     const { derives } = construireJeu();
-    assert.equal(derives.length, 5);
+    assert.equal(derives.length, 8);
     for (const d of derives) {
       assert.ok(d.detection, `dérive ${d.analyseur} non détectée`);
       assert.ok(d.detection <= d.revue_mensuelle);
@@ -78,8 +78,9 @@ describe('API /api/reseau', () => {
   it('résume le réseau (lecture autorisée au rôle client)', async () => {
     const r = await json('/api/reseau/resume');
     assert.equal(r.status, 200);
-    assert.equal(r.data.sites, 12);
-    assert.ok(r.data.controles_qc > 30000);
+    assert.equal(r.data.sites, 20);
+    assert.ok(r.data.controles_qc > 100000);
+    assert.ok(r.data.depense_remboursee_estimee > 0);
     assert.ok(r.data.resultats_exposes_avec < r.data.resultats_exposes_sans);
   });
   it('relie chaque dérive à au moins un lot de référence à revalider', async () => {
@@ -87,14 +88,21 @@ describe('API /api/reseau', () => {
     assert.equal(r.status, 200);
     for (const d of r.data) {
       assert.ok(d.lots_impactes.length >= 1);
-      assert.ok(d.lots_impactes.every((l) => l.statut === 'a_revalider'));
+      assert.ok(d.lots_impactes.every((l) => ['a_revalider', 'revalide'].includes(l.statut)));
     }
   });
   it('calcule un Sigma pour chaque couple analyseur × analyse', async () => {
     const r = await json('/api/reseau/performance');
     assert.equal(r.status, 200);
-    assert.equal(r.data.length, 72);
+    assert.equal(r.data.length, 115);
     assert.ok(r.data.every((p) => Number.isFinite(p.sigma) && p.regles_conseillees));
+  });
+  it('vérifie le k-anonymat des résultats patients après regroupement', async () => {
+    const r = await json('/api/reseau/resultats?analyte=HB');
+    assert.equal(r.status, 200);
+    assert.ok(r.data.n > 1000);
+    assert.equal(r.data.k_anonymat.respecte, true);
+    assert.ok(r.data.k_anonymat.par_departement.k_min >= 5);
   });
   it('exporte un CSV avec BOM', async () => {
     const r = await json('/api/reseau/export/sites');

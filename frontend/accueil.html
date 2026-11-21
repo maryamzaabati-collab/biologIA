@@ -19,15 +19,16 @@
     <p id="erreur-page" class="message erreur" hidden></p>
     <div class="accueil-reseau">
       <div class="card">
-        <p class="sur-titre">La problématique</p>
-        <h2>Les seuils d’alerte d’un laboratoire reposent-ils sur des données fiables ?</h2>
-        <p class="hint">La biologie contribue à environ 70 % des diagnostics. Mais si un analyseur dérive pendant des semaines, les « valeurs normales » calculées à partir de ses mesures deviennent fausses, et personne ne sait quels résultats revoir. biologIA trace chaque lot, surveille chaque machine et relie automatiquement une dérive aux données qu’elle a touchées.</p>
-        <a class="btn-link" href="apropos.html">Lire la problématique complète</a>
+        <p class="sur-titre">Le problème</p>
+        <h2>Et si la machine d’analyse se trompait sans que personne ne le voie ?</h2>
+        <p class="hint">Les prises de sang servent à environ 70 % des diagnostics. Si une machine mesure faux pendant des semaines, des milliers de résultats partent faux, et on ne sait plus quelles données refaire.</p>
+        <p class="hint"><b>biologIA</b> surveille chaque machine tous les jours, garde la trace de chaque donnée et dit tout de suite quoi refaire.</p>
+        <a class="btn-link" href="apropos.html">Comprendre le problème</a>
       </div>
       <div class="card">
-        <p class="sur-titre">Réseau biologIA Sud</p>
+        <p class="sur-titre">Notre réseau en chiffres</p>
         <div id="reseau-accueil" class="mini-stats" style="grid-template-columns:1fr 1fr"><p class="empty">Chargement…</p></div>
-        <a class="btn-link primary" href="reseau.html">Ouvrir l’observatoire</a>
+        <a class="btn-link primary" href="reseau.html">Voir les 20 laboratoires</a>
       </div>
     </div>
     <div class="cards" style="margin:18px 0">
@@ -59,6 +60,9 @@
           <dt>PSN</dt><dd>code qui replace le nom du patient</dd>
           <dt>Carte de contrôle</dt><dd>courbe qui montre si une machine dérive</dd>
           <dt>Signalement</dt><dd>anomalie repérée automatiquement</dd>
+          <dt>Panne (dérive)</dt><dd>machine qui se met à mesurer faux</dd>
+          <dt>Sigma</dt><dd>note de fiabilité d’une machine (6 = excellent)</dd>
+          <dt>Plateau technique</dt><dd>gros labo qui fait les analyses spécialisées</dd>
         </dl>
       </div>
     </div>
@@ -89,9 +93,9 @@
     const fr = (n) => Number(n).toLocaleString('fr-FR');
     document.getElementById('reseau-accueil').innerHTML = `
       <div><b>${r.sites}</b><span>laboratoires en région Sud</span></div>
-      <div><b>${(r.examens_10_mois / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} M</b><span>examens (janv.–oct. 2026)</span></div>
-      <div><b>${fr(r.controles_qc)}</b><span>contrôles qualité analysés</span></div>
-      <div><b>${r.derives}</b><span>dérives vues en ${String(r.delai_moyen_detection).replace('.', ',')} j en moyenne</span></div>`;
+      <div><b>${(r.examens_total / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} M</b><span>analyses (2025–2026)</span></div>
+      <div><b>${fr(r.controles_qc)}</b><span>contrôles de machines</span></div>
+      <div><b>${r.derives}</b><span>pannes repérées en ${String(r.delai_moyen_detection).replace('.', ',')} j en moyenne</span></div>`;
   } catch { /* observatoire indisponible */ }
 })();
 </script>

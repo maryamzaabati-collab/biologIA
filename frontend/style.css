@@ -1554,3 +1554,25 @@ details.jeu .btn-link { padding: 4px 12px; }
 .table-audit td.num, .table-audit .mono.petit { white-space: nowrap; }
 .table-lots-reseau td.mono { white-space: nowrap; font-size: .8rem; }
 .table-lots-reseau td { font-size: .86rem; }
+
+/* ===== Version simplifiée ===== */
+.en-clair { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 10px; padding: 12px 16px; margin: 0 0 16px; font-size: .95rem; line-height: 1.5; max-width: 90ch; }
+.pastille { display: inline-block; padding: 0 8px; border-radius: 999px; color: #fff; font-size: .8rem; font-weight: 600; }
+.pastille.vert { background: var(--ok); } .pastille.orange { background: var(--wait); } .pastille.rouge { background: var(--flag); }
+.etapes-simples { margin: 8px 0 0; padding-left: 20px; line-height: 1.55; }
+.etapes-simples li { margin-bottom: 8px; }
+.impact-phrase.gros { font-size: 1.15rem; color: var(--ok); }
+.resultats-grille { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; align-items: start; }
+.resultats-grille .mini-stats { margin-top: 10px; }
+.kanon { padding: 10px 14px; border-radius: 10px; background: var(--wait-soft, var(--accent-soft)); font-size: .9rem; line-height: 1.5; }
+.kanon.ok { background: var(--ok-soft); }
+details.card > summary { cursor: pointer; }
+@media (max-width: 900px) { .resultats-grille { grid-template-columns: 1fr; } }
+details.derive { padding-top: 12px; padding-bottom: 12px; margin-bottom: 8px; }
+.derive-resume { display: grid; grid-template-columns: 96px 1fr auto auto; gap: 14px; align-items: center; cursor: pointer; list-style: none; }
+.derive-resume::-webkit-details-marker { display: none; }
+.derive-resume::before { content: '▸'; position: absolute; margin-left: -14px; color: var(--ink-soft); }
+details.derive[open] .derive-resume { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+details.derive { padding-left: 30px; }
+.derive-date { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: .86rem; }
+@media (max-width: 700px) { .derive-resume { grid-template-columns: 1fr; gap: 4px; } }

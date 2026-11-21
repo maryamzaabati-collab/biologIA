@@ -110,19 +110,20 @@
          ${lienNav('journal.html', 'Journal', 'journal', page)}`
       : '';
     nav.innerHTML = `
-      <p class="nav-section">Suivi</p>
+      <p class="nav-section">Comprendre</p>
+      ${lienNav('apropos.html', 'Le problème', 'probleme', page)}
       ${lienNav('accueil.html', 'Accueil', 'accueil', page)}
-      ${lienNav('reseau.html', 'Observatoire réseau', 'reseau', page)}
-      ${lienNav('tableau.html', 'Tableau de bord', 'synthese', page)}
-      ${lienNav('index.html', 'Lots', 'lots', page)}
+      <p class="nav-section">Tout le réseau</p>
+      ${lienNav('reseau.html', '20 laboratoires', 'reseau', page)}
+      <p class="nav-section">Labo de Nice en détail</p>
+      ${lienNav('index.html', 'Lots de données', 'lots', page)}
       ${lienNav('machines.html', 'Machines', 'machines', page)}
-      ${lienNav('signalements.html', 'Signalements', 'signalements', page)}
-      <p class="nav-section">Données</p>
+      ${lienNav('signalements.html', 'Alertes', 'signalements', page)}
       ${role === 'client' ? '' : lienNav('patients.html', 'Patients', 'patients', page)}
+      ${lienNav('tableau.html', 'Tableau de bord', 'synthese', page)}
+      <p class="nav-section">Preuves</p>
       ${lienNav('documents.html', 'Documents', 'synthese', page)}
-      <p class="nav-section">Conformité</p>
       ${lienNav('conformite.html', 'Conformité', 'conformite', page)}
-      ${lienNav('apropos.html', 'Problématique', 'probleme', page)}
       ${admin}
     `;
   }
