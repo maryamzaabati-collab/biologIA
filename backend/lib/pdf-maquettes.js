@@ -29,7 +29,10 @@ function dessinerAnneau(doc, x, y, pct, texte, label, couleur) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
   doc.save();
   doc.circle(x, y, r).lineWidth(5).strokeColor('#E6E0D4').stroke();
-  if (p > 0) {
+  if (p >= 0.999) {
+    // cercle complet : un arc qui revient à son point de départ ne se dessinerait pas
+    doc.circle(x, y, r).lineWidth(5).strokeColor(couleur || SAGE).stroke();
+  } else if (p > 0) {
     const start = -Math.PI / 2;
     const end = start + p * 2 * Math.PI;
     const large = p > 0.5 ? 1 : 0;
@@ -72,10 +75,23 @@ function protegerTexte(doc) {
 }
 
 // En-tête commun à tous les PDF du site.
+// Le vrai logo du site (hélice d'ADN + point miel), dessiné en vectoriel.
+function dessinerLogo(doc, x, y, taille = 24) {
+  const k = taille / 28;
+  doc.save();
+  doc.translate(x, y).scale(k);
+  doc.roundedRect(0, 0, 28, 28, 7).fill(SAGE);
+  doc.path('M8.5 4C8.5 10 19.5 10 19.5 14S8.5 18 8.5 24M19.5 4C19.5 10 8.5 10 8.5 14s11 4 11 10')
+    .lineWidth(1.8).lineCap('round').strokeColor('#F7F4EC').stroke();
+  doc.path('M11 7.5h6M11 20.5h6').lineWidth(1.3).lineCap('round').strokeColor('#F7F4EC').stroke();
+  doc.circle(23.2, 4.8, 2).fill('#FCC88A');
+  doc.restore();
+}
+
 function enTete(doc, titre, sousTitre) {
-  doc.roundedRect(40, 28, 22, 22, 5).fill(SAGE);
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#FFFFFF').text('b', 40, 33, { width: 22, align: 'center' });
-  doc.font('Helvetica-Bold').fontSize(11).fillColor(SAGE).text('biologIA', 68, 33);
+  dessinerLogo(doc, 40, 27, 25);
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(INK).text('biolog', 72, 33, { continued: true, lineBreak: false })
+    .fillColor(SAGE).text('IA', { lineBreak: false });
   doc.font('Helvetica').fontSize(9).fillColor(MUTED).text('Registre de traçabilité des laboratoires', 300, 32, { width: 255, align: 'right' });
   doc.fontSize(8).text('Données fictives · projet pédagogique BUT SD', 300, 46, { width: 255, align: 'right' });
   doc.strokeColor(SAGE).lineWidth(1.2).moveTo(40, 68).lineTo(555, 68).stroke();
@@ -188,5 +204,5 @@ async function bufferQr(url) {
 module.exports = {
   SAGE, INK, MUTED, LINE, PAPER,
   urlPublique, couleurPoint, dessinerAnneau, tableauSimple, bufferQr,
-  nettoyer, protegerTexte, enTete, piedsDePage, place, blocSignature
+  nettoyer, protegerTexte, enTete, piedsDePage, place, blocSignature, dessinerLogo
 };

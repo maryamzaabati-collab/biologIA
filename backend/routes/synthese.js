@@ -173,6 +173,16 @@ function actionPour(lot) {
   return '';
 }
 
+// Arc de cercle (pour le graphique en anneau des statuts).
+function arc(doc, cx, cy, r, debut, fin, couleur, epaisseur) {
+  if (fin - debut <= 0.0001) return;
+  const a0 = -Math.PI / 2 + debut * 2 * Math.PI;
+  const a1 = -Math.PI / 2 + fin * 2 * Math.PI;
+  const large = fin - debut > 0.5 ? 1 : 0;
+  doc.path(`M ${cx + r * Math.cos(a0)} ${cy + r * Math.sin(a0)} A ${r} ${r} 0 ${large} 1 ${cx + r * Math.cos(a1)} ${cy + r * Math.sin(a1)}`)
+    .lineWidth(epaisseur).lineCap('butt').strokeColor(couleur).stroke();
+}
+
 router.get('/pdf', async (req, res) => {
   try {
     const s = await chiffres();
@@ -185,186 +195,182 @@ router.get('/pdf', async (req, res) => {
 
     const doc = protegerTexte(new PDFDocument({ margin: 40, size: 'A4', bufferPages: true }));
     doc.pipe(res);
-    const L = 515; // largeur utile
-    const PAPIER = '#F4F1E8';
     const LIGNE = '#DDD6C8';
     const ROUGE = '#C85A4A';
     const emise = req.utilisateur
       ? `Émise par ${req.utilisateur.nom} (${req.utilisateur.role}) · ${formaterParis(s.genereLe)}`
       : `Générée le ${formaterParis(s.genereLe)}`;
-    enTete(doc, 'Fiche de synthèse — contrôle qualité', `${emise} · plateau technique de Nice`);
+    enTete(doc, 'Fiche de synthèse — Contrôle qualité', `${emise} · plateau technique de Nice`);
 
     const titre = (texte, x, y) => {
-      doc.font('Helvetica-Bold').fontSize(10.5).fillColor(INK).text(texte, x, y, { lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(INK).text(texte, x, y, { lineBreak: false });
     };
     const noteMoy = lots.length ? Math.round(lots.reduce((t, l) => t + (Number(l.score_confiance) || 0), 0) / lots.length) : 0;
     const aTraiter = lots.filter((l) => l.statut_affiche !== 'valide').length;
 
-    // 1. Le message principal, en une phrase
-    let y = 120;
-    doc.roundedRect(40, y, L, 34, 6).fill(PAPIER);
-    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(INK)
-      .text(`${s.totalLots} lots suivis sur ${machines.length} machines : ${s.pourcentageValides} % sont validés et utilisables.`, 52, y + 7, { width: L - 24, lineBreak: false });
-    doc.font('Helvetica').fontSize(8.5).fillColor(MUTED)
-      .text(`${aTraiter} lot(s) demandent une action, dont ${s.lotsDouteux} signalé(s) à examiner en premier (liste en bas de page).`, 52, y + 20, { width: L - 24, lineBreak: false });
+    // 1. La phrase à retenir
+    doc.font('Helvetica').fontSize(9).fillColor(INK)
+      .text(`${s.totalLots} lots suivis sur ${machines.length} machines. `, 40, 120, { continued: true })
+      .font('Helvetica-Bold').text(`${s.pourcentageValides} % sont validés et utilisables`, { continued: true })
+      .font('Helvetica').text(` ; ${aTraiter} demandent une action (liste en bas de page).`);
 
-    // 2. Chiffres clés
-    y = 166;
-    const tuiles = [
-      [String(s.totalLots), 'lots suivis', SAGE],
-      [`${s.pourcentageValides} %`, 'validés par un biologiste', SAGE],
-      [`${s.pourcentageAnonymises} %`, 'pseudonymisés (sans nom)', SAGE],
-      [`${noteMoy}/100`, 'note de confiance moyenne', SAGE],
-      [String(s.signalementsEnCours), `signalements ouverts (sur ${s.lotsDouteux} lot${s.lotsDouteux > 1 ? 's' : ''})`, s.signalementsEnCours ? ROUGE : SAGE]
-    ];
-    const lt = (L - 4 * 8) / 5;
-    tuiles.forEach(([v, lib, c], i) => {
-      const x = 40 + i * (lt + 8);
-      doc.roundedRect(x, y, lt, 54, 6).lineWidth(0.8).strokeColor(LIGNE).stroke();
-      doc.rect(x, y + 8, 3, 38).fill(c);
-      doc.font('Helvetica-Bold').fontSize(17).fillColor(c === ROUGE ? ROUGE : INK).text(v, x + 12, y + 10, { width: lt - 18, lineBreak: false });
-      doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text(lib, x + 12, y + 33, { width: lt - 18, height: 18 });
-    });
+    // 2. Les anneaux, comme sur le site
+    const yA = 172;
+    dessinerAnneau(doc, 82, yA, 100, String(s.totalLots), 'lots suivis', SAGE);
+    dessinerAnneau(doc, 190, yA, s.pourcentageValides, `${s.pourcentageValides} %`, 'validés par un biologiste', SAGE);
+    dessinerAnneau(doc, 298, yA, s.pourcentageAnonymises, `${s.pourcentageAnonymises} %`, 'pseudonymisés', SAGE);
+    dessinerAnneau(doc, 406, yA, noteMoy, String(noteMoy), 'note de confiance moyenne', SAGE);
+    const pctSig = s.totalLots ? Math.max(6, Math.round(100 * s.lotsDouteux / s.totalLots)) : 0;
+    dessinerAnneau(doc, 514, yA, pctSig, String(s.signalementsEnCours), `signalements ouverts (${s.lotsDouteux} lots)`, ROUGE);
 
-    // 3. Où en sont les lots ? (barre empilée)
-    y = 236;
+    // 3a. Où en sont les lots ? — anneau des statuts
+    let y = 238;
+    doc.moveTo(40, y - 8).lineTo(555, y - 8).lineWidth(0.5).strokeColor(LIGNE).stroke();
     titre('Où en sont les lots ?', 40, y);
-    y += 17;
-    let x = 40;
     const comptes = COULEURS_STATUT.map(([code, lib, c]) => [lots.filter((l) => l.statut_affiche === code).length, lib, c]);
-    comptes.forEach(([n, , c]) => {
-      if (!n) return;
-      const w = (n / Math.max(1, s.totalLots)) * L;
-      doc.rect(x, y, w, 13).fill(c);
-      x += w;
-    });
-    y += 19;
-    x = 40;
-    comptes.forEach(([n, lib, c]) => {
-      doc.circle(x + 4, y + 4, 3.5).fill(c);
-      const t = `${lib} : ${n} (${Math.round(100 * n / Math.max(1, s.totalLots))} %)`;
-      doc.font('Helvetica').fontSize(7.8).fillColor(INK).text(t, x + 11, y, { lineBreak: false });
-      x += doc.widthOfString(t) + 26;
-    });
-
-    // 4a. Par discipline
-    y = 292;
-    titre('Par discipline', 40, y);
-    const disc = {};
-    for (const l of lots) {
-      const d = l.machine_type || 'non renseignée';
-      disc[d] = disc[d] || { lots: 0, valides: 0, note: 0, signales: 0 };
-      disc[d].lots++;
-      disc[d].note += Number(l.score_confiance) || 0;
-      if (l.statut_affiche === 'valide') disc[d].valides++;
-      if (l.statut_affiche === 'signale') disc[d].signales++;
+    const cx = 88;
+    const cy = y + 66;
+    let cumul = 0;
+    for (const [n, , c] of comptes) {
+      const part = n / Math.max(1, s.totalLots);
+      arc(doc, cx, cy, 38, cumul, cumul + part, c, 13);
+      cumul += part;
     }
-    const lignesDisc = Object.entries(disc).sort((a, b) => b[1].lots - a[1].lots).slice(0, 11);
-    const cols = [[40, 'Discipline', 98], [138, 'Machines', 44], [182, 'Lots', 32], [214, 'Validés', 46], [260, 'Note moy.', 46]];
-    let yt = y + 18;
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED);
-    cols.forEach(([cx, lib, w], i) => doc.text(lib, cx, yt, { width: w - 4, align: i ? 'right' : 'left', lineBreak: false }));
-    doc.moveTo(40, yt + 11).lineTo(306, yt + 11).lineWidth(0.8).strokeColor(SAGE).stroke();
-    yt += 15;
-    for (const [d, v] of lignesDisc) {
-      const nbM = machines.filter((m) => m.type === d).length;
-      const pct = Math.round(100 * v.valides / v.lots);
-      const cells = [NOMS_DISCIPLINES[d] || d, String(nbM), String(v.lots), `${pct} %`, String(Math.round(v.note / v.lots))];
-      doc.font('Helvetica').fontSize(7.8).fillColor(INK);
-      cells.forEach((c, i) => doc.text(c, cols[i][0], yt, { width: cols[i][2] - 4, align: i ? 'right' : 'left', lineBreak: false }));
-      yt += 14.5;
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(INK).text(String(s.totalLots), cx - 30, cy - 9, { width: 60, align: 'center', lineBreak: false });
+    doc.font('Helvetica').fontSize(6.5).fillColor(MUTED).text('lots', cx - 30, cy + 7, { width: 60, align: 'center', lineBreak: false });
+    let yl = y + 30;
+    for (const [n, lib, c] of comptes) {
+      doc.circle(152, yl + 4, 3.5).fill(c);
+      doc.font('Helvetica').fontSize(8.5).fillColor(INK).text(lib, 161, yl, { width: 80, lineBreak: false });
+      doc.font('Helvetica-Bold').text(String(n), 238, yl, { width: 28, align: 'right', lineBreak: false });
+      doc.font('Helvetica').fillColor(MUTED).text(`${Math.round(100 * n / Math.max(1, s.totalLots))} %`, 268, yl, { width: 30, align: 'right', lineBreak: false });
+      yl += 15;
     }
 
-    // 4b. Activité des 12 derniers mois
-    const xd = 330;
-    const ld = 225;
+    // 3b. Lots enregistrés sur 12 mois — barres
+    const xd = 335;
+    const ld = 220;
     titre('Lots enregistrés (12 derniers mois)', xd, y);
     const mois = [];
     const fin = new Date(s.genereLe);
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth() - i, 1));
-      mois.push(d.toISOString().slice(0, 7));
-    }
+    for (let i = 11; i >= 0; i--) mois.push(new Date(Date.UTC(fin.getUTCFullYear(), fin.getUTCMonth() - i, 1)).toISOString().slice(0, 7));
     const parMois = mois.map((m) => lots.filter((l) => String(l.date || '').startsWith(m)).length);
     const maxM = Math.max(1, ...parMois);
-    const hG = 62;
-    const yb = y + 22 + hG;
+    const hG = 72;
+    const yb = y + 26 + hG;
     const lb = ld / 12;
-    const lettres = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const lettres = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
+    [0.5, 1].forEach((t) => {
+      doc.moveTo(xd, yb - t * hG).lineTo(xd + ld, yb - t * hG).lineWidth(0.4).dash(2, { space: 2 }).strokeColor(LIGNE).stroke().undash();
+    });
     parMois.forEach((n, i) => {
       const h = (n / maxM) * hG;
-      doc.rect(xd + i * lb + 2, yb - h, lb - 4, h).fill(SAGE);
+      if (h) doc.roundedRect(xd + i * lb + 3, yb - h, lb - 6, h, 2).fill(i === 11 ? '#D4A04A' : SAGE);
       if (n) doc.font('Helvetica').fontSize(6.5).fillColor(MUTED).text(String(n), xd + i * lb, yb - h - 9, { width: lb, align: 'center', lineBreak: false });
-      doc.font('Helvetica').fontSize(6.5).fillColor(MUTED).text(lettres[Number(mois[i].slice(5)) - 1], xd + i * lb, yb + 3, { width: lb, align: 'center', lineBreak: false });
+      doc.font('Helvetica').fontSize(6).fillColor(MUTED).text(lettres[Number(mois[i].slice(5)) - 1], xd + i * lb - 2, yb + 4, { width: lb + 4, align: 'center', lineBreak: false });
     });
-    doc.moveTo(xd, yb).lineTo(xd + ld, yb).lineWidth(0.5).strokeColor(LIGNE).stroke();
+    doc.moveTo(xd, yb).lineTo(xd + ld, yb).lineWidth(0.8).strokeColor(SAGE).stroke();
 
-    // 4c. État du parc de machines
-    let ym = yb + 22;
-    titre('État des machines', xd, ym);
-    ym += 16;
+    // 4a. Par discipline — barres horizontales
+    y = 362;
+    doc.moveTo(40, y - 8).lineTo(555, y - 8).lineWidth(0.5).strokeColor(LIGNE).stroke();
+    titre('Les lots par discipline', 40, y);
+    doc.font('Helvetica').fontSize(7).fillColor(MUTED).text('vert = validés · clair = autres', 200, y + 3, { lineBreak: false });
+    const disc = {};
+    for (const l of lots) {
+      const d = l.machine_type || 'non renseignée';
+      disc[d] = disc[d] || { lots: 0, valides: 0 };
+      disc[d].lots++;
+      if (l.statut_affiche === 'valide') disc[d].valides++;
+    }
+    const lignesDisc = Object.entries(disc).sort((a, b) => b[1].lots - a[1].lots).slice(0, 10);
+    const maxD = Math.max(1, ...lignesDisc.map(([, v]) => v.lots));
+    let yd = y + 20;
+    for (const [d, v] of lignesDisc) {
+      const wTot = 140 * v.lots / maxD;
+      const wVal = 140 * v.valides / maxD;
+      doc.font('Helvetica').fontSize(8).fillColor(INK).text(NOMS_DISCIPLINES[d] || d, 40, yd, { width: 92, lineBreak: false });
+      doc.roundedRect(134, yd + 1, wTot, 7.5, 2).fill('#E3ECE6');
+      if (wVal) doc.roundedRect(134, yd + 1, wVal, 7.5, 2).fill(SAGE);
+      doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
+        .text(`${v.valides}/${v.lots} · ${Math.round(100 * v.valides / v.lots)} %`, 134 + wTot + 6, yd, { lineBreak: false });
+      yd += 13.5;
+    }
+
+    // 4b. État des machines
+    titre('État des machines', xd, y);
+    let ym = y + 20;
     const enService = machines.filter((m) => (m.statut_service || 'en_service') === 'en_service').length;
     const maint = machines.filter((m) => m.statut_service === 'maintenance');
     const hs = machines.filter((m) => m.statut_service === 'hors_service');
-    const ligneM = (couleur, texte) => {
+    // petite barre empilée du parc
+    const parts = [[enService, SAGE], [maint.length, '#D4A04A'], [hs.length, ROUGE]];
+    let xx = xd;
+    for (const [n, c] of parts) {
+      const w = ld * n / Math.max(1, machines.length);
+      if (w) doc.rect(xx, ym, w, 9).fill(c);
+      xx += w;
+    }
+    ym += 17;
+    const ligneM = (couleur, gras, texte) => {
       doc.circle(xd + 4, ym + 4, 3).fill(couleur);
-      doc.font('Helvetica').fontSize(7.8).fillColor(INK).text(texte, xd + 12, ym, { width: ld - 12 });
-      ym = doc.y + 3;
+      doc.font('Helvetica-Bold').fontSize(8).fillColor(INK).text(gras, xd + 12, ym, { continued: Boolean(texte), width: ld - 12 });
+      if (texte) doc.font('Helvetica').fillColor(MUTED).text(texte);
+      ym = doc.y + 4;
     };
-    ligneM(SAGE, `${enService} en service`);
-    ligneM('#D4A04A', `${maint.length} en maintenance : ${maint.map((m) => m.nom).join(', ')}`);
-    ligneM(ROUGE, `${hs.length} hors service${hs.length ? ' : ' + hs.map((m) => m.nom).join(', ') : ''}`);
+    ligneM(SAGE, `${enService} en service`, '');
+    ligneM('#D4A04A', `${maint.length} en maintenance`, maint.length ? ` : ${maint.map((m) => m.nom).join(', ')}` : '');
+    ligneM(ROUGE, `${hs.length} hors service`, hs.length ? ` : ${hs.map((m) => m.nom).join(', ')}` : '');
 
     // 5. À traiter en priorité
-    y = Math.max(yt, ym) + 14;
+    y = Math.max(yd, ym) + 12;
+    doc.moveTo(40, y - 8).lineTo(555, y - 8).lineWidth(0.5).strokeColor(LIGNE).stroke();
     const ordre = { signale: 0, brouillon: 1, a_valider: 2, a_revalider: 3 };
     const prio = lots.filter((l) => l.statut_affiche in ordre)
       .sort((a, b) => ordre[a.statut_affiche] - ordre[b.statut_affiche] || String(b.date || '').localeCompare(String(a.date || '')));
-    const place = Math.max(4, Math.floor((680 - (y + 34)) / 15));
-    const montres = prio.slice(0, place);
+    const nbLignes = Math.max(4, Math.floor((684 - (y + 34)) / 16));
+    const montres = prio.slice(0, nbLignes);
     titre(`À traiter en priorité (${prio.length})`, 40, y);
-    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
-      .text('Les signalés d’abord, puis les brouillons, les lots à valider et à revalider.', 210, y + 2, { width: 345, align: 'right', lineBreak: false });
-    y += 17;
-    const cp = [[40, 'Lot', 70], [110, 'Machine', 92], [202, 'Date', 50], [252, 'Statut', 62], [314, 'Action à faire', 241]];
+    doc.font('Helvetica').fontSize(7).fillColor(MUTED)
+      .text('signalés d’abord, puis brouillons, lots à valider et à revalider', 200, y + 3, { width: 355, align: 'right', lineBreak: false });
+    y += 18;
+    const cp = [[40, 'Lot', 72], [112, 'Machine', 92], [204, 'Date', 50], [254, 'Statut', 62], [316, 'Action à faire', 239]];
     doc.font('Helvetica-Bold').fontSize(7.5).fillColor(MUTED);
-    cp.forEach(([cx, lib, w]) => doc.text(lib, cx, y, { width: w, lineBreak: false }));
+    cp.forEach(([x0, lib, w]) => doc.text(lib, x0, y, { width: w, lineBreak: false }));
     doc.moveTo(40, y + 11).lineTo(555, y + 11).lineWidth(0.8).strokeColor(SAGE).stroke();
-    y += 15;
+    y += 16;
     const coul = Object.fromEntries(COULEURS_STATUT.map(([c, , col]) => [c, col]));
-    montres.forEach((l, i) => {
-      if (i % 2 === 0) doc.rect(40, y - 3, L, 15).fill('#FAF8F3');
-      doc.font('Helvetica-Bold').fontSize(7.8).fillColor(INK).text(l.nom, 42, y, { width: 68, lineBreak: false });
+    for (const l of montres) {
       doc.font('Helvetica').fontSize(7.8).fillColor(INK)
-        .text(l.machine_nom || 'non renseignée', 110, y, { width: 90, height: 10, ellipsis: true })
-        .text(l.date ? formaterJour(l.date) : '-', 202, y, { width: 48, lineBreak: false });
-      doc.circle(256, y + 3.5, 3).fill(coul[l.statut_affiche] || MUTED);
-      doc.fillColor(INK).text(l.statut_libelle, 263, y, { width: 50, lineBreak: false });
-      doc.fillColor(l.statut_affiche === 'signale' ? ROUGE : INK).text(actionPour(l), 314, y, { width: 241, height: 10, ellipsis: true });
-      y += 15;
-    });
+        .text(l.nom, 40, y, { width: 70, lineBreak: false })
+        .text(l.machine_nom || 'non renseignée', 112, y, { width: 90, height: 10, ellipsis: true })
+        .text(l.date ? formaterJour(l.date) : '-', 204, y, { width: 48, lineBreak: false });
+      doc.circle(258, y + 3.5, 3).fill(coul[l.statut_affiche] || MUTED);
+      doc.fillColor(INK).text(l.statut_libelle, 265, y, { width: 50, lineBreak: false });
+      doc.fillColor(l.statut_affiche === 'signale' ? ROUGE : INK).text(actionPour(l), 316, y, { width: 239, height: 10, ellipsis: true });
+      doc.moveTo(40, y + 12).lineTo(555, y + 12).lineWidth(0.4).strokeColor(LIGNE).stroke();
+      y += 16;
+    }
     if (prio.length > montres.length) {
       doc.font('Helvetica-Oblique').fontSize(7.5).fillColor(MUTED)
-        .text(`+ ${prio.length - montres.length} autre(s) lot(s) à traiter : liste complète sur le site (page Lots) ou dans l’export CSV.`, 40, y + 2, { width: L, lineBreak: false });
+        .text(`+ ${prio.length - montres.length} autre(s) lot(s) à traiter : liste complète sur le site (page Lots) ou dans l’export CSV.`, 40, y + 2, { width: 515, lineBreak: false });
     }
 
-    // 6. Comment lire + signature + QR (bas de page fixe)
-    const yb2 = 700;
-    doc.moveTo(40, yb2 - 8).lineTo(555, yb2 - 8).lineWidth(0.5).strokeColor(LIGNE).stroke();
-    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(INK).text('Comment lire la note de confiance (/100)', 40, yb2);
+    // 6. Mode d'emploi de la note + visa + QR
+    const yb2 = 702;
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(INK).text('Lire la note de confiance (/100)', 40, yb2);
     doc.font('Helvetica').fontSize(7).fillColor(MUTED).text(
-      'Machine (15) + date (15) + conditions de mesure (15) + pseudonymisation sans colonne identifiante (20) + aucun signalement ouvert (20) + validation de moins de 12 mois (15). 80 et plus : lot bien documenté.',
-      40, yb2 + 11, { width: 250 });
-    doc.roundedRect(305, yb2, 170, 62, 5).lineWidth(0.8).strokeColor(SAGE).stroke();
-    doc.font('Helvetica').fontSize(7).fillColor(MUTED).text('Visa du biologiste responsable', 313, yb2 + 7);
-    doc.text('Nom :', 313, yb2 + 24).text('Date :              Signature :', 313, yb2 + 40);
+      'Machine (15) + date (15) + conditions de mesure (15) + pseudonymisation sans colonne identifiante (20) + aucun signalement ouvert (20) + validation de moins de 12 mois (15).',
+      40, yb2 + 11, { width: 245 });
+    doc.rect(300, yb2, 175, 58).lineWidth(0.8).strokeColor(SAGE).stroke();
+    doc.font('Helvetica').fontSize(7.5).fillColor(MUTED).text('Visa du biologiste · nom, date, signature', 308, yb2 + 7);
     if (qr) {
       try {
-        doc.image(qr, 490, yb2 - 2, { width: 62 });
-        doc.fontSize(6).fillColor(MUTED).text('Version en ligne', 480, yb2 + 61, { width: 80, align: 'center', lineBreak: false });
+        doc.image(qr, 490, yb2 - 4, { width: 62 });
+        doc.fontSize(6).fillColor(MUTED).text('Version en ligne', 480, yb2 + 59, { width: 80, align: 'center', lineBreak: false });
       } catch { /* image invalide : on ignore */ }
     }
-    piedsDePage(doc, 'Fiche de synthèse biologIA · aucune donnée nominative · données fictives');
+    piedsDePage(doc, 'biologIA · fiche de synthèse · aucune donnée nominative · données fictives');
     doc.end();
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ erreur: err.message });

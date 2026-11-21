@@ -28,19 +28,34 @@
       <p class="landing-nom">biolog<span class="landing-ia">IA</span></p>
     </div>
     <div class="landing-texte">
+      <p class="landing-surtitre">Traçabilité des laboratoires d’analyses médicales</p>
       <h1>Chaque lot garde sa mémoire</h1>
-      <p>Registre de traçabilité des données de référence d’un laboratoire d’analyses : de la machine à la validation.</p>
+      <p>Savoir d’où vient chaque donnée, quelle machine l’a mesurée, si elle est fiable et qui l’a validée.</p>
+      <ul class="landing-piliers" aria-label="Les trois piliers">
+        <li><span class="pilier-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg></span>
+          <span><b>Origine</b>machine, date, conditions de mesure</span></li>
+        <li><span class="pilier-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 5-7 4 5"/><path d="M3 21h18"/></svg></span>
+          <span><b>Qualité</b>contrôles quotidiens, alertes automatiques</span></li>
+        <li><span class="pilier-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          <span><b>Validation</b>signée par un biologiste, tout est tracé</span></li>
+      </ul>
     </div>
-    <ul class="landing-mots" aria-label="Les trois piliers">
-      <li>Origine</li>
-      <li>Qualité</li>
-      <li>Validation</li>
+    <div class="landing-apercu" aria-hidden="true">
+      <div class="apercu-tete"><span class="apercu-nom">LOT-2026-001</span><span class="apercu-badge">Validé</span></div>
+      <div class="apercu-ligne"><span>Cobas 8000 · Glycémie à jeun</span><span class="apercu-note"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="fond"/><circle cx="18" cy="18" r="15" class="arc"/></svg><b>100</b></span></div>
+      <div class="apercu-etapes"><span>Origine</span><i></i><span>Machine</span><i></i><span>Patients (PSN)</span><i></i><span>Validation</span></div>
+    </div>
+    <ul class="landing-chiffres" aria-label="En chiffres">
+      <li><b>20</b><span>laboratoires</span></li>
+      <li><b>26</b><span>machines suivies</span></li>
+      <li><b>7,3 M</b><span>analyses</span></li>
     </ul>
   </section>
   <section class="landing-droite">
     <div id="langue-slot" class="langue-slot-connexion"></div>
+    <div class="connexion-carte">
     <h1>Connexion</h1>
-    <p class="page-intro">Accédez au registre de votre laboratoire.</p>
+    <p class="page-intro">Connectez-vous pour accéder au registre.</p>
     <div class="onglets-page onglets-connexion" role="tablist">
       <button type="button" class="active" id="onglet-connexion" role="tab" aria-selected="true">Se connecter</button>
       <button type="button" id="onglet-inscription" role="tab" aria-selected="false">Créer un compte</button>
@@ -62,10 +77,21 @@
       </div>
       <button type="submit" style="width:100%">Se connecter</button>
     </form>
-    <aside class="encart-demo" aria-label="Avertissement">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16v.5"/></svg>
-      <p><strong>Démonstrateur pédagogique.</strong> Données fictives, aucun bilan patient réel. Un biologiste valide chaque nouveau compte.</p>
-    </aside>
+    <section class="comptes-demo" aria-label="Comptes de démonstration">
+      <p class="comptes-titre"><span>Comptes de démonstration</span><span class="hint">cliquez pour remplir</span></p>
+      <button type="button" class="compte-demo" data-id="samira" data-mdp="labo2026">
+        <span class="compte-avatar tech">SK</span>
+        <span class="compte-texte"><b>Technicien</b><span>Samira K. · enregistre les lots</span></span>
+        <span class="compte-ids"><code>samira</code><code>labo2026</code></span>
+      </button>
+      <button type="button" class="compte-demo" data-id="amrani" data-mdp="labo2026">
+        <span class="compte-avatar bio">DA</span>
+        <span class="compte-texte"><b>Biologiste</b><span>Dr. Amrani · valide lots et comptes</span></span>
+        <span class="compte-ids"><code>amrani</code><code>labo2026</code></span>
+      </button>
+      <p class="hint comptes-note">Projet pédagogique : données fictives, aucun vrai patient.</p>
+    </section>
+    </div>
     <form id="form-oublie" hidden>
       <label for="oublie-id">Identifiant ou e-mail</label>
       <input type="text" id="oublie-id" required>
@@ -107,6 +133,13 @@
   }
   g.innerHTML = s;
 })();
+document.querySelectorAll('.compte-demo').forEach((b) => b.addEventListener('click', () => {
+  document.getElementById('onglet-connexion').click();
+  document.getElementById('identifiant').value = b.dataset.id;
+  document.getElementById('mot_de_passe').value = b.dataset.mdp;
+  document.querySelectorAll('.compte-demo').forEach((x) => x.classList.toggle('choisi', x === b));
+  document.querySelector('#form-connexion button[type="submit"]').focus();
+}));
 document.getElementById('voir-mdp').addEventListener('click', () => {
   const champ = document.getElementById('mot_de_passe');
   const btn = document.getElementById('voir-mdp');
