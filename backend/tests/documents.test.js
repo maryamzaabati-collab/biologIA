@@ -41,10 +41,12 @@ after(async () => {
 });
 
 describe('PDF', () => {
-  it('génère la fiche de synthèse', async () => {
+  it('génère la fiche de synthèse sur une seule page', async () => {
     const r = await telecharger('/api/synthese/pdf');
     assert.equal(r.status, 200);
     assert.ok(r.octets.subarray(0, 5).toString() === '%PDF-');
+    const pages = (r.octets.toString('latin1').match(/\/Type \/Page\b/g) || []).length;
+    assert.equal(pages, 1);
   });
   it('génère le certificat de chaque lot', async () => {
     const lots = await db.all('SELECT id FROM lots LIMIT 5');
