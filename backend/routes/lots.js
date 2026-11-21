@@ -357,7 +357,7 @@ router.get('/:id/certificat', async (req, res) => {
       { label: 'Maximum', w: 1.2 }
     ], [
       ...(vu.score_detail || []).map((l) => ({
-        cellules: [{ point: l.ok ? pdf.SAGE : '#C85A4A', texte: l.label }, String(l.points), String(l.max)]
+        cellules: [{ point: l.ok ? '#1D7A55' : '#C0392B', texte: l.label }, String(l.points), String(l.max)]
       })),
       { cellules: ['Note de confiance du lot', String(vu.score_confiance), '100'] }
     ], y + 32, { hauteur: 20 });

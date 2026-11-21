@@ -4,7 +4,7 @@
   const NS = 'http://www.w3.org/2000/svg';
 
   function couleur(nom) {
-    return getComputedStyle(document.documentElement).getPropertyValue(nom).trim() || '#3F6F55';
+    return getComputedStyle(document.documentElement).getPropertyValue(nom).trim() || '#0B5268';
   }
   function nombre(n, dec = 0) {
     const v = Number(n || 0);

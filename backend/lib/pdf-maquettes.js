@@ -1,8 +1,8 @@
-const SAGE = '#3F6F55';
-const INK = '#1C1A16';
-const MUTED = '#6B675E';
-const LINE = '#DDD6C8';
-const PAPER = '#F7F4EC';
+const SAGE = '#0B5268';
+const INK = '#14212B';
+const MUTED = '#5A6876';
+const LINE = '#E1E6EB';
+const PAPER = '#F4F6F8';
 
 function urlPublique(req) {
   if (process.env.PUBLIC_URL) return String(process.env.PUBLIC_URL).replace(/\/$/, '');
@@ -17,18 +17,18 @@ function urlPublique(req) {
 }
 
 function couleurPoint(code) {
-  if (code === 'valide' || code === 'ok') return SAGE;
-  if (code === 'signale') return '#C85A4A';
-  if (code === 'a_valider') return '#D4A04A';
-  if (code === 'a_revalider') return '#4A6FA5';
-  return '#9A958A';
+  if (code === 'valide' || code === 'ok') return '#1D7A55';
+  if (code === 'signale') return '#C0392B';
+  if (code === 'a_valider') return '#D08A1C';
+  if (code === 'a_revalider') return '#2F63A6';
+  return '#9AA5B1';
 }
 
 function dessinerAnneau(doc, x, y, pct, texte, label, couleur) {
   const r = 22;
   const p = Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
   doc.save();
-  doc.circle(x, y, r).lineWidth(5).strokeColor('#E6E0D4').stroke();
+  doc.circle(x, y, r).lineWidth(5).strokeColor('#E1E6EB').stroke();
   if (p >= 0.999) {
     // cercle complet : un arc qui revient à son point de départ ne se dessinerait pas
     doc.circle(x, y, r).lineWidth(5).strokeColor(couleur || SAGE).stroke();
@@ -82,9 +82,9 @@ function dessinerLogo(doc, x, y, taille = 24) {
   doc.translate(x, y).scale(k);
   doc.roundedRect(0, 0, 28, 28, 7).fill(SAGE);
   doc.path('M8.5 4C8.5 10 19.5 10 19.5 14S8.5 18 8.5 24M19.5 4C19.5 10 8.5 10 8.5 14s11 4 11 10')
-    .lineWidth(1.8).lineCap('round').strokeColor('#F7F4EC').stroke();
-  doc.path('M11 7.5h6M11 20.5h6').lineWidth(1.3).lineCap('round').strokeColor('#F7F4EC').stroke();
-  doc.circle(23.2, 4.8, 2).fill('#FCC88A');
+    .lineWidth(1.8).lineCap('round').strokeColor('#FFFFFF').stroke();
+  doc.path('M11 7.5h6M11 20.5h6').lineWidth(1.3).lineCap('round').strokeColor('#FFFFFF').stroke();
+  doc.circle(23.2, 4.8, 2).fill('#E8A33D');
   doc.restore();
 }
 

@@ -72,8 +72,9 @@ app.get('/app.js', (req, res) => {
   try {
     const base = lireTexteStable(path.join(__dirname, '..', 'frontend', 'app.js'));
     const extra = lireTexteStable(path.join(__dirname, '..', 'frontend', 'session-extra.js'));
+    const langues = lireTexteStable(path.join(__dirname, '..', 'frontend', 'langues.js'));
     res.setHeader('Cache-Control', 'no-store');
-    res.type('application/javascript').send(base + '\n' + extra);
+    res.type('application/javascript').send(base + '\n' + extra + '\n' + langues);
   } catch (err) {
     res.status(503).type('text').send('/* Fichier temporairement indisponible. Rechargez la page. */');
   }

@@ -155,11 +155,11 @@ const NOMS_DISCIPLINES = {
   electrophorese: 'Électrophorèse', biologie_moleculaire: 'Biologie moléculaire', centrifugeuse: 'Pré-analytique'
 };
 const COULEURS_STATUT = [
-  ['valide', 'Validés', '#3F6F55'],
-  ['a_valider', 'À valider', '#D4A04A'],
-  ['a_revalider', 'À revalider', '#4A6FA5'],
-  ['signale', 'Signalés', '#C85A4A'],
-  ['brouillon', 'Brouillons', '#9A958A']
+  ['valide', 'Validés', '#1D7A55'],
+  ['a_valider', 'À valider', '#D08A1C'],
+  ['a_revalider', 'À revalider', '#2F63A6'],
+  ['signale', 'Signalés', '#C0392B'],
+  ['brouillon', 'Brouillons', '#9AA5B1']
 ];
 
 function actionPour(lot) {
@@ -195,8 +195,8 @@ router.get('/pdf', async (req, res) => {
 
     const doc = protegerTexte(new PDFDocument({ margin: 40, size: 'A4', bufferPages: true }));
     doc.pipe(res);
-    const LIGNE = '#DDD6C8';
-    const ROUGE = '#C85A4A';
+    const LIGNE = '#E1E6EB';
+    const ROUGE = '#C0392B';
     const emise = req.utilisateur
       ? `Émise par ${req.utilisateur.nom} (${req.utilisateur.role}) · ${formaterParis(s.genereLe)}`
       : `Générée le ${formaterParis(s.genereLe)}`;
@@ -265,7 +265,7 @@ router.get('/pdf', async (req, res) => {
     });
     parMois.forEach((n, i) => {
       const h = (n / maxM) * hG;
-      if (h) doc.roundedRect(xd + i * lb + 3, yb - h, lb - 6, h, 2).fill(i === 11 ? '#D4A04A' : SAGE);
+      if (h) doc.roundedRect(xd + i * lb + 3, yb - h, lb - 6, h, 2).fill(i === 11 ? '#D08A1C' : SAGE);
       if (n) doc.font('Helvetica').fontSize(6.5).fillColor(MUTED).text(String(n), xd + i * lb, yb - h - 9, { width: lb, align: 'center', lineBreak: false });
       doc.font('Helvetica').fontSize(6).fillColor(MUTED).text(lettres[Number(mois[i].slice(5)) - 1], xd + i * lb - 2, yb + 4, { width: lb + 4, align: 'center', lineBreak: false });
     });
@@ -290,7 +290,7 @@ router.get('/pdf', async (req, res) => {
       const wTot = 140 * v.lots / maxD;
       const wVal = 140 * v.valides / maxD;
       doc.font('Helvetica').fontSize(8).fillColor(INK).text(NOMS_DISCIPLINES[d] || d, 40, yd, { width: 92, lineBreak: false });
-      doc.roundedRect(134, yd + 1, wTot, 7.5, 2).fill('#E3ECE6');
+      doc.roundedRect(134, yd + 1, wTot, 7.5, 2).fill('#E7F0F3');
       if (wVal) doc.roundedRect(134, yd + 1, wVal, 7.5, 2).fill(SAGE);
       doc.font('Helvetica').fontSize(7.5).fillColor(MUTED)
         .text(`${v.valides}/${v.lots} · ${Math.round(100 * v.valides / v.lots)} %`, 134 + wTot + 6, yd, { lineBreak: false });
@@ -304,7 +304,7 @@ router.get('/pdf', async (req, res) => {
     const maint = machines.filter((m) => m.statut_service === 'maintenance');
     const hs = machines.filter((m) => m.statut_service === 'hors_service');
     // petite barre empilée du parc
-    const parts = [[enService, SAGE], [maint.length, '#D4A04A'], [hs.length, ROUGE]];
+    const parts = [[enService, SAGE], [maint.length, '#D08A1C'], [hs.length, ROUGE]];
     let xx = xd;
     for (const [n, c] of parts) {
       const w = ld * n / Math.max(1, machines.length);
@@ -319,7 +319,7 @@ router.get('/pdf', async (req, res) => {
       ym = doc.y + 4;
     };
     ligneM(SAGE, `${enService} en service`, '');
-    ligneM('#D4A04A', `${maint.length} en maintenance`, maint.length ? ` : ${maint.map((m) => m.nom).join(', ')}` : '');
+    ligneM('#D08A1C', `${maint.length} en maintenance`, maint.length ? ` : ${maint.map((m) => m.nom).join(', ')}` : '');
     ligneM(ROUGE, `${hs.length} hors service`, hs.length ? ` : ${hs.map((m) => m.nom).join(', ')}` : '');
 
     // 5. À traiter en priorité

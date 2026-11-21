@@ -284,7 +284,7 @@ router.get('/:psn/pdf', async (req, res) => {
       .fillColor(pdf.MUTED)
       .text('Aucun nom, prénom ni date de naissance sur ce document.', 300, 152, { width: 245, align: 'right' });
     doc.font('Helvetica-Bold').fontSize(11).fillColor(pdf.INK).text('Mesures', 40, 204);
-    const couleur = { normal: pdf.SAGE, 'trop bas': '#D4A04A', 'trop haut': '#C85A4A' };
+    const couleur = { normal: '#1D7A55', 'trop bas': '#D08A1C', 'trop haut': '#C0392B' };
     let y = lignes.length
       ? pdf.tableauSimple(doc, [
         { label: 'Date', w: 1.2 },
@@ -301,7 +301,7 @@ router.get('/:psn/pdf', async (req, res) => {
           m.seuil_bas != null || m.seuil_haut != null
             ? `${m.seuil_bas != null ? String(m.seuil_bas).replace('.', ',') : '…'} – ${m.seuil_haut != null ? String(m.seuil_haut).replace('.', ',') : '…'}`
             : 'aucune règle',
-          { point: couleur[m.interpretation] || '#9A958A', texte: m.interpretation },
+          { point: couleur[m.interpretation] || '#9AA5B1', texte: m.interpretation },
           m.lot_nom
         ]
       })), 222)
