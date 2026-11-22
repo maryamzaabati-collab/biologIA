@@ -123,7 +123,7 @@
         <div><b>${compact(s.examens_total)}</b><span>analyses</span></div>
         <div><b>${nombre(s.population)}</b><span>habitants (INSEE)</span></div>
         <div><b>${s.indice_qualite}/100</b><span>note qualité</span></div>
-        <div><b>${s.derives}</b><span>panne(s)</span></div>
+        <div><b>${s.derives}</b><span>${s.derives > 1 ? 'pannes' : 'panne'}</span></div>
       </div>
       ${recoit.length ? `<p class="hint">Reçoit les analyses spécialisées de : ${recoit.map(esc).join(', ')}.</p>` : ''}
       <h3 style="margin-top:14px">Ses machines : note de fiabilité par analyse</h3><p class="hint">De la moins fiable à la plus fiable. Cliquez pour voir les contrôles.</p>
@@ -152,7 +152,7 @@
       max: Math.max(...r.par_analyte.map((a) => Math.max(a.part_reseau, a.part_nationale))),
       lignes: r.par_analyte.map((a) => ({
         libelle: a.libelle, valeur: a.part_reseau, valeur2: a.part_nationale,
-        texte: `${nombre(a.part_reseau, 1)} % · ${nombre(a.part_nationale, 1)} %`,
+        texte: `${nombre(a.part_reseau)} % · ${nombre(a.part_nationale)} %`,
         titre: `${a.libelle} (code ${a.nabm}) : ${nombre(a.examens)} analyses dans le réseau en 2026, ${nombre(a.actes_nationaux_s1_2026)} en France au 1er semestre 2026`
       }))
     });
@@ -286,7 +286,7 @@
     document.getElementById('titre-lj').textContent = `Les contrôles de la machine — ${p ? p.ville + ' · ' + p.analyte_libelle : ''}`;
     G.leveyJennings(document.getElementById('lj'), { points, derive: r.derive });
     const rejets = points.filter((x) => x.rejet).length / 2;
-    document.getElementById('lj-info').innerHTML = `${nombre(points.length / 2)} jours de contrôle · ${nombre(rejets)} alerte(s)
+    document.getElementById('lj-info').innerHTML = `${nombre(points.length / 2)} jours de contrôle · ${nombre(rejets)} ${rejets > 1 ? 'alertes' : 'alerte'}
       ${p ? ` · note de fiabilité ${nombre(p.sigma, 1)} (${esc(p.niveau_sigma)})` : ''}
       ${r.derive ? ` · <b>Panne</b> : ${esc(LIB_TYPE[r.derive.type]).toLowerCase()}, commencée le ${fdate(r.derive.debut)}, repérée le ${fdate(r.derive.detection)}.` : ''}`;
   }
@@ -389,7 +389,7 @@
       ? parSite.map((x) => {
         const p = perfBiais(x.site);
         return `<div class="alerte-ligne"><span class="badge douteux">Toujours à côté</span>
-          <b>${esc(ville(x.site))}</b> mesure ${x.moy > 0 ? 'trop haut' : 'trop bas'} presque chaque mois${p ? ` (environ ${nombre(Math.abs(p.biais), 1)} % ${x.moy > 0 ? 'de trop' : 'de moins'})` : ''}.
+          <b>${esc(ville(x.site))}</b> mesure ${x.moy > 0 ? 'trop haut' : 'trop bas'} presque chaque mois${p ? ` (environ ${nombre(Math.abs(p.biais))} % ${x.moy > 0 ? 'de trop' : 'de moins'})` : ''}.
           ${p ? `Note de fiabilité : ${nombre(p.sigma, 1)}. ` : ''}À faire : refaire le réglage de la machine avec le fabricant.</div>`;
       }).join('')
       : '<p class="hint">Pour cette analyse, tous les laboratoires sont d’accord entre eux. ✔</p>';

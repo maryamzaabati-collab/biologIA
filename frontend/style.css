@@ -1770,3 +1770,14 @@ html[data-theme="sombre"] .page-connexion .landing-gauche { background: linear-g
 .liste-controles .pastille { flex: 0 0 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .75rem; font-weight: 700; color: #fff; background: var(--ok); }
 .liste-controles li.ko .pastille { background: var(--flag); }
 .actions .choix-fichier { margin: 0; display: inline-flex; align-items: center; }
+
+/* Accueil : bloc « À traiter » */
+.a-traiter { display: flex; flex-direction: column; }
+.a-traiter-ligne { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.a-traiter-ligne:last-child { border-bottom: 0; }
+.a-traiter-ligne:hover { background: var(--panel-2); }
+.a-traiter-ligne b { font-size: 1.6rem; font-weight: 700; }
+.a-traiter-ligne b.attente { color: var(--wait); }
+.a-traiter-ligne b.alerte { color: var(--flag); }
+.a-traiter-ligne b.zero { color: var(--ok); }
+.a-traiter-ligne .fleche { color: var(--ink-soft); font-size: 1.4rem; }

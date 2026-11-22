@@ -100,7 +100,7 @@ async function chargerMachines() {
       if (etatF && (m.statut_service || 'en_service') !== etatF) return false;
       return true;
     }).sort((a, b) => (Number(b.nb_lots) || 0) - (Number(a.nb_lots) || 0));
-    document.getElementById('compte-machines').textContent = `${machines.length} machine(s) affichée(s) sur ${toutes.length}.`;
+    document.getElementById('compte-machines').textContent = `${machines.length} machine${machines.length > 1 ? 's' : ''} sur ${toutes.length}.`;
     if (!machines.length) {
       conteneur.innerHTML = '<p class="empty">Aucune machine ne correspond à ces filtres.</p>';
       return;

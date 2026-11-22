@@ -35,7 +35,6 @@
 
     <!-- 1. En bref -->
     <section data-panneau="ensemble">
-      <div class="en-clair"><b>En clair :</b> biologIA, c’est le <b>carnet de santé</b> des machines et des données d’un réseau de laboratoires. Il vérifie chaque jour que les machines mesurent juste et, si l’une se trompe, il dit tout de suite quelles données refaire.</div>
       <div id="kpis" class="stats-row kpis-reseau"></div>
       <div class="dash-2">
         <div class="card carte-impact">
@@ -68,11 +67,10 @@
 
     <!-- 2. Carte -->
     <section data-panneau="carte" hidden>
-      <div class="en-clair"><b>En clair :</b> chaque rond est un laboratoire. Plus il est gros, plus il fait d’analyses. <span class="pastille vert">vert</span> tout va bien, <span class="pastille orange">orange</span> à surveiller, <span class="pastille rouge">rouge</span> problème. Cliquez sur un rond.</div>
       <div class="carte-grille">
         <div class="card">
           <div id="carte" class="carte-reseau"></div>
-          <p class="hint">Les pointillés relient les petits laboratoires au gros laboratoire (« plateau technique ») qui fait leurs analyses spécialisées.</p>
+          <p class="hint">Pointillés : lien vers le plateau technique qui fait les analyses spécialisées.</p>
         </div>
         <div class="card" id="fiche-site"><p class="empty">Cliquez sur un laboratoire de la carte.</p></div>
       </div>
@@ -80,16 +78,15 @@
 
     <!-- 3. Activité -->
     <section data-panneau="activite" hidden>
-      <div class="en-clair"><b>En clair :</b> combien d’analyses le réseau fait, lesquelles, combien elles coûtent à l’Assurance Maladie, et à quoi ressemblent les résultats des patients.</div>
       <div class="card">
         <h2>Nombre d’analyses par mois</h2>
-        <p class="hint">Janvier 2025 → octobre 2026. Le creux d’août revient chaque année : ce sont les vacances.</p>
+        <p class="hint">Janvier 2025 → octobre 2026.</p>
         <div id="g-mois" class="g-boite"></div>
       </div>
       <div class="grid-2" style="margin-top:14px">
         <div class="card">
           <h2>Quelles analyses ? Réseau comparé à la France</h2>
-          <p class="hint">Si nos chiffres sont cohérents, les deux barres se ressemblent. Barre colorée : notre réseau en 2026. Trait gris : France entière (vrais chiffres de l’Assurance Maladie).</p>
+          <p class="hint">Barre : notre réseau en 2026. Trait gris : France entière (Assurance Maladie).</p>
           <div id="g-analytes"></div>
         </div>
         <div class="card">
@@ -104,7 +101,7 @@
         <div class="titre-ligne"><h2>Résultats des patients (anonymisés)</h2>
           <div class="filtres-inline"><select id="res-analyte"></select></div>
         </div>
-        <p class="hint">Un échantillon de résultats, sans aucun nom : seulement un code (PSN-…), le sexe et une tranche d’âge. En vert les résultats normaux, en orange trop bas, en rouge trop hauts.</p>
+        <p class="hint">Échantillon anonymisé. Vert : normal · orange : trop bas · rouge : trop haut.</p>
         <div class="resultats-grille">
           <div><div id="g-hist" class="g-boite"></div><div id="res-chiffres" class="mini-stats"></div></div>
           <div id="res-groupes"></div>
@@ -115,39 +112,38 @@
 
     <!-- 4. Machines -->
     <section data-panneau="machines" hidden>
-      <div class="en-clair"><b>En clair :</b> chaque machine reçoit une <b>note de fiabilité</b> (le « Sigma ») pour chaque analyse. C’est comme une note sur 6 : <b>6 et plus</b> = excellent, <b>moins de 3</b> = la machine se trompe trop souvent, il faut agir.</div>
+      <p class="hint">Note de fiabilité (Sigma) de chaque machine pour chaque analyse : 6 et plus = excellent, moins de 3 = trop d’erreurs.</p>
       <div class="card">
         <div class="titre-ligne"><h2>La note de chaque analyse, dans chaque laboratoire</h2>
           <div class="g-legende"><span><i style="background:var(--ok)"></i>6 et +</span><span><i style="background:color-mix(in srgb, var(--ok) 70%, var(--panel))"></i>5–6</span><span><i style="background:color-mix(in srgb, var(--wait) 55%, var(--panel))"></i>4–5</span><span><i style="background:var(--wait)"></i>3–4</span><span><i style="background:var(--flag)"></i>moins de 3</span></div>
         </div>
-        <p class="hint">Une case vide = l’analyse est faite dans un autre laboratoire. Cliquez sur une case pour voir les contrôles de la machine jour par jour.</p>
+        <p class="hint">Cliquez sur une case pour voir les contrôles de la machine.</p>
         <div id="heatmap-sigma" class="heatmap"></div>
       </div>
       <div class="card" style="margin-top:14px" id="bloc-lj">
         <div class="titre-ligne"><h2 id="titre-lj">Les contrôles de la machine, jour par jour</h2>
           <div class="filtres-inline"><select id="lj-analyseur"></select><select id="lj-analyte"></select><select id="lj-periode"><option value="90">3 mois</option><option value="180">6 mois</option><option value="680">Tout</option></select></div>
         </div>
-        <p class="hint">Chaque point = un contrôle. Au milieu (ligne « cible »), la machine mesure parfaitement. Plus un point s’éloigne, plus elle se trompe. Un point rouge = alerte.</p>
+        <p class="hint">Un point = un contrôle. Point rouge = alerte.</p>
         <div id="lj" class="g-boite"></div>
         <div id="lj-info" class="hint"></div>
       </div>
       <details class="card" style="margin-top:14px">
         <summary><b>Pour aller plus loin : ce qu’il faut faire, machine par machine</b></summary>
-        <p class="hint">Recommandation automatique selon la note (méthode « Westgard Sigma Rules ») : une machine très fiable peut être contrôlée moins souvent, une machine fragile plus souvent.</p>
+        <p class="hint">Fréquence de contrôle conseillée selon la note de chaque machine.</p>
         <div id="table-perf"></div>
       </details>
     </section>
 
     <!-- 5. Alertes -->
     <section data-panneau="alertes" hidden>
-      <div class="en-clair"><b>En clair :</b> une <b>panne de mesure</b> (on dit « dérive »), c’est une machine qui se met à mesurer faux sans que personne ne le remarque. biologIA la voit en quelques jours au lieu d’un mois, et dit quelles données refaire.</div>
       <div id="resume-alertes" class="stats-row kpis-reseau"></div>
       <div id="liste-derives"></div>
       <div class="card" style="margin-top:14px">
         <div class="titre-ligne"><h2>Un laboratoire qui mesure toujours un peu à côté</h2>
           <div class="filtres-inline"><select id="eeq-analyte"></select></div>
         </div>
-        <p class="hint">Chaque mois, tous les laboratoires analysent <b>le même échantillon</b>, puis on compare leurs résultats. Si un labo est toujours à l’écart (cases rouges sur la même ligne), sa machine a un défaut de réglage. Son propre contrôle ne peut pas le voir, car elle se compare à elle-même.</p>
+        <p class="hint">Chaque mois, tous les labos analysent le même échantillon. Une ligne rouge = un labo toujours à l’écart.</p>
         <div id="heatmap-eeq" class="heatmap"></div>
         <div id="eeq-alertes" style="margin-top:12px"></div>
       </div>
@@ -155,14 +151,13 @@
 
     <!-- 6. Données -->
     <section data-panneau="donnees" hidden>
-      <div class="en-clair"><b>En clair :</b> toutes les données du site, prêtes à télécharger, avec ce qui est <b>vrai</b> (chiffres officiels) et ce qui est <b>simulé</b> (les vraies données des labos ne sont pas publiques).</div>
       <div class="card">
         <h2>D’où viennent les données ?</h2>
         <div id="sources"></div>
       </div>
       <div class="card" style="margin-top:14px">
         <h2>Les lots de référence</h2>
-        <p class="hint">Un lot = un paquet de résultats qui sert à fixer les limites « normal / anormal ». Chaque trimestre, chaque machine en produit un. Un biologiste doit le valider.</p>
+        <p class="hint">Un lot par machine et par trimestre, validé par un biologiste.</p>
         <div class="filtres">
           <select id="lots-site"><option value="">Tous les laboratoires</option></select>
           <select id="lots-analyte"><option value="">Toutes les analyses</option></select>
@@ -175,7 +170,7 @@
       </div>
       <div class="card" style="margin-top:14px">
         <h2>Tous les jeux de données</h2>
-        <p class="hint">Fichiers CSV « à la française » (séparateur « ; », décimales avec une virgule) : s’ouvrent directement dans Excel, et dans R avec read.csv2(). Cliquez sur un jeu pour voir ses colonnes.</p>
+        <p class="hint">CSV (séparateur « ; »), s’ouvre dans Excel.</p>
         <div id="jeux"></div>
       </div>
     </section>

@@ -104,11 +104,7 @@
 
     <section class="card panneau" id="panneau-anonymiser" hidden>
       <h2>Vérifier qu’un fichier est vraiment anonyme</h2>
-      <div class="en-clair"><b>À quoi ça sert ?</b> Quand le labo envoie des résultats à l’extérieur
-        (chercheurs, ARS, autre laboratoire), personne ne doit pouvoir retrouver un patient.
-        Ce vérificateur fonctionne comme le <b>portique de sécurité d’un aéroport</b> : il lit un fichier CSV,
-        le passe au contrôle et dit s’il peut partir ou non.
-        <b>Il n’importe rien et ne modifie aucun patient</b> : il lit, vérifie, puis donne un verdict.</div>
+      <p class="hint">Avant d’envoyer des résultats à l’extérieur (chercheurs, ARS…), on vérifie que personne ne peut être retrouvé. Rien n’est importé ni modifié.</p>
 
       <h3 class="anon-titre">1. Le fichier préparé par le labo</h3>
       <p class="hint">biologIA fabrique un fichier sans nom ni code patient : l’âge devient une tranche (ex. 30-44),
@@ -214,7 +210,7 @@ async function chargerIdentifiants() {
       document.getElementById('pagination-id').innerHTML = '';
       return;
     }
-    box.innerHTML = `<p class="hint">${data.total} patient(s). Cliquez sur « Voir » pour afficher ses mesures.</p>
+    box.innerHTML = `<p class="hint">${data.total} ${data.total > 1 ? 'patients' : 'patient'}.</p>
       <table class="table-audit"><thead><tr><th>PSN (code patient)</th>${bio ? '<th>Numéro</th>' : ''}<th class="num">Lots</th><th class="num">Mesures</th><th></th></tr></thead><tbody>
       ${data.identifiants.map((l) => `<tr>
         <td class="mono">${echap(l.psn)}</td>

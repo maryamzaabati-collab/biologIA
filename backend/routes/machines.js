@@ -137,7 +137,7 @@ router.delete('/:id', async (req, res) => {
     const { n } = await db.get('SELECT COUNT(*) AS n FROM lots WHERE machine_id = ?', [req.params.id]);
     if (n > 0) {
       return res.status(409).json({
-        erreur: `Impossible de supprimer : ${n} lot(s) sont encore rattachés à cette machine.`
+        erreur: `Impossible de supprimer : ${n} ${n > 1 ? 'lots sont encore rattachés' : 'lot est encore rattaché'} à cette machine.`
       });
     }
     await db.run('DELETE FROM machines WHERE id = ?', [req.params.id]);

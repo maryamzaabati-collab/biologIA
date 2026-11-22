@@ -25,8 +25,8 @@
     <h2 class="section-titre">Le contexte en chiffres (données publiques)</h2>
     <div class="chiffres">
       <div class="chiffre"><b>70 %</b><span>des démarches diagnostiques s’appuient sur la biologie médicale</span><small>Rapport IGF / IGAS, mai 2025</small></div>
-      <div class="chiffre"><b>588 M</b><span>actes de biologie remboursés en France de janvier à juin 2026 (1,9 Md€)</span><small>Assurance Maladie (Cnam), séries mensuelles 2026</small></div>
-      <div class="chiffre"><b>7,3</b><span>sites de laboratoire pour 100 000 habitants en moyenne en France</span><small>ARS Île-de-France, PRS 2023-2028 (source SI BIO2)</small></div>
+      <div class="chiffre"><b>588 M</b><span>actes de biologie remboursés en France de janvier à juin 2026 (1,9 milliard d’euros)</span><small>Assurance Maladie (Cnam), séries mensuelles 2026</small></div>
+      <div class="chiffre"><b>7</b><span>sites de laboratoire pour 100 000 habitants en France</span><small>ARS Île-de-France, PRS 2023-2028 (source SI BIO2)</small></div>
       <div class="chiffre"><b>100 %</b><span>des examens doivent être accrédités ISO 15189 par le Cofrac</span><small>Ordonnance n° 2010-49 du 13 janvier 2010</small></div>
     </div>
 
@@ -125,7 +125,7 @@
       <li>Biais systématiques entre sites invisibles (aucune vue réseau).</li>
       <li>Pour un auditeur : retrouver l’origine d’un seuil prend des heures, voire est impossible.</li>`;
     document.getElementById('avec').innerHTML = `
-      <li>Pannes repérées en <b>${String(r.delai_moyen_detection).replace('.', ',')} jour(s)</b> en moyenne : <b>${fr(r.resultats_exposes_avec)}</b> résultats concernés, soit <b>−${baisse} %</b>.</li>
+      <li>Pannes repérées en <b>${String(r.delai_moyen_detection).replace('.', ',')} jours</b> en moyenne : <b>${fr(r.resultats_exposes_avec)}</b> résultats concernés, soit <b>−${baisse} %</b>.</li>
       <li><b>${r.lots.a_revalider || 0}</b> lots de référence passés automatiquement « à revalider ».</li>
       <li><b>${r.eeq_hors_limites}</b> écarts inter-laboratoires détectés, dont des biais persistants expliqués.</li>
       <li>${fr(r.controles_qc)} contrôles qualité analysés ; chaque seuil est relié à son lot, sa machine et son validateur.</li>`;

@@ -13,7 +13,7 @@
   }
   function compact(n) {
     const v = Number(n || 0);
-    if (Math.abs(v) >= 1e6) return `${nombre(v / 1e6, 2)} M`;
+    if (Math.abs(v) >= 1e6) return `${nombre(v / 1e6, Math.abs(v) >= 1e7 ? 0 : 1).replace(/,0$/, '')} M`;
     if (Math.abs(v) >= 1e4) return `${nombre(v / 1e3, 0)} k`;
     return nombre(v);
   }

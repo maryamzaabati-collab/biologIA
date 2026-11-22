@@ -15,56 +15,22 @@
   </aside>
   <main>
     <h1>Bienvenue dans biologIA</h1>
-    <p class="page-intro" style="max-width:62ch">Pour chaque lot de mesures d’un laboratoire, on sait <strong>d’où il vient</strong>, <strong>quelle machine l’a produit</strong>, <strong>s’il est fiable</strong> et <strong>qui l’a validé</strong>.</p>
+    <p class="page-intro" style="max-width:62ch">Le suivi des lots de données et des machines du laboratoire de Nice.</p>
     <p id="erreur-page" class="message erreur" hidden></p>
     <div class="accueil-reseau">
       <div class="card">
-        <p class="sur-titre">Le problème</p>
-        <h2>Et si la machine d’analyse se trompait sans que personne ne le voie ?</h2>
-        <p class="hint">Les prises de sang servent à environ 70 % des diagnostics. Si une machine mesure faux pendant des semaines, des milliers de résultats partent faux, et on ne sait plus quelles données refaire.</p>
-        <p class="hint"><b>biologIA</b> surveille chaque machine tous les jours, garde la trace de chaque donnée et dit tout de suite quoi refaire.</p>
-        <a class="btn-link" href="apropos.html">Comprendre le problème</a>
+        <h2>À traiter</h2>
+        <div id="a-traiter" class="a-traiter"><p class="empty">Chargement…</p></div>
       </div>
       <div class="card">
-        <p class="sur-titre">Notre réseau en chiffres</p>
+        <h2>Notre réseau en chiffres</h2>
         <div id="reseau-accueil" class="mini-stats" style="grid-template-columns:1fr 1fr"><p class="empty">Chargement…</p></div>
         <a class="btn-link primary" href="reseau.html">Voir les 20 laboratoires</a>
       </div>
     </div>
-    <div class="cards" style="margin:18px 0">
-      <div class="card">
-        <div class="etape-num">1</div>
-        <h3>Saisir</h3>
-        <p class="hint">Un technicien enregistre un lot : machine, date, conditions de mesure et fichier de mesures.</p>
-      </div>
-      <div class="card">
-        <div class="etape-num">2</div>
-        <h3>Contrôler</h3>
-        <p class="hint">Le site vérifie tout seul : données complètes, aucun nom de patient, valeurs dans les seuils.</p>
-      </div>
-      <div class="card">
-        <div class="etape-num">3</div>
-        <h3>Valider</h3>
-        <p class="hint">Un biologiste valide ou signale le lot. Tout est tracé, daté et imprimable.</p>
-      </div>
-    </div>
-    <div class="dash-2">
-      <div class="card">
-        <h2>Où en est le laboratoire ?</h2>
-        <div id="anneaux" class="anneaux-ligne"><p class="empty">Chargement…</p></div>
-      </div>
-      <div class="card">
-        <h2>Les mots à connaître</h2>
-        <dl class="lexique">
-          <dt>Lot</dt><dd>une série de mesures d’une machine</dd>
-          <dt>PSN</dt><dd>code qui replace le nom du patient</dd>
-          <dt>Carte de contrôle</dt><dd>courbe qui montre si une machine dérive</dd>
-          <dt>Signalement</dt><dd>anomalie repérée automatiquement</dd>
-          <dt>Panne (dérive)</dt><dd>machine qui se met à mesurer faux</dd>
-          <dt>Sigma</dt><dd>note de fiabilité d’une machine (6 = excellent)</dd>
-          <dt>Plateau technique</dt><dd>gros labo qui fait les analyses spécialisées</dd>
-        </dl>
-      </div>
+    <div class="card" style="margin:18px 0">
+      <h2>Où en est le laboratoire ?</h2>
+      <div id="anneaux" class="anneaux-ligne"><p class="empty">Chargement…</p></div>
     </div>
     <div class="actions">
       <a class="btn-link primary" href="demo.html">Visite guidée (5 min)</a>
@@ -81,6 +47,14 @@
       api('/machines').catch(() => [])
     ]);
     const calOk = (machines || []).filter((m) => !m.calibration_a_renouveler).length;
+    const calKo = (machines || []).length - calOk;
+    const ligne = (n, libelle, href, ton) => `<a class="a-traiter-ligne" href="${href}">
+        <b class="${n ? ton : 'zero'}">${n}</b><span>${libelle}</span><span class="fleche" aria-hidden="true">›</span></a>`;
+    document.getElementById('a-traiter').innerHTML =
+      ligne(s.lotsAValider || 0, 'lots à valider', 'index.html?filtre=a_valider', 'attente')
+      + ligne(s.lotsARevalider || 0, 'lots à revalider après une panne', 'index.html?filtre=a_revalider', 'alerte')
+      + ligne(s.signalementsEnCours || 0, 'alertes ouvertes', 'signalements.html', 'alerte')
+      + ligne(calKo, 'machines à recalibrer', 'machines.html', 'attente');
     document.getElementById('anneaux').innerHTML =
       htmlAnneau((s.pourcentageValides || 0) + ' %', 'lots validés', s.pourcentageValides)
       + htmlAnneau((s.pourcentageAnonymises || 0) + ' %', 'pseudonymisés', s.pourcentageAnonymises)
@@ -95,7 +69,7 @@
       <div><b>${r.sites}</b><span>laboratoires en région Sud</span></div>
       <div><b>${(r.examens_total / 1e6).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} M</b><span>analyses (2025–2026)</span></div>
       <div><b>${fr(r.controles_qc)}</b><span>contrôles de machines</span></div>
-      <div><b>${r.derives}</b><span>pannes repérées en ${String(r.delai_moyen_detection).replace('.', ',')} j en moyenne</span></div>`;
+      <div><b>${r.derives}</b><span>pannes repérées, en ${String(r.delai_moyen_detection).replace('.', ',')} jours en moyenne</span></div>`;
   } catch { /* observatoire indisponible */ }
 })();
 </script>
