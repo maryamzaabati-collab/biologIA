@@ -117,14 +117,15 @@ function scannerContenuCsv(texte) {
     const cellules = cellulesLigne(lignes[i]);
     cellules.forEach((cellule, idx) => {
       const col = colonnes[idx] || `colonne ${idx + 1}`;
-      if (RE_NIR.test(cellule.replace(/\s/g, ''))) {
-        trouvailles.push(`NIR détecté dans ${col}`);
+      const estNir = RE_NIR.test(cellule.replace(/\s/g, ''));
+      if (estNir) {
+        trouvailles.push(`n° de sécurité sociale (NIR) trouvé dans « ${col} »`);
       }
       if (RE_EMAIL.test(cellule)) {
-        trouvailles.push(`E-mail détecté dans ${col}`);
+        trouvailles.push(`e-mail trouvé dans « ${col} »`);
       }
-      if (RE_TEL.test(cellule)) {
-        trouvailles.push(`Téléphone détecté dans ${col}`);
+      if (!estNir && RE_TEL.test(cellule)) {
+        trouvailles.push(`téléphone trouvé dans « ${col} »`);
       }
       if (/naiss/i.test(col) && /^\d{4}-\d{2}-\d{2}$/.test(cellule)) {
         trouvailles.push(`Date de naissance complète dans ${col}`);

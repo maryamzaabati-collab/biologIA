@@ -3,9 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<title>Démo jury — biologIA</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<title>Visite guidée — biologIA</title>
 <link rel="stylesheet" href="style.css">
+<style>
+  .visite { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; counter-reset: etape; }
+  .visite li { counter-increment: etape; display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: start;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 16px 18px; }
+  .visite li::before { content: counter(etape); width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+  .visite h3 { margin: 4px 0 4px; font-size: 1rem; }
+  .visite p { margin: 0; color: var(--ink-soft); font-size: .92rem; line-height: 1.5; }
+  .visite .duree { font-size: .75rem; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+  .visite .btn-link { white-space: nowrap; margin-top: 4px; }
+  .roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0 0 22px; }
+  .roles div { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 12px 14px; background: var(--panel); }
+  .roles code { font-size: .85rem; }
+  @media (max-width: 720px) { .visite li { grid-template-columns: 32px 1fr; } .visite .btn-link { grid-column: 2; justify-self: start; } }
+</style>
 </head>
 <body>
 <div class="layout">
@@ -16,21 +31,59 @@
   <main>
     <div class="page-head">
       <div>
-        <h1>Démo</h1>
-        <p class="page-intro">Parcours pédagogique (données fictives). samira / amrani / lea · labo2026</p>
+        <h1>Visite guidée</h1>
+        <p class="page-intro">Le chemin conseillé pour comprendre biologIA en 5 minutes, par exemple pendant la présentation.</p>
       </div>
     </div>
-    <ol class="card">
-      <li>Connexion technicien → créer ou ouvrir un lot → CSV sans identité.</li>
-      <li>Règle d’alerte : le technicien saisit, le biologiste valide (quatre yeux).</li>
-      <li>Mesure hors seuil → signalement listant les PSN concernés (pas un bilan patient).</li>
-      <li>Carte Levey-Jennings (≥ 20 points) + Westgard 1-3s, 2-2s, 4-1s, R-4s, 10x̄.</li>
-      <li>Onglet cohérence : scores complétude / cohérence / conformité.</li>
-      <li>Machine en maintenance : rattachement de lot refusé.</li>
-      <li>Journal d’audit (biologiste) : chaîne de hachage SHA-256.</li>
-      <li>Lots TEST exclus du tableau de bord et des cartes.</li>
+
+    <div class="en-clair"><b>À quoi sert cette page ?</b> Le site a beaucoup de pages. Celle-ci dit simplement
+      <b>dans quel ordre les regarder</b> et ce qu’il faut remarquer à chaque fois. Chaque bouton ouvre la bonne page ;
+      revenez ici avec le bouton « retour » du navigateur. Rien n’est modifié en suivant la visite.</div>
+
+    <h2 style="margin:22px 0 10px;font-size:1rem">Les deux comptes, et ce qu’ils peuvent faire</h2>
+    <div class="roles">
+      <div><b>Technicien</b> · <code>samira</code> / <code>labo2026</code><br>
+        <span class="hint">Enregistre les lots de mesures. Ne voit jamais les noms des patients.</span></div>
+      <div><b>Biologiste</b> · <code>amrani</code> / <code>labo2026</code><br>
+        <span class="hint">Valide ou refuse les lots, voit tout, signe les documents, gère les comptes.</span></div>
+    </div>
+
+    <ol class="visite">
+      <li><div><span class="duree">30 s</span><h3>Le problème</h3>
+        <p>Une machine d’analyse qui se dérègle, c’est comme une balance de cuisine faussée : tout ce qu’on mesure devient faux.
+          Lisez la question en haut et l’encadré « En une image ».</p></div>
+        <a class="btn-link" href="apropos.html">Ouvrir</a></li>
+
+      <li><div><span class="duree">1 min</span><h3>Les 20 laboratoires du réseau</h3>
+        <p>À regarder : les 4 chiffres du haut, le bloc « Ce que biologIA change » (combien de résultats faux évités)
+          et le classement des labos avec leur note sur 100.</p></div>
+        <a class="btn-link" href="reseau.html#ensemble">Ouvrir</a></li>
+
+      <li><div><span class="duree">1 min</span><h3>Une panne repérée</h3>
+        <p>Choisissez une machine : la courbe montre ses contrôles jour par jour. Quand les points sortent de la zone,
+          biologIA lance une alerte et retrouve les données faites pendant la panne.</p></div>
+        <a class="btn-link" href="reseau.html#alertes">Ouvrir</a></li>
+
+      <li><div><span class="duree">1 min</span><h3>Un lot de données</h3>
+        <p>Ouvrez n’importe quel lot. Sa <b>note de confiance sur 100</b> est expliquée critère par critère,
+          et les onglets montrent ses mesures, son historique et son certificat.</p></div>
+        <a class="btn-link" href="index.html">Ouvrir</a></li>
+
+      <li><div><span class="duree">30 s</span><h3>Les alertes du labo</h3>
+        <p>Les problèmes trouvés tout seuls par le site (information manquante, valeur hors limites…).
+          Seul un biologiste peut les clôturer, et chaque décision est enregistrée.</p></div>
+        <a class="btn-link" href="signalements.html">Ouvrir</a></li>
+
+      <li><div><span class="duree">1 min</span><h3>Les patients protégés</h3>
+        <p>Les noms sont remplacés par un code (PSN). Dans l’onglet ouvert, cliquez sur « Exemple piège » :
+          le site <b>refuse</b> un fichier qui contient encore des noms, et explique pourquoi.</p></div>
+        <a class="btn-link" href="patients.html?onglet=anonymiser">Ouvrir</a></li>
+
+      <li><div><span class="duree">30 s</span><h3>Les preuves à imprimer</h3>
+        <p>La fiche de synthèse en PDF, les certificats avec QR code et le parcours complet d’un lot :
+          ce qu’on montrerait à un auditeur.</p></div>
+        <a class="btn-link" href="documents.html">Ouvrir</a></li>
     </ol>
-    <p><a class="btn-link" href="accueil.html">Tableau de bord</a> <a class="btn-link" href="controle.html">Cartes de contrôle</a></p>
   </main>
 </div>
 <script src="app.js"></script>

@@ -24,7 +24,7 @@
       <button type="button" class="secondary actif" data-onglet="identifier">Identifier</button>
       <button type="button" class="secondary only-biologiste" data-onglet="creer">Créer</button>
       <button type="button" class="secondary" data-onglet="tester">Tester l’identification</button>
-      <button type="button" class="secondary" data-onglet="anonymiser">Anonymisation</button>
+      <button type="button" class="secondary" data-onglet="anonymiser">Vérifier un fichier anonyme</button>
       <button type="button" class="secondary" data-onglet="identifiants">Identifiants</button>
     </div>
     <p id="erreur-page" class="message erreur" hidden></p>
@@ -97,25 +97,43 @@
 
     <section class="card panneau" id="panneau-tester" hidden>
       <h2>Tester l’identification</h2>
-      <p class="hint">Rapport OK/KO exécuté sur le serveur (numéro, chiffre de contrôle, inconnu, accents, doublon, droits technicien).</p>
-      <button type="button" id="btn-tests">Lancer la suite de tests</button>
+      <p class="hint">Contrôle automatique que la recherche de patient marche bien : bon numéro, numéro faux, numéro inconnu, nom avec accents, doublon, et un technicien qui n’a pas le droit de voir les noms.</p>
+      <button type="button" id="btn-tests">Lancer les vérifications</button>
       <div id="rapport-tests"></div>
     </section>
 
     <section class="card panneau" id="panneau-anonymiser" hidden>
-      <h2>Anonymisation</h2>
-      <p class="hint">Table irréversible : tranche d’âge, sexe, territoire, paramètre, valeur. Les groupes k &lt; 5 sont généralisés puis exclus. Aucun PSN.</p>
-      <p id="statut-anon" class="hint">Aucun jeu généré. Cliquez sur Générer.</p>
+      <h2>Vérifier qu’un fichier est vraiment anonyme</h2>
+      <div class="en-clair"><b>À quoi ça sert ?</b> Quand le labo envoie des résultats à l’extérieur
+        (chercheurs, ARS, autre laboratoire), personne ne doit pouvoir retrouver un patient.
+        Ce vérificateur fonctionne comme le <b>portique de sécurité d’un aéroport</b> : il lit un fichier CSV,
+        le passe au contrôle et dit s’il peut partir ou non.
+        <b>Il n’importe rien et ne modifie aucun patient</b> : il lit, vérifie, puis donne un verdict.</div>
+
+      <h3 class="anon-titre">1. Le fichier préparé par le labo</h3>
+      <p class="hint">biologIA fabrique un fichier sans nom ni code patient : l’âge devient une tranche (ex. 30-44),
+        l’adresse devient un département, et les profils trop rares sont regroupés ou retirés.</p>
+      <p id="statut-anon" class="hint">Aucun fichier préparé pour l’instant.</p>
       <div class="actions">
-        <button type="button" class="only-biologiste" id="btn-generer-anon">Générer / régénérer</button>
-        <button type="button" class="secondary" id="btn-export-anon">Exporter CSV anonymisé</button>
-        <button type="button" class="secondary" id="btn-test-propre">Tester le jeu généré</button>
-        <button type="button" class="secondary" id="btn-test-piege">CSV piège (doit échouer)</button>
+        <button type="button" class="only-biologiste" id="btn-generer-anon">Préparer le fichier</button>
+        <button type="button" class="secondary" id="btn-test-propre">Le vérifier</button>
+        <button type="button" class="secondary" id="btn-export-anon">Le télécharger (CSV)</button>
       </div>
       <div id="resultat-anon"></div>
-      <label for="csv-anon">Ou coller un CSV</label>
-      <textarea id="csv-anon" rows="6" placeholder="tranche_age;sexe;territoire;parametre;valeur;unite;mois"></textarea>
-      <button type="button" class="secondary" id="btn-test-csv">Analyser ce CSV</button>
+
+      <h3 class="anon-titre">2. Vérifier votre propre fichier</h3>
+      <p class="hint">Choisissez un fichier .csv (séparateur ; ou ,) ou collez son contenu ci-dessous.
+        Pour qu’il soit vérifiable, il faut au moins les colonnes <code>tranche_age</code>, <code>sexe</code> et <code>territoire</code>.</p>
+      <div class="actions">
+        <label class="btn-link secondary choix-fichier">Choisir un fichier .csv
+          <input type="file" id="fichier-anon" accept=".csv,text/csv,text/plain" hidden></label>
+        <button type="button" class="secondary" id="btn-exemple-ok">Exemple correct</button>
+        <button type="button" class="secondary" id="btn-test-piege">Exemple piège (avec des noms)</button>
+      </div>
+      <p id="nom-fichier-anon" class="hint"></p>
+      <label for="csv-anon">Contenu du fichier</label>
+      <textarea id="csv-anon" rows="7" placeholder="tranche_age;sexe;territoire;parametre;valeur;unite;mois&#10;30-44;F;06;Glycémie à jeun;0,95;g/L;2026-03"></textarea>
+      <button type="button" id="btn-test-csv">Vérifier ce fichier</button>
       <div id="rapport-anon"></div>
     </section>
 
@@ -356,10 +374,10 @@ async function chargerStatutAnon() {
   try {
     const s = await api('/anonymisation/statut');
     document.getElementById('statut-anon').textContent = s.genere
-      ? `Dernier jeu : ${s.nb_lignes} lignes, k min = ${s.meta.k_min} (${s.meta.genere_le || ''})`
-      : 'Aucun jeu généré. Cliquez sur Générer.';
+      ? `Fichier prêt : ${Number(s.nb_lignes).toLocaleString('fr-FR')} résultats ; le profil le plus rare concerne ${s.meta.k_min} personnes (il en faut au moins 5).`
+      : 'Aucun fichier préparé pour l’instant.';
   } catch {
-    document.getElementById('statut-anon').textContent = 'Aucun jeu généré. Cliquez sur Générer.';
+    document.getElementById('statut-anon').textContent = 'Aucun fichier préparé pour l’instant.';
   }
 }
 chargerStatutAnon();
@@ -371,44 +389,51 @@ document.getElementById('btn-generer-anon').addEventListener('click', async () =
   try {
     const r = await api('/anonymisation/generer', { method: 'POST', body: '{}' });
     document.getElementById('resultat-anon').innerHTML =
-      `<p class="message ok">${r.nb_lignes} lignes · ${r.generalisees} généralisées · ${r.supprimees} exclues · k min = ${r.k_min}</p>`;
-    notifier('Jeu anonymisé généré', 'ok');
+      `<p class="message ok">Fichier préparé : ${r.nb_lignes} résultats gardés, ${r.generalisees} regroupés dans une catégorie plus large, ${r.supprimees} retirés car trop rares.</p>`;
+    notifier('Fichier anonyme préparé', 'ok');
     chargerStatutAnon();
   } catch (err) {
     document.getElementById('resultat-anon').innerHTML = `<p class="message erreur">${echap(err.message)}</p>`;
   }
 });
 
-function iconeControle(c) {
-  if (c.ok) return '✓';
-  if (/non testable|non applicable/i.test(c.detail || '')) return '⚠';
-  return '✗';
-}
+const LIBELLES_ANON = {
+  identifiants: 'Pas de nom, prénom, n° de sécurité sociale, e-mail ni téléphone',
+  dates: 'Pas de date de naissance complète',
+  k_anonymat: 'Chaque profil (âge + sexe + lieu) concerne au moins 5 personnes',
+  irreversible: 'Impossible de retrouver l’identité à partir du fichier',
+  colonnes: 'Aucune colonne qui désigne une personne (nom, numéro, PSN…)',
+  psn: 'Aucun code patient (PSN) dans les valeurs',
+  reidentification: 'Personne n’est reconnaissable en croisant âge, sexe et lieu'
+};
 function afficherRapportAnon(r) {
   const statut = r.statut || (r.ok ? 'conforme' : 'non_conforme');
-  const titre = statut === 'conforme' ? 'Conforme' : (statut === 'non_testable' ? 'Non testable' : 'Non conforme');
-  const cls = statut === 'conforme' ? 'ok' : 'erreur';
-  const okN = (r.controles || []).filter((c) => c.ok).length;
-  const tot = (r.controles || []).length;
+  const verdict = {
+    conforme: ['ok', '✓ Ce fichier peut être partagé', 'Aucun patient ne peut être retrouvé.'],
+    non_conforme: ['erreur', '✗ Ce fichier ne doit pas être partagé', 'Corrigez les points en rouge ci-dessous, puis vérifiez à nouveau.'],
+    non_testable: ['attention', '⚠ Impossible de vérifier ce fichier', 'Il manque des lignes, ou les colonnes tranche_age, sexe et territoire.']
+  }[statut] || ['erreur', statut, ''];
+  const ctrls = r.controles || [];
+  const okN = ctrls.filter((c) => c.ok).length;
   const html = `
-    <div class="page-head" style="margin:0 0 8px"><h2>Dernier test d’anonymisation</h2>
-      <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${okN} sur ${tot || 0}</span></div>
-    <ul class="lexique" style="list-style:none;padding:0;margin:0">${(r.controles || []).map((c) =>
-      `<li style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)">
-        <span>${echap(c.libelle)}</span><strong>${c.ok ? 'ok' : iconeControle(c)}</strong></li>`).join('')}</ul>
-    <p class="message ${cls}">${titre}${tot ? ` — ${okN} sur ${tot} contrôles réussis` : ''}</p>`;
+    <div class="verdict-anon ${verdict[0]}"><strong>${verdict[1]}</strong><span>${verdict[2]} (${okN} sur ${ctrls.length} contrôles réussis)</span></div>
+    <ul class="liste-controles">${ctrls.map((c) => `
+      <li class="${c.ok ? 'ok' : 'ko'}"><span class="pastille">${c.ok ? '✓' : '✗'}</span>
+        <div><span>${echap(LIBELLES_ANON[c.code] || c.libelle)}</span>
+        ${c.ok ? '' : `<small>${echap(c.detail || '')}</small>`}</div></li>`).join('')}</ul>`;
   const rapport = document.getElementById('rapport-anon');
-  if (rapport) rapport.innerHTML = html;
-  // Dans l'onglet « Identifier », une seule ligne de rappel : le détail du test
-  // appartient à l'onglet « Anonymisation », pas à la recherche d'un patient.
+  if (rapport) {
+    rapport.innerHTML = html;
+    if (rapport.offsetParent) rapport.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
   const resume = document.getElementById('dernier-test-anon');
   if (resume) {
     resume.innerHTML = `
       <div class="page-head" style="margin:0">
-        <span class="hint" style="margin:0">Dernier test d’anonymisation</span>
-        <span class="badge ${cls === 'ok' ? 'ok' : 'douteux'}">${titre}</span>
+        <span class="hint" style="margin:0">Dernière vérification d’un fichier anonyme</span>
+        <span class="badge ${statut === 'conforme' ? 'ok' : 'douteux'}">${statut === 'conforme' ? 'Partageable' : (statut === 'non_testable' ? 'Non vérifiable' : 'Non partageable')}</span>
       </div>
-      <p class="hint" style="margin:8px 0 0">${okN} sur ${tot || 0} contrôles réussis.
+      <p class="hint" style="margin:8px 0 0">${okN} sur ${ctrls.length} contrôles réussis.
         <button type="button" class="lien-discret" data-va-onglet="anonymiser">Voir le détail</button></p>`;
     resume.querySelector('[data-va-onglet]')?.addEventListener('click', () => {
       montrerOnglet('anonymiser');
@@ -438,10 +463,43 @@ document.getElementById('btn-test-propre').addEventListener('click', async () =>
   catch (err) { afficherMessage('erreur-page', err.message); }
 });
 document.getElementById('btn-test-piege').addEventListener('click', async () => {
-  try { afficherRapportAnon(await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'piege' }) })); }
-  catch (err) { afficherMessage('erreur-page', err.message); }
+  try {
+    const r = await api('/anonymisation/tester', { method: 'POST', body: JSON.stringify({ source: 'piege' }) });
+    if (r.csv_texte) document.getElementById('csv-anon').value = r.csv_texte.replace(/^\uFEFF/, '');
+    document.getElementById('nom-fichier-anon').textContent = 'Exemple piège : un fichier qui contient encore des noms et des numéros de sécurité sociale.';
+    afficherRapportAnon(r);
+  } catch (err) { afficherMessage('erreur-page', err.message); }
+});
+document.getElementById('btn-exemple-ok').addEventListener('click', () => {
+  const profils = [['30-44', 'F', '06'], ['30-44', 'M', '06'], ['45-59', 'F', '83']];
+  const lignes = ['tranche_age;sexe;territoire;parametre;valeur;unite;mois'];
+  profils.forEach(([a, sx, t], i) => {
+    for (let n = 0; n < 6; n++) lignes.push(`${a};${sx};${t};Glycémie à jeun;${(0.86 + ((i * 6 + n) % 9) * 0.02).toFixed(2).replace('.', ',')};g/L;2026-0${1 + (n % 6)}`);
+  });
+  document.getElementById('csv-anon').value = lignes.join('\n');
+  document.getElementById('nom-fichier-anon').textContent = 'Exemple correct : 18 résultats, 3 profils de 6 personnes chacun. Cliquez sur « Vérifier ce fichier ».';
+  document.getElementById('rapport-anon').innerHTML = '';
+});
+document.getElementById('fichier-anon').addEventListener('change', (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const info = document.getElementById('nom-fichier-anon');
+  if (f.size > 1500000) { info.textContent = 'Fichier trop gros (1,5 Mo maximum pour la démonstration).'; return; }
+  const lecteur = new FileReader();
+  lecteur.onload = () => {
+    document.getElementById('csv-anon').value = String(lecteur.result).replace(/^\uFEFF/, '');
+    const n = String(lecteur.result).split(/\r?\n/).filter((l) => l.trim()).length;
+    info.textContent = `Fichier chargé : ${f.name} (${Math.max(0, n - 1)} lignes de données). Cliquez sur « Vérifier ce fichier ».`;
+    document.getElementById('rapport-anon').innerHTML = '';
+  };
+  lecteur.readAsText(f, 'utf-8');
+  e.target.value = '';
 });
 document.getElementById('btn-test-csv').addEventListener('click', async () => {
+  if (!document.getElementById('csv-anon').value.trim()) {
+    document.getElementById('nom-fichier-anon').textContent = 'Choisissez d’abord un fichier, ou cliquez sur « Exemple correct ».';
+    return;
+  }
   try {
     afficherRapportAnon(await api('/anonymisation/tester', {
       method: 'POST',

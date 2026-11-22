@@ -144,7 +144,7 @@ function enrichirRapport(csvTexte, identites = []) {
       groupes.set(cle, (groupes.get(cle) || 0) + 1);
     }
   }
-  const petits = [...groupes.entries()].filter(([, n]) => n < 5).map(([k, n]) => `${k} (${n})`);
+  const petits = [...groupes.entries()].filter(([, n]) => n < 5).map(([k, n]) => { const [a, sx, t] = k.split('|'); return `${a} ans, ${sx === 'F' ? 'femme' : sx === 'M' ? 'homme' : sx}, ${t} (${n} personne${n > 1 ? 's' : ''})`; });
   const kMin = groupes.size ? Math.min(...groupes.values()) : null;
 
   const kCtrl = base.controles.find((c) => c.code === 'k_anonymat');
@@ -155,7 +155,7 @@ function enrichirRapport(csvTexte, identites = []) {
       ? 'CSV sans lignes de données — test non testable'
       : 'Colonnes tranche d’âge, sexe et territoire absentes — test non testable';
   } else if (kCtrl && petits.length) {
-    kCtrl.detail = `k minimum : ${kMin}. Groupes < 5 : ${petits.slice(0, 8).join(' ; ')}`;
+    kCtrl.detail = `Profils trop rares, donc reconnaissables : ${petits.slice(0, 6).join(' ; ')}${petits.length > 6 ? ` et ${petits.length - 6} autres` : ''}. Regroupez-les ou retirez-les.`;
     kCtrl.ok = false;
   } else if (kCtrl && kMin != null) {
     kCtrl.detail = `k minimum observé : ${kMin}`;
@@ -176,7 +176,7 @@ function enrichirRapport(csvTexte, identites = []) {
     code: 'colonnes',
     ok: !aPsn,
     libelle: 'Aucune colonne identifiante (nom, prénom, numéro, NIR, PSN)',
-    detail: aPsn ? `Colonnes : ${cols.join(', ')}` : `Colonnes contrôlées : ${cols.join(', ') || 'aucune'}`
+    detail: aPsn ? `Colonnes à supprimer : ${cols.filter((c) => /psn|code_patient|numero_patient|nir|nom|prenom/.test(c)).join(', ')}` : `Colonnes contrôlées : ${cols.join(', ') || 'aucune'}`
   });
   base.controles.push({
     code: 'psn',
@@ -188,7 +188,7 @@ function enrichirRapport(csvTexte, identites = []) {
     code: 'reidentification',
     ok: reident === 0,
     libelle: 'Test de ré-identification (âge + sexe + territoire → un seul candidat)',
-    detail: `${reident} ligne(s) n’ont qu’un seul candidat dans patients_identite (doit être 0)`
+    detail: reident ? `${reident} ligne(s) correspondent à une seule personne connue du labo : on pourrait deviner de qui il s’agit.` : 'Aucune ligne ne correspond à une seule personne.'
   });
 
   const nonTestable = nbDonnees === 0 || iAge < 0 || iSexe < 0 || iTer < 0;
