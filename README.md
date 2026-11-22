@@ -1,6 +1,6 @@
-# biologIA — registre de traçabilité
+# biologIA :registre de traçabilité
 
-Projet 4 BUT Science des Données (Biologie / Laboratoires). Application web pour tracer l’origine et la qualité des **lots de données de référence** : machines, conditions de mesure, pseudonymisation, signalements, validation biologiste, cartes de contrôle, certificat, lignée et journal d’audit.
+Projet BUT Science des Données (Biologie / Laboratoires). Application web pour tracer l’origine et la qualité des **lots de données de référence** : machines, conditions de mesure, pseudonymisation, signalements, validation biologiste, cartes de contrôle, certificat, lignée et journal d’audit.
 
 Aucun dossier patient réel n’est stocké ni interprété.
 
